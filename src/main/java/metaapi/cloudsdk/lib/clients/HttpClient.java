@@ -1,16 +1,18 @@
 package metaapi.cloudsdk.lib.clients;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.async.Callback;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mashape.unirest.request.HttpRequest;
 import com.mashape.unirest.request.HttpRequestWithBody;
+import com.mashape.unirest.request.body.MultipartBody;
 
+import metaapi.cloudsdk.lib.clients.HttpRequestOptions.FileStreamField;
 import metaapi.cloudsdk.lib.clients.errorHandler.*;
 import metaapi.cloudsdk.lib.clients.errorHandler.InternalError;
 
@@ -38,13 +40,15 @@ public class HttpClient {
     /**
      * Does the same as {@link #request(HttpRequestOptions)} but automatically converts response into json.
      * If there is a json parsing error, completes exceptionally with {@link JsonProcessingException}.
+     * @param options request options
+     * @param valueType class into which the response will be transformed
      * @return completable future with request results as json
      */
-    public CompletableFuture<JsonNode> requestJson(HttpRequestOptions options) throws Exception {
-        CompletableFuture<JsonNode> result = new CompletableFuture<>();
+    public <T> CompletableFuture<T> requestJson(HttpRequestOptions options, Class<T> valueType) throws Exception {
+        CompletableFuture<T> result = new CompletableFuture<>();
         request(options).thenAccept((response) -> {
             try {
-                result.complete(JsonMapper.getInstance().readTree(response));
+                result.complete(JsonMapper.getInstance().readValue(response, valueType));
             } catch (JsonProcessingException e) {
                 result.completeExceptionally(e);
             }
@@ -73,10 +77,19 @@ public class HttpClient {
                 String jsonString = JsonMapper.getInstance().writeValueAsString(options.getBodyJson().get());
                 request = bodyRequest.body(jsonString).getHttpRequest().header("content-type", "application/json");
             } else if (options.getBodyFields().isPresent()) {
-                request = bodyRequest.fields(options.getBodyFields().get()).getHttpRequest();
-            } else {
-                request = bodyRequest.getHttpRequest();
-            }
+                Map<String, Object> fields = options.getBodyFields().get();
+                if (fields.isEmpty()) request = bodyRequest.getHttpRequest();
+                else {
+                    MultipartBody multipartBody = bodyRequest.fields(null);
+                    fields.forEach((name, value) -> {
+                        if (value instanceof FileStreamField) {
+                            FileStreamField fileField = (FileStreamField) value;
+                            multipartBody.field(name, fileField.getStream(), fileField.getFileName());
+                        } else multipartBody.field(name, value);
+                    });
+                    request = multipartBody.getHttpRequest();
+                }
+            } else request = bodyRequest.getHttpRequest();
         }
         
         request
