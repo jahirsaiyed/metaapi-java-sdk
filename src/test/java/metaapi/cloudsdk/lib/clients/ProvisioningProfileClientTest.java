@@ -33,7 +33,7 @@ class ProvisioningProfileClientTest {
     private static HttpClientMock httpClient;
     
     @BeforeAll
-    static void setUpBeforeClass() throws Exception {
+    static void setUpBeforeClass() {
         httpClient = new HttpClientMock((opts) -> CompletableFuture.completedFuture("empty"));
         provisioningClient = new ProvisioningProfileClient(httpClient, "token");
     }
