@@ -3,7 +3,7 @@ package metaapi.cloudsdk.lib.clients.errorHandler;
 /**
  * Represents unexpected error. Throwing this error results in 500 (Internal Error) HTTP response code.
  */
-public class InternalError extends ApiError {
+public class InternalException extends ApiException {
     
     private static final long serialVersionUID = 1L;
 
@@ -11,7 +11,7 @@ public class InternalError extends ApiError {
      * Constructs unexpected error.
      * @param message error message
      */
-    public InternalError(String message) {
+    public InternalException(String message) {
         super(message, 500);
     }
 }

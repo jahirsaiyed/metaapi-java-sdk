@@ -2,7 +2,9 @@ package metaapi.cloudsdk.lib.clients;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -46,14 +48,14 @@ public class ProvisioningProfileClient {
      * @param status optional status filter (allowed values are new and active)
      * @return completable future resolving with provisioning profiles found
      */
-    public CompletableFuture<ProvisioningProfileDto[]> getProvisioningProfiles(
+    public CompletableFuture<List<ProvisioningProfileDto>> getProvisioningProfiles(
         Optional<Integer> version, Optional<String> status
     ) throws Exception {
         HttpRequestOptions opts = new HttpRequestOptions(host + "/users/current/provisioning-profiles", Method.GET);
         if (version.isPresent()) opts.getQueryParameters().put("version", version.get());
         if (status.isPresent()) opts.getQueryParameters().put("status", status.get());
         opts.getHeaders().put("auth-token", token);
-        return httpClient.requestJson(opts, ProvisioningProfileDto[].class);
+        return httpClient.requestJson(opts, ProvisioningProfileDto[].class).thenApply(array -> Arrays.asList(array));
     }
     
     /**

@@ -3,7 +3,7 @@ package metaapi.cloudsdk.lib.clients.errorHandler;
 /**
  * Throwing this error results in 401 (Unauthorized) HTTP response code.
  */
-public class UnauthorizedError extends ApiError {
+public class UnauthorizedException extends ApiException {
 
     private static final long serialVersionUID = 1L;
     
@@ -11,7 +11,7 @@ public class UnauthorizedError extends ApiError {
      * Constructs unauthorized error.
      * @param message error message
      */
-    public UnauthorizedError(String message) {
+    public UnauthorizedException(String message) {
         super(message, 401);
     }
 }

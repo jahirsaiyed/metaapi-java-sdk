@@ -51,7 +51,7 @@ public class HttpClientTest {
      */
     @Test
     public void testReturnsNotFoundIfServerReturns404() {
-        assertThrows(NotFoundError.class, () -> {
+        assertThrows(NotFoundException.class, () -> {
             HttpRequestOptions opts = new HttpRequestOptions("http://example.com/not-found", Method.GET);
             try {
                 httpClient.request(opts).get(10000, TimeUnit.MILLISECONDS);

@@ -4,6 +4,17 @@ package metaapi.cloudsdk.lib.clients.models;
  * MetaTrader account model
  */
 public class MetatraderAccountDto {
+    
+    /**
+     * Account deployment state enum
+     */
+    public enum DeploymentState { CREATED, DEPLOYING, DEPLOYED, UNDEPLOYING, UNDEPLOYED, DELETING }
+    
+    /**
+     * Terminal & broker connection status enum
+     */
+    public enum ConnectionStatus { CONNECTED, DISCONNECTED, DISCONNECTED_FROM_BROKER }
+    
     /**
      * Account unique identifier
      */
@@ -47,13 +58,13 @@ public class MetatraderAccountDto {
      */
     public int magic;
     /**
-     * Account deployment state. One of CREATED, DEPLOYING, DEPLOYED, UNDEPLOYING, UNDEPLOYED, DELETING
+     * Account deployment state
      */
-    public String state;
+    public DeploymentState state;
     /**
-     * Terminal & broker connection status, one of CONNECTED, DISCONNECTED, DISCONNECTED_FROM_BROKER
+     * Terminal & broker connection status
      */
-    public String connectionStatus;
+    public ConnectionStatus connectionStatus;
     /**
      * Authorization token to be used for accessing single account data. Intended to be used in browser API.
      */
