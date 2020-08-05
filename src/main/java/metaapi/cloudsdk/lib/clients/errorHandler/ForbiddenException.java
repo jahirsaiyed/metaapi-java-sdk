@@ -3,7 +3,7 @@ package metaapi.cloudsdk.lib.clients.errorHandler;
 /**
  * Throwing this error results in 403 (Forbidden) HTTP response code.
  */
-public class ForbiddenError extends ApiError {
+public class ForbiddenException extends ApiException {
 
     private static final long serialVersionUID = 1L;
 
@@ -11,7 +11,7 @@ public class ForbiddenError extends ApiError {
      * Constructs forbidden error.
      * @param message error message
      */
-    public ForbiddenError(String message) {
+    public ForbiddenException(String message) {
         super(message, 403);
     }
 }

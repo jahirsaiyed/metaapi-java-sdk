@@ -1,5 +1,6 @@
 package metaapi.cloudsdk.lib.clients;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -14,7 +15,8 @@ import com.mashape.unirest.request.body.MultipartBody;
 
 import metaapi.cloudsdk.lib.clients.HttpRequestOptions.FileStreamField;
 import metaapi.cloudsdk.lib.clients.errorHandler.*;
-import metaapi.cloudsdk.lib.clients.errorHandler.InternalError;
+import metaapi.cloudsdk.lib.clients.errorHandler.InternalException;
+import metaapi.cloudsdk.lib.clients.models.Error;
 
 /**
  * HTTP client library based on request-promise
@@ -30,7 +32,7 @@ public class HttpClient {
     public CompletableFuture<String> request(HttpRequestOptions options) throws Exception {
         CompletableFuture<HttpResponse<String>> result = new CompletableFuture<>();
         this.makeReqest(options).thenAccept((response) -> {
-            ApiError error = checkHttpError(response);
+            ApiException error = checkHttpError(response);
             if (error == null) result.complete(response);
             else result.completeExceptionally(error);
         });
@@ -113,17 +115,29 @@ public class HttpClient {
         return result;
     }
     
-    private ApiError checkHttpError(HttpResponse<String> response) {
+    private ApiException checkHttpError(HttpResponse<String> response) {
         int statusType = response.getStatus() / 100;
         if (statusType != 4 && statusType != 5) return null;
+        Error error;
+        try {
+            error = JsonMapper.getInstance().readValue(response.getBody(), Error.class);
+        } catch (JsonProcessingException e) {
+            error = null;
+        }
         switch (response.getStatus()) {
-            case 400: return new ValidationError("Bad Request", response.getBody());
-            case 401: return new UnauthorizedError("Unauthorized");
-            case 403: return new ForbiddenError("Forbidden");
-            case 404: return new NotFoundError("Not Found");
-            case 409: return new ConflictError("Conflict");
-            case 500: return new InternalError("Internal Server Error");
-            default: return new ApiError(response.getBody(), response.getStatus());
+            case 400: return new ValidationException(
+                error != null ? error.message : response.getStatusText(),
+                error != null ? error.details.get() : List.of()
+            );
+            case 401: return new UnauthorizedException(error != null ? error.message : response.getStatusText());
+            case 403: return new ForbiddenException(error != null ? error.message : response.getStatusText());
+            case 404: return new NotFoundException(error != null ? error.message : response.getStatusText());
+            case 409: return new ConflictException(error != null ? error.message : response.getStatusText());
+            case 500: return new InternalException(error != null ? error.message : response.getStatusText());
+            default: return new ApiException(
+                error != null ? error.message : response.getStatusText(),
+                response.getStatus()
+            );
         }
     }
 }

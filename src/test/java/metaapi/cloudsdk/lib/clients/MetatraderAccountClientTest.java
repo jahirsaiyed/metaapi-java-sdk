@@ -2,6 +2,7 @@ package metaapi.cloudsdk.lib.clients;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import metaapi.cloudsdk.lib.clients.HttpRequestOptions.Method;
 import metaapi.cloudsdk.lib.clients.mocks.HttpClientMock;
 import metaapi.cloudsdk.lib.clients.models.*;
+import metaapi.cloudsdk.lib.clients.models.MetatraderAccountDto.*;
 
 /**
  * Tests {@link MetatraderAccountClient}
@@ -39,7 +41,7 @@ class MetatraderAccountClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderAccountDto")
     void testRetrievesMetatraderAccountsFromApi(MetatraderAccountDto account) throws Exception {
-        MetatraderAccountDto[] expectedResponse = { account };
+        List<MetatraderAccountDto> expectedResponse = List.of(account);
         httpClient.setRequestMock((actualOptions) -> {
             try {
                 HttpRequestOptions expectedOptions = new HttpRequestOptions(
@@ -53,7 +55,7 @@ class MetatraderAccountClientTest {
                 return null;
             }
         });
-        MetatraderAccountDto[] actualResponse = provisioningClient
+        List<MetatraderAccountDto> actualResponse = provisioningClient
             .getAccounts(Optional.of("f9ce1f12-e720-4b9a-9477-c2d4cb25f076")).get();
         assertThat(actualResponse).usingRecursiveComparison().isEqualTo(expectedResponse);
     }
@@ -206,8 +208,8 @@ class MetatraderAccountClientTest {
         account.magic = 123456;
         account.timeConverter = "icmarkets";
         account.application = "MetaApi";
-        account.connectionStatus = "DISCONNECTED";
-        account.state = "DEPLOYED";
+        account.connectionStatus = ConnectionStatus.DISCONNECTED;
+        account.state = DeploymentState.DEPLOYED;
         account.synchronizationMode = "automatic";
         account.type = "cloud";
         return Stream.of(Arguments.of(account));

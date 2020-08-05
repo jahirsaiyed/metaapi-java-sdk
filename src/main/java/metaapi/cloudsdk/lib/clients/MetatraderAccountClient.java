@@ -1,5 +1,7 @@
 package metaapi.cloudsdk.lib.clients;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -40,7 +42,7 @@ public class MetatraderAccountClient {
      * @param provisioningProfileId optional provisioning profile id filter
      * @return completable future resolving with MetaTrader accounts found
      */
-    public CompletableFuture<MetatraderAccountDto[]> getAccounts(
+    public CompletableFuture<List<MetatraderAccountDto>> getAccounts(
         Optional<String> provisioningProfileId
     ) throws Exception {
         HttpRequestOptions opts = new HttpRequestOptions(host + "/users/current/accounts", Method.GET);
@@ -48,7 +50,7 @@ public class MetatraderAccountClient {
             opts.getQueryParameters().put("provisioningProfileId", provisioningProfileId.get());
         }
         opts.getHeaders().put("auth-token", token);
-        return httpClient.requestJson(opts, MetatraderAccountDto[].class);
+        return httpClient.requestJson(opts, MetatraderAccountDto[].class).thenApply(array -> Arrays.asList(array));
     }
     
     /**

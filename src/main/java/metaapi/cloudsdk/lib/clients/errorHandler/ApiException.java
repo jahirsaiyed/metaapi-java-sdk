@@ -1,24 +1,29 @@
 package metaapi.cloudsdk.lib.clients.errorHandler;
 
+import java.util.List;
+
 /**
  * Base class for API errors. Contains indication of HTTP status.
  */
-public class ApiError extends Exception {
+public class ApiException extends Exception {
     
     private static final long serialVersionUID = 1L;
+    
+    /**
+     * HTTP status code
+     */
     public int status;
-    public String name;
+    
     private String code;
-    private Object[] args; // TODO: Clarify args type
+    private List<Object> args;
 
     /**
      * ApiError constructor
      * @param message error message
      * @param status HTTP status
      */
-    public ApiError(String message, int status) {
+    public ApiException(String message, int status) {
         super(message);
-        this.name = this.getClass().getSimpleName();
         this.status = status;
     }
 
@@ -42,7 +47,7 @@ public class ApiError extends Exception {
      * Set message arguments for i18n
      * @param args arguments for i18n
      */
-    public void setArguments(Object[] args) {
+    public void setArguments(List<Object> args) {
         this.args = args;
     }
 
@@ -50,7 +55,7 @@ public class ApiError extends Exception {
      * Returns message arguments for i18n
      * @return message arguments for i18n
      */
-    public Object[] getArguments() {
+    public List<Object> getArguments() {
         return this.args;
     }
 }

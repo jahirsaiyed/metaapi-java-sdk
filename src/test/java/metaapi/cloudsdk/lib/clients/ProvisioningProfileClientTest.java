@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -44,7 +45,7 @@ class ProvisioningProfileClientTest {
     @ParameterizedTest
     @MethodSource("provideProvisioningProfileDto")
     void testRetrievesProvisioningProfilesFromApi(ProvisioningProfileDto profile) throws Exception {
-        ProvisioningProfileDto[] expectedResponse = { profile };
+        List<ProvisioningProfileDto> expectedResponse = List.of(profile);
         httpClient.setRequestMock((actualOptions) -> {
             try {
                 HttpRequestOptions expectedOptions = new HttpRequestOptions(
@@ -59,7 +60,7 @@ class ProvisioningProfileClientTest {
                 return null;
             }
         });
-        ProvisioningProfileDto[] actualResponse = provisioningClient
+        List<ProvisioningProfileDto> actualResponse = provisioningClient
             .getProvisioningProfiles(Optional.of(5), Optional.of("active")).get();
         assertThat(actualResponse).usingRecursiveComparison().isEqualTo(expectedResponse);
     }
