@@ -350,31 +350,12 @@ public class MetaApiWebsocketClient {
     /**
      * Returns the history of completed orders for a specific time range (see
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readHistoryOrdersByTimeRange/).
-     * By default pagination offset is set to 0 and pagination limit is set to 1000.
      * @param accountId id of the MetaTrader account to return information for
      * @param startTime start of time range, inclusive
      * @param endTime end of time range, exclusive
-     * @returns completable future resolving with request results containing history orders found
-     */
-    public CompletableFuture<MetatraderHistoryOrders> getHistoryOrdersByTimeRange(
-        String accountId, IsoTime startTime, IsoTime endTime
-    ) throws Exception {
-        return getHistoryOrdersByTimeRange(accountId, startTime, endTime, 0, 1000);
-    }
-    
-    /**
-     * @see #getHistoryOrdersByTimeRange(String, IsoTime, IsoTime)
      * @param offset pagination offset
-     */
-    public CompletableFuture<MetatraderHistoryOrders> getHistoryOrdersByTimeRange(
-        String accountId, IsoTime startTime, IsoTime endTime, int offset
-    ) throws Exception {
-        return getHistoryOrdersByTimeRange(accountId, startTime, endTime, offset, 1000);
-    }
-    
-    /**
-     * @see #getHistoryOrdersByTimeRange(String, IsoTime, IsoTime, int)
      * @param limit pagination limit
+     * @returns completable future resolving with request results containing history orders found
      */
     public CompletableFuture<MetatraderHistoryOrders> getHistoryOrdersByTimeRange(
         String accountId, IsoTime startTime, IsoTime endTime, int offset, int limit
@@ -458,31 +439,12 @@ public class MetaApiWebsocketClient {
     /**
      * Returns history deals with for a specific time range (see
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readDealsByTimeRange/).
-     * By default pagination offset is set to 0 and pagination limit is set to 1000.
      * @param accountId id of the MetaTrader account to return information for
      * @param startTime start of time range, inclusive
      * @param endTime end of time range, exclusive
-     * @returns completable future resolving with request results containing deals found
-     */
-    public CompletableFuture<MetatraderDeals> getDealsByTimeRange(
-        String accountId, IsoTime startTime, IsoTime endTime
-    ) throws Exception {
-        return getDealsByTimeRange(accountId, startTime, endTime, 0, 1000);
-    }
-    
-    /**
-     * @see #getDealsByTimeRange(String, IsoTime, IsoTime)
      * @param offset pagination offset
-     */
-    public CompletableFuture<MetatraderDeals> getDealsByTimeRange(
-        String accountId, IsoTime startTime, IsoTime endTime, int offset
-    ) throws Exception {
-        return getDealsByTimeRange(accountId, startTime, endTime, offset, 1000);
-    }
-    
-    /**
-     * @see #getDealsByTimeRange(String, IsoTime, IsoTime, int)
      * @param limit pagination limit
+     * @returns completable future resolving with request results containing deals found
      */
     public CompletableFuture<MetatraderDeals> getDealsByTimeRange(
         String accountId, IsoTime startTime, IsoTime endTime, int offset, int limit

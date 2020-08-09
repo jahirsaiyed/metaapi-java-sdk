@@ -8,7 +8,7 @@ import cloud.metaapi.sdk.clients.models.*;
 /**
  * Mock for testing synchronization listener events
  */
-public class SynchronizationListenerMock implements SynchronizationListener {
+public class SynchronizationListenerMock extends SynchronizationListener {
 
     /**
      * Completable future which is completed when onConnected event is handled
