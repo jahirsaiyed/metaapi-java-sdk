@@ -3,6 +3,7 @@ package cloud.metaapi.sdk;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,12 +21,9 @@ import cloud.metaapi.sdk.clients.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.errorHandler.NotFoundException;
-import cloud.metaapi.sdk.clients.models.MetatraderAccountDto;
+import cloud.metaapi.sdk.clients.models.*;
 import cloud.metaapi.sdk.clients.models.MetatraderAccountDto.ConnectionStatus;
 import cloud.metaapi.sdk.clients.models.MetatraderAccountDto.DeploymentState;
-import cloud.metaapi.sdk.clients.models.MetatraderAccountIdDto;
-import cloud.metaapi.sdk.clients.models.MetatraderAccountUpdateDto;
-import cloud.metaapi.sdk.clients.models.NewMetatraderAccountDto;
 
 /**
  * Tests {@link MetatraderAccountApi}
@@ -376,7 +374,27 @@ public class MetatraderAccountApiTest {
         });
         assertEquals(ConnectionStatus.DISCONNECTED, account.getConnectionStatus());
     }
-
+    
+    /**
+     * Tests {@link MetatraderAccount#connect}
+     */
+    @ParameterizedTest
+    @MethodSource("provideAccountDto")
+    void testConnectsToAnMtTerminal(MetatraderAccountDto accountDto) throws Exception {
+        accountDto.synchronizationMode = "user";
+        Mockito.when(metaApiWebsocketClient.subscribe("id")).thenReturn(CompletableFuture.completedFuture(null));
+        Mockito.when(client.getAccount("id")).thenReturn(CompletableFuture.completedFuture(accountDto));
+        MetatraderAccount account = api.getAccount("id").get();
+        HistoryStorage storage = Mockito.mock(HistoryStorage.class);
+        Mockito.when(storage.getLastHistoryOrderTime())
+            .thenReturn(CompletableFuture.completedFuture(new IsoTime("2020-01-01T00:00:00.000Z")));
+        Mockito.when(storage.getLastDealTime())
+            .thenReturn(CompletableFuture.completedFuture(new IsoTime("2020-01-02T00:00:00.000Z")));
+        MetaApiConnection connection = account.connect(Optional.of(storage)).get();
+        assertTrue(connection.getHistoryStorage().isPresent());
+        assertEquals(storage, connection.getHistoryStorage().get());
+    }
+    
     /**
      * Tests {@link MetatraderAccount#update(MetatraderAccountUpdateDto)}
      */
