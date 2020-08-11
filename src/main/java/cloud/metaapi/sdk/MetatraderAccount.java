@@ -1,7 +1,9 @@
 package cloud.metaapi.sdk;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import cloud.metaapi.sdk.clients.MetaApiWebsocketClient;
@@ -411,7 +413,24 @@ public class MetatraderAccount {
         });
         return result;
     }
-
+    
+    /**
+     * Connects to MetaApi
+     * @param historyStorage optional history storage
+     * @returns MetaApi connection
+     */
+    public CompletableFuture<MetaApiConnection> connect(Optional<HistoryStorage> historyStorage) {
+        return CompletableFuture.supplyAsync(() -> {
+            MetaApiConnection connection = new MetaApiConnection(metaApiWebsocketClient, this, historyStorage);
+            try {
+                connection.subscribe().get();
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+            return connection;
+        });
+    }
+    
     /**
      * Updates MetaTrader account data
      * @param account MetaTrader account update

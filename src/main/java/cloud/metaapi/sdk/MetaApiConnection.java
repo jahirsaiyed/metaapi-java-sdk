@@ -22,18 +22,33 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     private MetaApiWebsocketClient websocketClient;
     private MetatraderAccount account;
     private boolean isSynchronized = false;
+    private Optional<TerminalState> terminalState;
+    private Optional<HistoryStorage> historyStorage;
     
     /**
      * Constructs MetaApi MetaTrader Api connection
      * @param websocketClient MetaApi websocket client
      * @param account MetaTrader account to connect to
+     * @param local terminal history storage. Use for accounts in user synchronization mode. By default
+     * an instance of MemoryHistoryStorage will be used.
      */
-    public MetaApiConnection(MetaApiWebsocketClient websocketClient, MetatraderAccount account) {
+    public MetaApiConnection(
+        MetaApiWebsocketClient websocketClient,
+        MetatraderAccount account,
+        Optional<HistoryStorage> historyStorage
+    ) {
         this.websocketClient = websocketClient;
         this.account = account;
         if (account.getSynchronizationMode().equals("user")) {
+            this.terminalState = Optional.of(new TerminalState());
+            this.historyStorage = Optional.of(historyStorage.orElseGet(() -> new MemoryHistoryStorage()));
             websocketClient.addSynchronizationListener(account.getId(), this);
+            websocketClient.addSynchronizationListener(account.getId(), this.terminalState.get());
+            websocketClient.addSynchronizationListener(account.getId(), this.historyStorage.get());
             websocketClient.addReconnectListener(this);
+        } else {
+            this.terminalState = Optional.empty();
+            this.historyStorage = Optional.empty();
         }
     }
     
@@ -484,7 +499,20 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     public CompletableFuture<Void> reconnect() throws Exception {
         return websocketClient.reconnect(account.getId());
     }
-
+    
+    /**
+     * Requests the terminal to start synchronization process. Use it if user synchronization mode is set to user for the
+     * account (see https://metaapi.cloud/docs/client/websocket/synchronizing/synchronize/). Use only for user
+     * synchronization mode.
+     * @returns completable future which resolves when synchronization started
+     */
+    public CompletableFuture<Void> synchronize() throws Exception {
+        if (!account.getSynchronizationMode().equals("user")) return CompletableFuture.completedFuture(null);
+        Optional<IsoTime> startingHistoryOrderTime = Optional.of(historyStorage.get().getLastHistoryOrderTime().get());
+        Optional<IsoTime> startingDealTime = Optional.of(historyStorage.get().getLastDealTime().get());
+        return websocketClient.synchronize(account.getId(), startingHistoryOrderTime, startingDealTime);
+    }
+    
     /**
      * Initiates subscription to MetaTrader terminal
      * @returns completable future which resolves when subscription is initiated
@@ -522,7 +550,23 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     public CompletableFuture<MetatraderSymbolPrice> getSymbolPrice(String symbol) throws Exception {
         return websocketClient.getSymbolPrice(account.getId(), symbol);
     }
-
+    
+    /**
+     * Returns local copy of terminal state. Use this method for accounts in user synchronization mode
+     * @returns local copy of terminal state
+     */
+    public Optional<TerminalState> getTerminalState() {
+        return terminalState;
+    }
+    
+    /**
+     * Returns local history storage. Use this method for accounts in user synchronization mode
+     * @returns local history storage
+     */
+    public Optional<HistoryStorage> getHistoryStorage() {
+        return historyStorage;
+    }
+    
     /**
      * Adds synchronization listener. Use this method for accounts in user synchronization mode
      * @param listener synchronization listener to add
@@ -545,7 +589,11 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     
     @Override
     public CompletableFuture<Void> onConnected() {
-        return CompletableFuture.completedFuture(null);
+        try {
+            return synchronize();
+        } catch (Exception e) {
+            throw new CompletionException(e);
+        }
     }
 
     @Override
@@ -611,6 +659,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     void close() {
         if (account.getSynchronizationMode().equals("user")) {
             websocketClient.removeSynchronizationListener(account.getId(), this);
+            websocketClient.removeSynchronizationListener(account.getId(), terminalState.get());
+            websocketClient.removeSynchronizationListener(account.getId(), historyStorage.get());
         }
     }
 }
