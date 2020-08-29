@@ -2,9 +2,12 @@ package cloud.metaapi.sdk.clients.models;
 
 import java.util.Optional;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * MetaTrader order
  */
+@JsonIgnoreProperties(value = { "sequenceNumber", "connectionId", "event" })
 public class MetatraderOrder {
     
     /**
@@ -48,7 +51,7 @@ public class MetatraderOrder {
     /**
      * Optional time order was executed or canceled at. Will be specified for completed orders only
      */
-    public Optional<IsoTime> doneTime;
+    public Optional<IsoTime> doneTime = Optional.empty();
     /**
      * Order symbol
      */
@@ -57,7 +60,7 @@ public class MetatraderOrder {
      * Order open price (market price for market orders, limit price for limit orders or stop price
      * for stop orders)
      */
-    public Optional<Double> openPrice;
+    public Optional<Double> openPrice = Optional.empty();
     /**
      * Current price
      */
@@ -65,11 +68,11 @@ public class MetatraderOrder {
     /**
      * Optional order stop loss price
      */
-    public Optional<Double> stopLoss;
+    public Optional<Double> stopLoss = Optional.empty();
     /**
      * Optional order take profit price
      */
-    public Optional<Double> takeProfit;
+    public Optional<Double> takeProfit = Optional.empty();
     /**
      * Order requested quantity
      */
@@ -81,16 +84,16 @@ public class MetatraderOrder {
     /**
      * Order position id. Present only if the order has a position attached to it
      */
-    public Optional<String> positionId;
+    public Optional<String> positionId = Optional.empty();
     /**
      * Optional order comment. The sum of the line lengths of the comment and the clientId must be less
      * than or equal to 27. For more information see https://metaapi.cloud/docs/client/clientIdUsage/
      */
-    public Optional<String> comment;
+    public Optional<String> comment = Optional.empty();
     /**
      * Optional order original comment (present if possible to restore original comment from history)
      */
-    public Optional<String> originalComment;
+    public Optional<String> originalComment = Optional.empty();
     /**
      * Optional client-assigned id. The id value can be assigned when submitting a trade
      * and will be present on position, history orders and history deals related to the trade.
@@ -98,7 +101,7 @@ public class MetatraderOrder {
      * The sum of the line lengths of the comment and the clientId must be less than or equal to 27.
      * For more information see https://metaapi.cloud/docs/client/clientIdUsage/
      */
-    public Optional<String> clientId;
+    public Optional<String> clientId = Optional.empty();
     /**
      * Platform id (mt4 or mt5)
      */
@@ -107,5 +110,5 @@ public class MetatraderOrder {
      * Optional flag indicating that order client id and original comment was not
      * identified yet and will be updated in a future synchronization packet
      */
-    public Optional<Boolean> updatePending;
+    public Optional<Boolean> updatePending = Optional.empty();
 }

@@ -7,6 +7,10 @@ import java.util.Optional;
  */
 public class MetatraderAccountInformation {
     /**
+     * Platform id, either mt4 or mt5
+     */
+    public String platform;
+    /**
      * Broker name
      */
     public String broker;
@@ -41,5 +45,5 @@ public class MetatraderAccountInformation {
     /**
      * Margin level calculated as % of freeMargin/margin
      */
-    public Optional<Double> marginLevel;
+    public Optional<Double> marginLevel = Optional.empty();
 }

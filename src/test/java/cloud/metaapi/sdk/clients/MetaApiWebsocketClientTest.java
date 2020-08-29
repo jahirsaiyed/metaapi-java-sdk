@@ -3,9 +3,10 @@ package cloud.metaapi.sdk.clients;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.lang.reflect.Field;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -89,10 +90,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideAccountInformation")
     void testRetrievesMetaTraderAccountInformationFromApi(MetatraderAccountInformation expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getAccountInformation") 
                      && request.get("accountId").asText().equals("accountId")
                  ) {
@@ -116,10 +117,10 @@ class MetaApiWebsocketClientTest {
     @MethodSource("provideMetatraderPosition")
     void testRetrievesMetaTraderPositionsFromApi(MetatraderPosition position) throws Exception {
         List<MetatraderPosition> expected = List.of(position);
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getPositions") 
                      && request.get("accountId").asText().equals("accountId")
                 ) {
@@ -142,10 +143,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderPosition")
     void testRetrievesMetaTraderPositionFromApiById(MetatraderPosition expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (	request.get("type").asText().equals("getPosition") 
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("positionId").asText().equals(expected.id)
@@ -170,10 +171,10 @@ class MetaApiWebsocketClientTest {
     @MethodSource("provideMetatraderOrder")
     void testRetrievesMetaTraderOrdersFromApi(MetatraderOrder order) throws Exception {
         List<MetatraderOrder> expected = List.of(order);
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getOrders")
                      && request.get("accountId").asText().equals("accountId")
                 ) {
@@ -196,10 +197,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderOrder")
     void testRetrievesMetaTraderOrderFromApiById(MetatraderOrder expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getOrder")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("orderId").asText().equals(expected.id)
@@ -223,10 +224,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderHistoryOrders")
     void testRetrievesMetaTraderHistoryOrdersFromApiByTicket(MetatraderHistoryOrders expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getHistoryOrdersByTicket")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("ticket").asText().equals(expected.historyOrders.get(0).id)
@@ -252,10 +253,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderHistoryOrders")
     void testRetrievesMetaTraderHistoryOrdersFromApiByPosition(MetatraderHistoryOrders expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getHistoryOrdersByPosition")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("positionId").asText().equals(expected.historyOrders.get(0).positionId.get())
@@ -281,10 +282,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderHistoryOrders")
     void testRetrievesMetaTraderHistoryOrdersFromApiByTimeRange(MetatraderHistoryOrders expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getHistoryOrdersByTimeRange")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("startTime").asText().equals("2020-04-15T02:45:00Z")
@@ -314,10 +315,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderDeals")
     void testRetrievesMetaTraderDealsFromApiByTicket(MetatraderDeals expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getDealsByTicket")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("ticket").asText().equals(expected.deals.get(0).orderId.get())
@@ -342,10 +343,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderDeals")
     void testRetrievesMetaTraderDealsFromApiByPosition(MetatraderDeals expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getDealsByPosition")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("positionId").asText().equals(expected.deals.get(0).positionId.get())
@@ -370,10 +371,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderDeals")
     void testRetrievesMetaTraderDealsFromApiByTimeRange(MetatraderDeals expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getDealsByTimeRange")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("startTime").asText().equals("2020-04-15T02:45:00Z")
@@ -403,10 +404,10 @@ class MetaApiWebsocketClientTest {
     @Test
     void testRemovesHistoryFromApi() throws Exception {
         requestReceived = false;
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("removeHistory")
                      && request.get("accountId").asText().equals("accountId")
                 ) {
@@ -432,16 +433,14 @@ class MetaApiWebsocketClientTest {
         expectedTrade.actionType = ActionType.ORDER_TYPE_SELL;
         expectedTrade.symbol = Optional.of("AUDNZD");
         expectedTrade.volume = Optional.of(0.07);
-        emptyOptionalNullValues(expectedTrade);
         MetatraderTradeResponse expectedTradeResponse = new MetatraderTradeResponse();
-        expectedTradeResponse.error = 10009;
-        expectedTradeResponse.description = "TRADE_RETCODE_DONE";
+        expectedTradeResponse.numericCode = 10009;
+        expectedTradeResponse.stringCode = "TRADE_RETCODE_DONE";
         expectedTradeResponse.orderId = Optional.of("46870472");
-        emptyOptionalNullValues(expectedTradeResponse);
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("trade")
                      && request.get("accountId").asText().equals("accountId")
                 ) {
@@ -469,10 +468,10 @@ class MetaApiWebsocketClientTest {
     @Test
     void testSubscribesToMetatraderTerminal() throws Exception {
         requestReceived = false;
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("subscribe")
                      && request.get("accountId").asText().equals("accountId")
                 ) {
@@ -495,10 +494,10 @@ class MetaApiWebsocketClientTest {
     @Test
     void testReconnectsToMetatraderTerminal() throws Exception {
         requestReceived = false;
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("reconnect")
                      && request.get("accountId").asText().equals("accountId")
                 ) {
@@ -521,10 +520,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideSymbolSpecification")
     void testRetrievesSymbolSpecificationFromApi(MetatraderSymbolSpecification expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getSymbolSpecification")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("symbol").asText().equals(expected.symbol)
@@ -548,10 +547,10 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideSymbolPrice")
     void testRetrievesSymbolPriceFromApi(MetatraderSymbolPrice expected) throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getSymbolPrice")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("symbol").asText().equals(expected.symbol)
@@ -581,10 +580,10 @@ class MetaApiWebsocketClientTest {
         expectedDetail.parameter = "volume";
         expectedDetail.message = "Required value.";
         List<ErrorDetail> expectedDetails = List.of(expectedDetail);
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 WebsocketError error = new WebsocketError();
                 error.id = 1;
                 error.error = "ValidationError";
@@ -609,10 +608,10 @@ class MetaApiWebsocketClientTest {
      */
     @Test
     void testHandlesNotFoundError() throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 WebsocketError error = new WebsocketError();
                 error.id = 1;
                 error.error = "NotFoundError";
@@ -634,10 +633,10 @@ class MetaApiWebsocketClientTest {
      */
     @Test
     void testHandlesNotSynchronizedError() throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 WebsocketError error = new WebsocketError();
                 error.id = 1;
                 error.error = "NotSynchronizedError";
@@ -659,10 +658,10 @@ class MetaApiWebsocketClientTest {
      */
     @Test
     void testHandlesNotConnectedError() throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 WebsocketError error = new WebsocketError();
                 error.id = 1;
                 error.error = "NotAuthenticatedError";
@@ -684,10 +683,10 @@ class MetaApiWebsocketClientTest {
      */
     @Test
     void testHandlesOtherErrors() throws Exception {
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 WebsocketError error = new WebsocketError();
                 error.id = 1;
                 error.error = "Error";
@@ -753,10 +752,10 @@ class MetaApiWebsocketClientTest {
     @Test
     void testSynchronizesWithMetatraderTerminal() throws Exception {
         requestReceived = false;
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("synchronize")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("startingHistoryOrderTime").asText().equals("2020-01-01T00:00:00Z")
@@ -774,7 +773,10 @@ class MetaApiWebsocketClientTest {
         client.synchronize("accountId",
             Optional.of(new IsoTime("2020-01-01T00:00:00.000Z")),
             Optional.of(new IsoTime("2020-01-02T00:00:00.000Z"))).get();
-        assertTrue(requestReceived);
+        assertTimeoutPreemptively(Duration.ofSeconds(7), () -> {
+            while (!requestReceived) Thread.sleep(200);
+            assertTrue(requestReceived);
+        });
     }
     
     /**
@@ -896,10 +898,10 @@ class MetaApiWebsocketClientTest {
     @Test
     void testSubscribesToMarketDataWithMetatraderTerminal() throws Exception {
         requestReceived = false;
-        server.addEventListener("request", String.class, new DataListener<String>() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
-            public void onData(SocketIOClient client, String data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.readTree(data);
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("subscribeToMarketData")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("symbol").asText().equals("EURUSD")
@@ -960,7 +962,6 @@ class MetaApiWebsocketClientTest {
         accountInformation.freeMargin = 7120.22;
         accountInformation.leverage = 100;
         accountInformation.marginLevel = Optional.of(3967.58283542);
-        emptyOptionalNullValues(accountInformation);
         return Stream.of(Arguments.of(accountInformation));
     }
     
@@ -984,7 +985,6 @@ class MetaApiWebsocketClientTest {
         position.stopLoss = Optional.of(1.17721);
         position.unrealizedProfit = Optional.of(-85.25999999999901);
         position.realizedProfit = Optional.of(-6.536993168992922e-13);
-        emptyOptionalNullValues(position);
         return Stream.of(Arguments.of(position));
     }
     
@@ -1002,7 +1002,6 @@ class MetaApiWebsocketClientTest {
         order.volume = 0.01;
         order.currentVolume = 0.01;
         order.comment = Optional.of("COMMENT2");
-        emptyOptionalNullValues(order);
         return Stream.of(Arguments.of(order));
     }
     
@@ -1021,7 +1020,6 @@ class MetaApiWebsocketClientTest {
         order.time = new IsoTime("2020-04-15T02:45:06.260Z");
         order.type = OrderType.ORDER_TYPE_BUY;
         order.volume = 0.07;
-        emptyOptionalNullValues(order);
         MetatraderHistoryOrders history = new MetatraderHistoryOrders();
         history.historyOrders = List.of(order);
         history.synchronizing = false;
@@ -1045,7 +1043,6 @@ class MetaApiWebsocketClientTest {
         deal.time = new IsoTime("2020-04-15T02:45:06.521Z");
         deal.type = DealType.DEAL_TYPE_BUY;
         deal.volume = Optional.of(0.07);
-        emptyOptionalNullValues(deal);
         MetatraderDeals deals = new MetatraderDeals();
         deals.deals = List.of(deal);
         deals.synchronizing = false;
@@ -1080,20 +1077,5 @@ class MetaApiWebsocketClientTest {
         price.profitTickValue = 0.59731;
         price.lossTickValue = 0.59736;
         return Stream.of(Arguments.of(price));
-    }
-    
-    /**
-     * Model optional null values are not sent at all but in case their absence in responses they are 
-     * still parsed as Optional.empty that is correct semantically but breaks tests because (initial) 
-     * null != (recieved) Optional.empty. So this method explicitly sets them as Optional.empty.
-     */
-    private static void emptyOptionalNullValues(Object object) throws Exception {
-        Field[] publicFields = object.getClass().getFields();
-        for (int i = 0; i < publicFields.length; ++i) {
-            Field field = publicFields[i];
-            if (field.get(object) == null && field.getType().isAssignableFrom(Optional.class)) {
-                field.set(object, Optional.empty());
-            }
-        }
     }
 }

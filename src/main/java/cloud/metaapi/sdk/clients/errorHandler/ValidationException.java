@@ -1,6 +1,7 @@
 package cloud.metaapi.sdk.clients.errorHandler;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Represents validation error. Throwing this error results in 400 (Bad Request) HTTP response code.
@@ -19,6 +20,10 @@ public class ValidationException extends ApiException {
          * Message of the error
          */
         public String message;
+        /**
+         * Value of the parameter
+         */
+        public Optional<String> value = Optional.empty();
     }
     
     private static final long serialVersionUID = 1L;

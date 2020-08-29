@@ -23,41 +23,41 @@ public class MetatraderTrade {
     /**
      * Symbol to trade
      */
-    public Optional<String> symbol;
+    public Optional<String> symbol = Optional.empty();
     /**
      * Order volume
      */
-    public Optional<Double> volume;
+    public Optional<Double> volume = Optional.empty();
     /**
      * Order limit or stop price
      */
-    public Optional<Double> openPrice;
+    public Optional<Double> openPrice = Optional.empty();
     /**
      * Stop loss price
      */
-    public Optional<Double> stopLoss;
+    public Optional<Double> stopLoss = Optional.empty();
     /**
      * Take profit price
      */
-    public Optional<Double> takeProfit;
+    public Optional<Double> takeProfit = Optional.empty();
     /**
      * Order id, must be specified for order modification commands
      */
-    public Optional<String> orderId;
+    public Optional<String> orderId = Optional.empty();
     /**
      * Position id, must be specified for position modification commands
      */
-    public Optional<String> positionId;
+    public Optional<String> positionId = Optional.empty();
     /**
      * Order comment. The sum of the line lengths of the comment and the clientId must be less
      * than or equal to 27. For more information see https://metaapi.cloud/docs/client/clientIdUsage/
      */
-    public Optional<String> comment;
+    public Optional<String> comment = Optional.empty();
     /**
      * Client-assigned id. The id value can be assigned when submitting a trade and will be present on position,
      * history orders and history deals related to the trade. You can use this field to bind your trades to objects
      * in your application and then track trade progress. The sum of the line lengths of the comment and the clientId
      * must be less than or equal to 27. For more information see https://metaapi.cloud/docs/client/clientIdUsage/
      */
-    public Optional<String> clientId;
+    public Optional<String> clientId = Optional.empty();
 }

@@ -34,15 +34,15 @@ public class MetatraderDeal {
     /**
      * Deal entry type
      */
-    public Optional<DealEntryType> entryType;
+    public Optional<DealEntryType> entryType = Optional.empty();
     /**
      * Optional symbol deal relates to
      */
-    public Optional<String> symbol;
+    public Optional<String> symbol = Optional.empty();
     /**
      * Optional deal magic number, identifies the EA which initiated the deal
      */
-    public Optional<Integer> magic;
+    public Optional<Integer> magic = Optional.empty();
     /**
      * Time the deal was conducted at
      */
@@ -50,19 +50,19 @@ public class MetatraderDeal {
     /**
      * Optional deal volume
      */
-    public Optional<Double> volume;
+    public Optional<Double> volume = Optional.empty();
     /**
      * Optional, the price the deal was conducted at
      */
-    public Optional<Double> price;
+    public Optional<Double> price = Optional.empty();
     /**
      * Optional deal commission
      */
-    public Optional<Double> commission;
+    public Optional<Double> commission = Optional.empty();
     /**
      * Optional deal swap
      */
-    public Optional<Double> swap;
+    public Optional<Double> swap = Optional.empty();
     /**
      * Deal profit
      */
@@ -70,20 +70,20 @@ public class MetatraderDeal {
     /**
      * Optional id of position the deal relates to
      */
-    public Optional<String> positionId;
+    public Optional<String> positionId = Optional.empty();
     /**
      * Optional id of order the deal relates to
      */
-    public Optional<String> orderId;
+    public Optional<String> orderId = Optional.empty();
     /**
      * Optional deal comment. The sum of the line lengths of the comment and the clientId must be less than
      * or equal to 27. For more information see https://metaapi.cloud/docs/client/clientIdUsage/
      */
-    public Optional<String> comment;
+    public Optional<String> comment = Optional.empty();
     /**
      * Optional deal original comment (present if possible to restore original comment from history)
      */
-    public Optional<String> originalComment;
+    public Optional<String> originalComment = Optional.empty();
     /**
      * Optional client-assigned id. The id value can be assigned when submitting a trade and will be present
      * on position, history orders and history deals related to the trade. You can use this field to bind your
@@ -91,7 +91,7 @@ public class MetatraderDeal {
      * comment and the clientId must be less than or equal to 27. For more information see 
      * https://metaapi.cloud/docs/client/clientIdUsage/
      */
-    public Optional<String> clientId;
+    public Optional<String> clientId = Optional.empty();
     /**
      * Platform id (mt4 or mt5)
      */
@@ -100,5 +100,5 @@ public class MetatraderDeal {
      * Optional flag indicating that deal client id and original comment was not identified yet and will be
      * updated in a future synchronization packet
      */
-    public Optional<Boolean> updatePending;
+    public Optional<Boolean> updatePending = Optional.empty();
 }
