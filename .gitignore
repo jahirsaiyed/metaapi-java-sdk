@@ -3,3 +3,7 @@ target
 
 # Logs directory
 logs
+
+# Metatrader files for examples testing
+broker.srv
+servers.dat

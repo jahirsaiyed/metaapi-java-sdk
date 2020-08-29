@@ -1,8 +1,11 @@
 package cloud.metaapi.sdk.clients.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * MetaTrader account model
  */
+@JsonIgnoreProperties(value = { "lastHealthyAt", "test", "version", "host", "lastDeployedAt" })
 public class MetatraderAccountDto {
     
     /**

@@ -2,9 +2,12 @@ package cloud.metaapi.sdk.clients.models;
 
 import java.util.Optional;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * MetaTrader position
  */
+@JsonIgnoreProperties(value = { "platform" })
 public class MetatraderPosition {
     
     /**
@@ -51,11 +54,11 @@ public class MetatraderPosition {
     /**
      * Optional position stop loss price
      */
-    public Optional<Double> stopLoss;
+    public Optional<Double> stopLoss = Optional.empty();
     /**
      * Optional position take profit price
      */
-    public Optional<Double> takeProfit;
+    public Optional<Double> takeProfit = Optional.empty();
     /**
      * Position volume
      */
@@ -73,7 +76,7 @@ public class MetatraderPosition {
      * the clientId must be less than or equal to 27. For more information see
      * https://metaapi.cloud/docs/client/clientIdUsage/
      */
-    public Optional<String> comment;
+    public Optional<String> comment = Optional.empty();
     /**
      * Optional client-assigned id. The id value can be assigned when submitting a trade and
      * will be present on position, history orders and history deals related to the trade. 
@@ -81,17 +84,17 @@ public class MetatraderPosition {
      * The sum of the line lengths of the comment and the clientId must be less than or equal to 27. 
      * For more information see https://metaapi.cloud/docs/client/clientIdUsage/
      */
-    public Optional<String> clientId;
+    public Optional<String> clientId = Optional.empty();
     /**
      * Profit of the part of the position which is not yet closed, including swap
      */
-    public Optional<Double> unrealizedProfit;
+    public Optional<Double> unrealizedProfit = Optional.empty();
     /**
      * Profit of the already closed part, including commissions and swap
      */
-    public Optional<Double> realizedProfit;
+    public Optional<Double> realizedProfit = Optional.empty();
     /**
      * Optional position commission
      */
-    public Optional<Double> commission;
+    public Optional<Double> commission = Optional.empty();
 }

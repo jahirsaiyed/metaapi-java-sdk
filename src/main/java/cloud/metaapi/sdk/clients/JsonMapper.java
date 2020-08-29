@@ -1,5 +1,6 @@
 package cloud.metaapi.sdk.clients;
 
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 
@@ -17,7 +18,8 @@ public class JsonMapper {
     public static ObjectMapper getInstance() {
         if (mapper == null) {
             mapper = new ObjectMapper();
-            mapper.registerModule(new Jdk8Module());
+            mapper.registerModule(new Jdk8Module().configureAbsentsAsNulls(true));
+            mapper.setSerializationInclusion(Include.NON_NULL);
         }
         return mapper;
     }

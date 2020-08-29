@@ -791,16 +791,16 @@ class MetaApiConnectionTest {
     
     private static Stream<Arguments> provideTradeOrderResponse() {
         MetatraderTradeResponse result = new MetatraderTradeResponse();
-        result.error = 10009;
-        result.description = "TRADE_RETCODE_DONE";
+        result.numericCode = 10009;
+        result.stringCode = "TRADE_RETCODE_DONE";
         result.orderId = Optional.of("46870472");
         return Stream.of(Arguments.of(result));
     }
     
     private static Stream<Arguments> provideTradePositionResponse() {
         MetatraderTradeResponse result = new MetatraderTradeResponse();
-        result.error = 10009;
-        result.description = "TRADE_RETCODE_DONE";
+        result.numericCode = 10009;
+        result.stringCode = "TRADE_RETCODE_DONE";
         result.positionId = Optional.of("46870472");
         return Stream.of(Arguments.of(result));
     }

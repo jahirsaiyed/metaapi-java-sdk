@@ -3,11 +3,11 @@ package cloud.metaapi.sdk.clients;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
-import com.mashape.unirest.http.async.Callback;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mashape.unirest.request.HttpRequest;
 import com.mashape.unirest.request.HttpRequestWithBody;
@@ -29,13 +29,11 @@ public class HttpClient {
      * @return completable future with request results
      */
     public CompletableFuture<String> request(HttpRequestOptions options) throws Exception {
-        CompletableFuture<HttpResponse<String>> result = new CompletableFuture<>();
-        this.makeReqest(options).thenAccept((response) -> {
+        return this.makeReqest(options).thenApply((response) -> {
             ApiException error = checkHttpError(response);
-            if (error == null) result.complete(response);
-            else result.completeExceptionally(error);
+            if (error == null) return response.getBody();
+            else throw new CompletionException(error);
         });
-        return result.thenApply((response) -> response.getBody());
     }
     
     /**
@@ -46,15 +44,13 @@ public class HttpClient {
      * @return completable future with request results as json
      */
     public <T> CompletableFuture<T> requestJson(HttpRequestOptions options, Class<T> valueType) throws Exception {
-        CompletableFuture<T> result = new CompletableFuture<>();
-        request(options).thenAccept((response) -> {
+        return request(options).thenApply((response) -> {
             try {
-                result.complete(JsonMapper.getInstance().readValue(response, valueType));
+                return JsonMapper.getInstance().readValue(response, valueType);
             } catch (JsonProcessingException e) {
-                result.completeExceptionally(e);
+                throw new CompletionException(e);
             }
         });
-        return result;
     }
 
     /**
@@ -62,7 +58,6 @@ public class HttpClient {
      * with {@link UnirestException}. If request is cancelled, completable future is cancelled as well.
      */
     private CompletableFuture<HttpResponse<String>> makeReqest(HttpRequestOptions options) throws Exception {
-        CompletableFuture<HttpResponse<String>> result = new CompletableFuture<>();
         HttpRequest request = null;
         
         if (options.getMethod() == HttpRequestOptions.Method.GET) request = Unirest.get(options.getUrl());
@@ -93,25 +88,17 @@ public class HttpClient {
             } else request = bodyRequest.getHttpRequest();
         }
         
-        request
-            .queryString(options.getQueryParameters())
-            .headers(options.getHeaders())
-            .asStringAsync(new Callback<String>() 
-        {
-            @Override
-            public void completed(HttpResponse<String> response) {
-                result.complete(response);
-            }
-            @Override
-            public void failed(UnirestException e) {
-                result.completeExceptionally(e);
-            }
-            @Override
-            public void cancelled() {
-                result.cancel(false);
+        HttpRequest finalRequest = request;
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return finalRequest
+                    .queryString(options.getQueryParameters())
+                    .headers(options.getHeaders())
+                    .asString();
+            } catch (UnirestException e) {
+                throw new CompletionException(e);
             }
         });
-        return result;
     }
     
     private ApiException checkHttpError(HttpResponse<String> response) {

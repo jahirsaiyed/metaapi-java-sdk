@@ -24,5 +24,5 @@ public class Error {
     /**
      * Additional information about error. Used to supply validation error details
      */
-    public Optional<List<ValidationException.ErrorDetail>> details;
+    public Optional<List<ValidationException.ErrorDetail>> details = Optional.empty();
 }

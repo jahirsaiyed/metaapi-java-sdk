@@ -625,8 +625,18 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     public CompletableFuture<Boolean> isSynchronized() throws Exception {
         if (account.getSynchronizationMode().equals("user")) return CompletableFuture.completedFuture(isSynchronized);
         return CompletableFuture.completedFuture(
-            getDealsByTimeRange(new IsoTime(Date.from(Instant.now())), new IsoTime(Date.from(Instant.now())), 0, 1000)
+            !getDealsByTimeRange(new IsoTime(Date.from(Instant.now())), new IsoTime(Date.from(Instant.now())), 0, 1000)
         .get().synchronizing);
+    }
+    
+    /**
+     * Waits until synchronization to MetaTrader terminal is completed. Completes exceptionally with TimeoutError 
+     * if application failed to synchronize with the teminal withing timeout allowed. Timeout in seconds is 300 
+     * and interval in milliseconds between account reloads while waiting for a change is 5000.
+     * @return completable future which resolves when synchronization to MetaTrader terminal is completed
+     */
+    public CompletableFuture<Void> waitSynchronized() {
+        return waitSynchronized(300, 5000);
     }
     
     /**

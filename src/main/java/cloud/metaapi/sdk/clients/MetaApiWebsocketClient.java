@@ -7,10 +7,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -135,7 +136,7 @@ public class MetaApiWebsocketClient {
         });
         socket.on("response", (Object[] args) -> {
             try {
-                JsonNode data = jsonMapper.readTree((String) args[0]);
+                JsonNode data = jsonMapper.readTree(args[0].toString());
                 CompletableFuture<JsonNode> requestResolve = requestResolves.remove(data.get("requestId").asText());
                 if (requestResolve != null) requestResolve.complete(data);
             } catch (JsonProcessingException e) {
@@ -144,15 +145,15 @@ public class MetaApiWebsocketClient {
         });
         socket.on("processingError", (Object[] args) -> {
             try {
-                WebsocketError error = jsonMapper.readValue((String) args[0], WebsocketError.class);
+                WebsocketError error = jsonMapper.readValue(args[0].toString(), WebsocketError.class);
                 CompletableFuture<JsonNode> requestResolve = requestResolves.remove(error.requestId);
                 if (requestResolve != null) requestResolve.completeExceptionally(convertError(error));
-            } catch (JsonProcessingException e) {
+            } catch (Exception e) {
                 logger.error("MetaApi websocket parse processingError data error", e);
             }
         });
         socket.on("synchronization", (Object[] args) -> {
-            processSynchronizationPacket((String) args[0]);
+            processSynchronizationPacket(args[0].toString());
         });
         socket.connect();
         return result;
@@ -546,7 +547,13 @@ public class MetaApiWebsocketClient {
             request.put("startingHistoryOrderTime", startingHistoryOrderTime.get().getIsoString());
         if (startingDealTime.isPresent())
             request.put("startingDealTime", startingDealTime.get().getIsoString());
-        return rpcRequest(accountId, request).thenApply((response) -> null);
+        
+        // If here we wait for response on the synchronize request, neither response nor synchronization 
+        // socket event listener will be called for some magic reason when working with a real server...
+        rpcRequest(accountId, request);
+        
+        // ...so return completeted future right now.
+        return CompletableFuture.completedFuture(null);
     }
     
     /**
@@ -690,12 +697,12 @@ public class MetaApiWebsocketClient {
     
     private CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request) throws Exception {
         if (!connected) connect().get();
-        String requestId = RandomStringUtils.randomAlphanumeric(32);
+        String requestId = UUID.randomUUID().toString();
         CompletableFuture<JsonNode> result = new CompletableFuture<>();
         requestResolves.put(requestId, result);
         request.put("accountId", accountId);
         request.put("requestId", requestId);
-        socket.emit("request", request.toString());
+        socket.emit("request", new JSONObject(jsonMapper.writeValueAsString(request)));
         return result;
     }
     
