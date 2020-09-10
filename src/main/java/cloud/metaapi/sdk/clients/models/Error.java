@@ -1,9 +1,6 @@
 package cloud.metaapi.sdk.clients.models;
 
 import java.util.List;
-import java.util.Optional;
-
-import cloud.metaapi.sdk.clients.errorHandler.ValidationException;
 
 /**
  * Contains an error message
@@ -18,11 +15,19 @@ public class Error {
      */
     public String error;
     /**
+     * Numeric error code or {@code null}
+     */
+    public Integer numericCode = null;
+    /**
+     * String error code or {@code null}
+     */
+    public String stringCode = null;
+    /**
      * Error description
      */
     public String message;
     /**
-     * Additional information about error. Used to supply validation error details
+     * Additional information about error or {@code null}. Used to supply validation error details
      */
-    public Optional<List<ValidationException.ErrorDetail>> details = Optional.empty();
+    public List<ValidationDetails> details = null;
 }

@@ -7,3 +7,6 @@ logs
 # Metatrader files for examples testing
 broker.srv
 servers.dat
+
+# Internal MetaApi directory
+.metaapi

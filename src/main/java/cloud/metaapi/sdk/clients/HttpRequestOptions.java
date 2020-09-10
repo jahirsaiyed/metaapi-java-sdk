@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -130,8 +131,9 @@ public class HttpRequestOptions {
     
     /**
      * Returns query parameters of request. The returned value can be used for setting parameters.
-     * @return map of query parameters where the key is the parameter name and 
-     * the value is its parsable into a string value
+     * @return map of query parameters where the key is the parameter name and the value is its 
+     * parsable into a string value. The value cal also be a {@link Collection} of parsable into
+     * a string values.
      */
     public Map<String, Object> getQueryParameters() {
         return queryParameters;

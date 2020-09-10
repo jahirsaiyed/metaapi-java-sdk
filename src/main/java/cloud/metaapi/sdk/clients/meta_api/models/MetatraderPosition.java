@@ -1,0 +1,108 @@
+package cloud.metaapi.sdk.clients.meta_api.models;
+
+import cloud.metaapi.sdk.clients.models.IsoTime;
+
+/**
+ * MetaTrader position
+ */
+public class MetatraderPosition {
+    
+    /**
+     * Position type
+     */
+    public enum PositionType { POSITION_TYPE_BUY, POSITION_TYPE_SELL }
+    
+    /**
+     * Position opening reason. See
+     * https://www.mql5.com/en/docs/constants/tradingconstants/positionproperties#enum_position_reason
+     */
+    public enum PositionReason { POSITION_REASON_CLIENT, POSITION_REASON_EXPERT,
+        POSITION_REASON_MOBILE, POSITION_REASON_WEB, POSITION_REASON_UNKNOWN }
+    
+    /**
+     * Position id (ticket number)
+     */
+    public String id;
+    /**
+     * Position type
+     */
+    public PositionType type;
+    /**
+     * Position symbol
+     */
+    public String symbol;
+    /**
+     * Position magic number, identifies the EA which opened the position
+     */
+    public int magic;
+    /**
+     * Time position was opened at
+     */
+    public IsoTime time;
+    /**
+     * Last position modification time
+     */
+    public IsoTime updateTime;
+    /**
+     * Position open price
+     */
+    public double openPrice;
+    /**
+     * Current price
+     */
+    public double currentPrice;
+    /**
+     * Current tick value
+     */
+    public double currentTickValue;
+    /**
+     * Position stop loss price or {@code null}
+     */
+    public Double stopLoss;
+    /**
+     * Position take profit price or {@code null}
+     */
+    public Double takeProfit;
+    /**
+     * Position volume
+     */
+    public double volume;
+    /**
+     * Position cumulative swap
+     */
+    public double swap;
+    /**
+     * Position cumulative profit
+     */
+    public double profit;
+    /**
+     * Position comment or {@code null}. The sum of the line lengths of the comment and 
+     * the clientId must be less than or equal to 26. For more information see
+     * https://metaapi.cloud/docs/client/clientIdUsage/
+     */
+    public String comment;
+    /**
+     * Client-assigned id or {@code null}. The id value can be assigned when submitting a trade and
+     * will be present on position, history orders and history deals related to the trade. 
+     * You can use this field to bind your trades to objects in your application and then track trade progress.
+     * The sum of the line lengths of the comment and the clientId must be less than or equal to 26. 
+     * For more information see https://metaapi.cloud/docs/client/clientIdUsage/
+     */
+    public String clientId;
+    /**
+     * Profit of the part of the position which is not yet closed, including swap, or {@code null}
+     */
+    public Double unrealizedProfit;
+    /**
+     * Profit of the already closed part, including commissions and swap, or {@code null}
+     */
+    public Double realizedProfit;
+    /**
+     * Position commission
+     */
+    public Double commission;
+    /**
+     * Position opening reason
+     */
+    public PositionReason reason;
+}

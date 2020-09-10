@@ -2,8 +2,8 @@ package cloud.metaapi.sdk.clients.mocks;
 
 import java.util.concurrent.CompletableFuture;
 
-import cloud.metaapi.sdk.clients.SynchronizationListener;
-import cloud.metaapi.sdk.clients.models.*;
+import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
+import cloud.metaapi.sdk.clients.meta_api.models.*;
 
 /**
  * Mock for testing synchronization listener events
@@ -139,13 +139,13 @@ public class SynchronizationListenerMock extends SynchronizationListener {
     }
 
     @Override
-    public CompletableFuture<Void> onDealSynchronizationFinished() {
+    public CompletableFuture<Void> onDealSynchronizationFinished(String synchronizationId) {
         this.onDealSynchronizationFinishedResult.complete(null);
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletableFuture<Void> onOrderSynchronizationFinished() {
+    public CompletableFuture<Void> onOrderSynchronizationFinished(String synchronizationId) {
         this.onOrderSynchronizationFinishedResult.complete(null);
         return CompletableFuture.completedFuture(null);
     }

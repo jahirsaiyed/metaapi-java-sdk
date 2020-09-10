@@ -4,18 +4,21 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
-import cloud.metaapi.sdk.MetaApi;
-import cloud.metaapi.sdk.MetaApiConnection;
-import cloud.metaapi.sdk.MetatraderAccount;
-import cloud.metaapi.sdk.ProvisioningProfile;
-import cloud.metaapi.sdk.clients.JsonMapper;
+import cloud.metaapi.sdk.clients.meta_api.TradeException;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
+import cloud.metaapi.sdk.clients.meta_api.models.NewMetatraderAccountDto;
+import cloud.metaapi.sdk.clients.meta_api.models.NewProvisioningProfileDto;
+import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
 import cloud.metaapi.sdk.clients.models.IsoTime;
-import cloud.metaapi.sdk.clients.models.MetatraderTradeResponse;
-import cloud.metaapi.sdk.clients.models.NewMetatraderAccountDto;
-import cloud.metaapi.sdk.clients.models.NewProvisioningProfileDto;
+import cloud.metaapi.sdk.meta_api.MetaApi;
+import cloud.metaapi.sdk.meta_api.MetaApiConnection;
+import cloud.metaapi.sdk.meta_api.MetatraderAccount;
+import cloud.metaapi.sdk.meta_api.ProvisioningProfile;
+import cloud.metaapi.sdk.util.JsonMapper;
 
 /**
  * Note: for information on how to use this example code please read https://metaapi.cloud/docs/client/usingCodeExamples
@@ -32,8 +35,7 @@ public class MetaApiRpcExample {
     
     public static void main(String[] args) {
         try {
-            List<ProvisioningProfile> profiles = api.getProvisioningProfileApi()
-                .getProvisioningProfiles(Optional.empty(), Optional.empty()).get();
+            List<ProvisioningProfile> profiles = api.getProvisioningProfileApi().getProvisioningProfiles().get();
             
             // create test MetaTrader account profile
             Optional<ProvisioningProfile> profile = profiles.stream()
@@ -53,11 +55,11 @@ public class MetaApiRpcExample {
             }
             
             // Add test MetaTrader account
-            List<MetatraderAccount> accounts = api.getMetatraderAccountApi().getAccounts(Optional.empty()).get();
+            List<MetatraderAccount> accounts = api.getMetatraderAccountApi().getAccounts().get();
             Optional<MetatraderAccount> account = accounts.stream()
                 .filter(   a -> a.getLogin().equals(login) 
                         && a.getSynchronizationMode().equals("automatic") 
-                        && a.getType().equals("cloud")
+                        && a.getType().startsWith("cloud")
                 ).findFirst();
             if (account.isEmpty()) {
                 System.out.println("Adding MT4 account to MetaApi");
@@ -87,7 +89,7 @@ public class MetaApiRpcExample {
             account.get().waitConnected().get();
             
             // connect to MetaApi API
-            MetaApiConnection connection = account.get().connect(Optional.empty()).get();
+            MetaApiConnection connection = account.get().connect().get();
             
             System.out.println("Waiting for SDK to synchronize to terminal state "
                 + "(may take some time depending on your history size)");
@@ -97,9 +99,7 @@ public class MetaApiRpcExample {
             System.out.println("Testing MetaAPI RPC API");
             System.out.println("account information: " + asJson(connection.getAccountInformation().get()));
             System.out.println("positions: " + asJson(connection.getPositions().get()));
-            // System.out.println(asJson(connection.getPosition("1234567").get()));
             System.out.println("open orders:" + asJson(connection.getOrders().get()));
-            // System.out.println(asJson(connection.getOrder("1234567").get()));
             System.out.println("history orders by ticket: " + asJson(connection.getHistoryOrdersByTicket("1234567").get()));
             System.out.println("history orders by position: " + asJson(connection.getHistoryOrdersByPosition("1234567").get()));
             System.out.println("history orders (~last 3 months): " + asJson(connection.getHistoryOrdersByTimeRange(
@@ -115,24 +115,23 @@ public class MetaApiRpcExample {
             
             // trade
             System.out.println("Submitting pending order");
-            MetatraderTradeResponse result = connection.createLimitBuyOrder(
-                "GBPUSD", 0.07, 1.0, Optional.of(0.9), Optional.of(2.0), 
-                Optional.of("comm"), Optional.of("TE_GBPUSD_7hyINWqAlE")
-            ).get();
-            if (result.stringCode.equals("TRADE_RETCODE_DONE")) {
-                System.out.println("Trade successful");
-            } else {
-                System.out.println("Trade failed with " + result.stringCode + " error");
+            try {
+                MetatraderTradeResponse result = connection
+                    .createLimitBuyOrder("GBPUSD", 0.07, 1.0, 0.9, 2.0, new PendingTradeOptions() {{
+                        comment = "comm"; clientId = "TE_GBPUSD_7hyINWqAlE"; 
+                    }}).get();
+                System.out.println("Trade successful, result code is " + result.stringCode);
+            } catch (ExecutionException err) {
+                System.out.println("Trade failed with result code " + ((TradeException) err.getCause()).stringCode);
             }
             
             // finally, undeploy account
             System.out.println("Undeploying MT4 account so that it does not consume any unwanted resources");
             account.get().undeploy().get();
-            
-            System.exit(0);
         } catch (Exception err) {
             System.err.println(err);
         }
+        System.exit(0);
     }
     
     private static String getEnvOrDefault(String name, String defaultValue) {
