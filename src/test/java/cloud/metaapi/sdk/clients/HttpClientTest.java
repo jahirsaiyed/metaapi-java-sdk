@@ -3,14 +3,18 @@ package cloud.metaapi.sdk.clients;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
-import cloud.metaapi.sdk.clients.errorHandler.*;
+import cloud.metaapi.sdk.clients.error_handler.*;
 import cloud.metaapi.sdk.clients.mocks.HttpClientMock;
+import kong.unirest.UnirestException;
 
+import java.net.SocketTimeoutException;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +38,12 @@ class JsonModelExample {
  */
 public class HttpClientTest {
 
-    private final HttpClient httpClient = new HttpClient();
+    private HttpClient httpClient;
+    
+    @BeforeEach
+    public void setUp() {
+        httpClient = new HttpClient();
+    }
     
     /**
      * Tests {@link HttpClient#request(HttpRequestOptions)}
@@ -88,6 +97,24 @@ public class HttpClientTest {
                 clientMock.requestJson(null, JsonModelExample.class).get();
             } catch (ExecutionException e) {
                 throw e.getCause();
+            }
+        });
+    }
+    
+    /**
+     * Tests {@link HttpClient#request(HttpRequestOptions)}
+     */
+    @Test
+    public void testReturnsTimeoutExceptionIfRequestIsTimedOut() {
+        httpClient = new HttpClient(1, 60000);
+        HttpRequestOptions opts = new HttpRequestOptions("http://example.com/not-found", Method.GET);
+        assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
+            try {
+                httpClient.request(opts).get();
+            } catch (ExecutionException e) {
+                assertTrue(e.getCause() instanceof ApiException);
+                assertTrue(e.getCause().getCause() instanceof UnirestException);
+                assertTrue(e.getCause().getCause().getCause() instanceof SocketTimeoutException);
             }
         });
     }
