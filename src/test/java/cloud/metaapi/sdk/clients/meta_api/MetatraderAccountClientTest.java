@@ -160,7 +160,6 @@ class MetatraderAccountClientTest {
         newAccount.magic = 123456;
         newAccount.timeConverter = "icmarkets";
         newAccount.application = "MetaApi";
-        newAccount.synchronizationMode = "automatic";
         newAccount.type = "cloud";
         httpClient.setRequestMock((actualOptions) -> {
             try {
@@ -332,8 +331,6 @@ class MetatraderAccountClientTest {
         MetatraderAccountUpdateDto updateAccount = new MetatraderAccountUpdateDto();
         updateAccount.name = "new account name";
         updateAccount.password = "new_password007";
-        updateAccount.server = "ICMarketsSC2-Demo";
-        updateAccount.synchronizationMode = "user";
         httpClient.setRequestMock((actualOptions) -> {
             HttpRequestOptions expectedOptions = new HttpRequestOptions(
                 provisioningApiUrl + "/users/current/accounts/id", Method.PUT);
@@ -374,7 +371,6 @@ class MetatraderAccountClientTest {
         account.application = "MetaApi";
         account.connectionStatus = ConnectionStatus.DISCONNECTED;
         account.state = DeploymentState.DEPLOYED;
-        account.synchronizationMode = "automatic";
         account.type = "cloud";
         return Stream.of(Arguments.of(account));
     }

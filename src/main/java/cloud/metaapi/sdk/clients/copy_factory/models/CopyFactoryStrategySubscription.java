@@ -61,7 +61,7 @@ public class CopyFactoryStrategySubscription {
      */
     public CopyFactoryStrategyMaxStopLoss maxStopLoss;
     /**
-     * Optional setting indicating maxumum leverage allowed when opening a new positions, or {@code null}.
+     * Optional setting indicating maximum leverage allowed when opening a new positions, or {@code null}.
      * Any trade which results in a higher leverage will be discarded
      */
     public Double maxLeverage;

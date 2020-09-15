@@ -2,11 +2,13 @@ package example_generator;
 
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import cloud.metaapi.sdk.clients.meta_api.TradeException;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
 import cloud.metaapi.sdk.clients.models.IsoTime;
@@ -28,10 +30,15 @@ public class MetaApiRpcExample {
     public static void main(String[] args) {
         try {
             MetatraderAccount account = api.getMetatraderAccountApi().getAccount(accountId).get();
+            DeploymentState initialState = account.getState();
+            List<DeploymentState> deployedStates = List.of(DeploymentState.DEPLOYING, DeploymentState.DEPLOYED);
             
-            // wait until account is deployed and connected to broker
-            System.out.println("Deploying account");
-            account.deploy().get();
+            if (!deployedStates.contains(initialState)) {
+                // wait until account is deployed and connected to broker
+                System.out.println("Deploying account");
+                account.deploy().get();
+            }
+            
             System.out.println("Waiting for API server to connect to broker (may take couple of minutes)");
             account.waitConnected().get();
             
@@ -72,9 +79,12 @@ public class MetaApiRpcExample {
                 System.out.println("Trade failed with result code " + ((TradeException) err.getCause()).stringCode);
             }
             
-            // finally, undeploy account
-            System.out.println("Undeploying account so that it does not consume any unwanted resources");
-            account.undeploy().get();
+            if (!deployedStates.contains(initialState)) {
+                // finally, undeploy account
+                System.out.println("Undeploying account so that it does not consume any unwanted resources");
+                account.undeploy().get();
+            }
+            
         } catch (Exception err) {
             System.err.println(err);
         }

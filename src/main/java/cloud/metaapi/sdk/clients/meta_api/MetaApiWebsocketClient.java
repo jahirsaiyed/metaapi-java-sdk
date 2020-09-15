@@ -13,6 +13,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -22,6 +23,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import cloud.metaapi.sdk.clients.HttpClientWithCookies;
+import cloud.metaapi.sdk.clients.HttpRequestOptions;
+import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.*;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
@@ -37,7 +41,11 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.models.*;
 import cloud.metaapi.sdk.util.JsonMapper;
 import io.socket.client.IO;
+import io.socket.client.Manager;
 import io.socket.client.Socket;
+import io.socket.engineio.client.Transport;
+import kong.unirest.Cookie;
+import kong.unirest.Cookies;
 
 /**
  * MetaApi websocket API client (see https://metaapi.cloud/docs/client/websocket/overview/)
@@ -51,6 +59,7 @@ public class MetaApiWebsocketClient {
     private Socket socket;
     private long requestTimeout;
     private long connectTimeout;
+    private HttpClientWithCookies httpClientWithCookies;
     private ObjectMapper jsonMapper = JsonMapper.getInstance();
     private Map<String, CompletableFuture<JsonNode>> requestResolves;
     private Map<String, List<SynchronizationListener>> synchronizationListeners;
@@ -61,20 +70,24 @@ public class MetaApiWebsocketClient {
     /**
      * Constructs MetaApi websocket API client instance. Domain is {@code agiliumtrade.agiliumtrade.ai},
      * timeout for socket requests is {@code 1 minute}, timeout for connecting to server is {@code 1 minute}.
+     * @param httpClient HTTP client with cookies
      * @param token authorization token
      */
-    public MetaApiWebsocketClient(String token) {
-        this(token, "agiliumtrade.agiliumtrade.ai", 60000, 60000);
+    public MetaApiWebsocketClient(HttpClientWithCookies httpClient, String token) {
+        this(httpClient, token, "agiliumtrade.agiliumtrade.ai", 60000, 60000);
     }
     
     /**
      * Constructs MetaApi websocket API client instance
+     * @param httpClient HTTP client with cookies
      * @param token authorization token
      * @param domain domain to connect to
      * @param requestTimeout timeout for socket requests in milliseconds
      * @param connectTimeout timeout for connecting to server in milliseconds
      */
-    public MetaApiWebsocketClient(String token, String domain, long requestTimeout, long connectTimeout) {
+    public MetaApiWebsocketClient(
+        HttpClientWithCookies httpClient, String token, String domain, long requestTimeout, long connectTimeout
+    ) {
         this.url = "https://mt-client-api-v1." + domain;
         this.token = token;
         this.requestResolves = new HashMap<>();
@@ -82,6 +95,7 @@ public class MetaApiWebsocketClient {
         this.reconnectListeners = new LinkedList<>();
         this.requestTimeout = requestTimeout;
         this.connectTimeout = connectTimeout;
+        this.httpClientWithCookies = httpClient;
     }
     
     /**
@@ -97,93 +111,114 @@ public class MetaApiWebsocketClient {
      * @returns completable future which resolves when connection is established
      */
     public CompletableFuture<Void> connect() {
-        if (connected) return null;
-        connected = true;
-        requestResolves.clear();
-        CompletableFuture<Void> result = new CompletableFuture<>();
-        String url = this.url + "?auth-token=" + token;
-        IO.Options socketOptions = new IO.Options();
-        socketOptions.path = "/ws";
-        socketOptions.reconnection = true;
-        socketOptions.reconnectionDelay = 1000;
-        socketOptions.reconnectionDelayMax = 5000;
-        socketOptions.reconnectionAttempts = Integer.MAX_VALUE;
-        socketOptions.timeout = connectTimeout;
-        isSocketConnecting = true;
-        try {
-            socket = IO.socket(url, socketOptions);
-            socket.on(Socket.EVENT_CONNECT, (Object[] args) -> {
-                isSocketConnecting = false;
-                logger.info("MetaApi websocket client connected to the MetaApi server");
-                if (!result.isDone()) result.complete(null);
-                else fireReconnected().exceptionally((e) -> {
-                    logger.error("Failed to notify reconnect listeners", e);
-                    return null;
-                }).join();
-                if (!connected) socket.close();
-            });
-            socket.on(Socket.EVENT_RECONNECT, (Object[] args) -> {
-                try {
-                    fireReconnected();
-                } catch (Exception e) {
-                    logger.error("Failed to notify reconnect listeners", e);
-                }
-            });
-            socket.on(Socket.EVENT_CONNECT_ERROR, (Object[] args) -> {
-                Exception error = (Exception) args[0];
-                logger.error("MetaApi websocket client connection error", error);
-                if (!result.isDone()) result.completeExceptionally(error);
-            });
-            socket.on(Socket.EVENT_CONNECT_TIMEOUT, (Object[] args) -> {
-                logger.info("MetaApi websocket client connection timeout");
-                if (!result.isDone()) result.completeExceptionally(
-                    new TimeoutException("MetaApi websocket client connection timed out")
-                );
-            });
-            socket.on(Socket.EVENT_DISCONNECT, (Object[] args) -> {
-                String reason = (String) args[0];
-                logger.info("MetaApi websocket client disconnected from the MetaApi server because of " + reason);
-                try {
-                    reconnect();
-                } catch (Exception e) {
-                    logger.error("MetaApi websocket reconnect error", e);
-                }
-            });
-            socket.on(Socket.EVENT_ERROR, (Object[] args) -> {
-                Exception error = (Exception) args[0];
-                logger.error("MetaApi websocket client error", error);
-                try {
-                    reconnect();
-                } catch (Exception e) {
-                    logger.error("MetaApi websocket reconnect error ", e);
-                }
-            });
-            socket.on("response", (Object[] args) -> {
-                try {
-                    JsonNode data = jsonMapper.readTree(args[0].toString());
-                    CompletableFuture<JsonNode> requestResolve = requestResolves.remove(data.get("requestId").asText());
-                    if (requestResolve != null) requestResolve.complete(data);
-                } catch (JsonProcessingException e) {
-                    logger.error("MetaApi websocket parse json response error", e);
-                }
-            });
-            socket.on("processingError", (Object[] args) -> {
-                try {
-                    WebsocketError error = jsonMapper.readValue(args[0].toString(), WebsocketError.class);
-                    CompletableFuture<JsonNode> requestResolve = requestResolves.remove(error.requestId);
-                    if (requestResolve != null) requestResolve.completeExceptionally(convertError(error));
-                } catch (Exception e) {
-                    logger.error("MetaApi websocket parse processingError data error", e);
-                }
-            });
-            socket.on("synchronization", (Object[] args) -> {
-                processSynchronizationPacket(args[0].toString());
-            });
-            socket.connect();
-        } catch (URISyntaxException e) {
-            result.completeExceptionally(e);
-        }
-        return result;
+        return CompletableFuture.supplyAsync(() -> {
+            if (connected) return null;
+            connected = true;
+            requestResolves.clear();
+            CompletableFuture<Void> result = new CompletableFuture<>();
+            
+            // get cookies
+            HttpRequestOptions options = new HttpRequestOptions(this.url + "/health", Method.GET);
+            Pair<String, Cookies> response = httpClientWithCookies.request(options).join();
+            Cookie routeCookie = response.getRight().getNamed("route");
+            
+            String url = this.url + "?auth-token=" + token;
+            IO.Options socketOptions = new IO.Options();
+            socketOptions.path = "/ws";
+            socketOptions.reconnection = true;
+            socketOptions.reconnectionDelay = 1000;
+            socketOptions.reconnectionDelayMax = 5000;
+            socketOptions.reconnectionAttempts = Integer.MAX_VALUE;
+            socketOptions.timeout = connectTimeout;
+            isSocketConnecting = true;
+            try {
+                socket = IO.socket(url, socketOptions);
+                
+                // Adding extra headers
+                socket.io().on(Manager.EVENT_TRANSPORT, (Object[] socketEventArgs) -> {
+                    Transport transport = (Transport) socketEventArgs[0];
+                    transport.on(Transport.EVENT_REQUEST_HEADERS, (Object[] transportEventArgs) -> {
+                        @SuppressWarnings("unchecked")
+                        Map<String, List<String>> headers = (Map<String, List<String>>) transportEventArgs[0];
+                        if (routeCookie != null) {
+                            headers.put("Cookie", Arrays.asList("route=" + routeCookie.getValue()));
+                        }
+                    });
+                });
+                
+                socket.on(Socket.EVENT_CONNECT, (Object[] args) -> {
+                    isSocketConnecting = false;
+                    logger.info("MetaApi websocket client connected to the MetaApi server");
+                    if (!result.isDone()) result.complete(null);
+                    else fireReconnected().exceptionally((e) -> {
+                        logger.error("Failed to notify reconnect listeners", e);
+                        return null;
+                    }).join();
+                    if (!connected) socket.close();
+                });
+                socket.on(Socket.EVENT_RECONNECT, (Object[] args) -> {
+                    try {
+                        fireReconnected();
+                    } catch (Exception e) {
+                        logger.error("Failed to notify reconnect listeners", e);
+                    }
+                });
+                socket.on(Socket.EVENT_CONNECT_ERROR, (Object[] args) -> {
+                    Exception error = (Exception) args[0];
+                    logger.error("MetaApi websocket client connection error", error);
+                    if (!result.isDone()) result.completeExceptionally(error);
+                });
+                socket.on(Socket.EVENT_CONNECT_TIMEOUT, (Object[] args) -> {
+                    logger.info("MetaApi websocket client connection timeout");
+                    if (!result.isDone()) result.completeExceptionally(
+                        new TimeoutException("MetaApi websocket client connection timed out")
+                    );
+                });
+                socket.on(Socket.EVENT_DISCONNECT, (Object[] args) -> {
+                    String reason = (String) args[0];
+                    logger.info("MetaApi websocket client disconnected from the MetaApi server because of " + reason);
+                    try {
+                        reconnect();
+                    } catch (Exception e) {
+                        logger.error("MetaApi websocket reconnect error", e);
+                    }
+                });
+                socket.on(Socket.EVENT_ERROR, (Object[] args) -> {
+                    Exception error = (Exception) args[0];
+                    logger.error("MetaApi websocket client error", error);
+                    try {
+                        reconnect();
+                    } catch (Exception e) {
+                        logger.error("MetaApi websocket reconnect error ", e);
+                    }
+                });
+                socket.on("response", (Object[] args) -> {
+                    try {
+                        JsonNode data = jsonMapper.readTree(args[0].toString());
+                        CompletableFuture<JsonNode> requestResolve = requestResolves.remove(data.get("requestId").asText());
+                        if (requestResolve != null) requestResolve.complete(data);
+                    } catch (JsonProcessingException e) {
+                        logger.error("MetaApi websocket parse json response error", e);
+                    }
+                });
+                socket.on("processingError", (Object[] args) -> {
+                    try {
+                        WebsocketError error = jsonMapper.readValue(args[0].toString(), WebsocketError.class);
+                        CompletableFuture<JsonNode> requestResolve = requestResolves.remove(error.requestId);
+                        if (requestResolve != null) requestResolve.completeExceptionally(convertError(error));
+                    } catch (Exception e) {
+                        logger.error("MetaApi websocket parse processingError data error", e);
+                    }
+                });
+                socket.on("synchronization", (Object[] args) -> {
+                    processSynchronizationPacket(args[0].toString());
+                });
+                socket.connect();
+            } catch (URISyntaxException e) {
+                result.completeExceptionally(e);
+            }
+            return result.join();
+        });
     }
     
     /**
@@ -569,8 +604,8 @@ public class MetaApiWebsocketClient {
     }
     
     /**
-     * Requests the terminal to start synchronization process. Use it if user synchronization mode is set to user for the
-     * account (see https://metaapi.cloud/docs/client/websocket/synchronizing/synchronize/).
+     * Requests the terminal to start synchronization process 
+     * (see https://metaapi.cloud/docs/client/websocket/synchronizing/synchronize/).
      * @param accountId id of the MetaTrader account to synchronize
      * @param synchronizationId synchronization request id
      * @param startingHistoryOrderTime from what date to start synchronizing history orders from. If not specified,

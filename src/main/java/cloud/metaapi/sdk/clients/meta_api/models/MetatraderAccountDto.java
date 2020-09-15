@@ -36,11 +36,6 @@ public class MetatraderAccountDto {
      */
     public String server;
     /**
-     * Synchronization mode, can be automatic or user. See
-     * https://metaapi.cloud/docs/client/websocket/synchronizationMode/ for more details.
-     */
-    public String synchronizationMode;
-    /**
      * Id of the account's provisioning profile
      */
     public String provisioningProfileId;
@@ -76,7 +71,7 @@ public class MetatraderAccountDto {
     public Boolean manualTrades;
     /**
      * Quote streaming interval in seconds, or {@code null}. Set to 0 in order to receive quotes on each tick.
-     * Default value is 2.5 seconds. Values less than 2.5 are not supported for G1.
+     * Default value is 2.5 seconds. Intervals less than 2.5 seconds are supported only for G2
      */
     public Double quoteStreamingIntervalInSeconds;
 }

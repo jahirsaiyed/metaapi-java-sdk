@@ -81,15 +81,6 @@ public class MetatraderAccount {
     }
     
     /**
-     * Returns synchronization mode, can be automatic or user. See
-     * https://metaapi.cloud/docs/client/websocket/synchronizationMode/ for more details.
-     * @return synchronization mode
-     */
-    public String getSynchronizationMode() {
-        return data.synchronizationMode;
-    }
-    
-    /**
      * Returns id of the account's provisioning profile
      * @return id of the account's provisioning profile
      */
@@ -388,15 +379,11 @@ public class MetatraderAccount {
      */
     public CompletableFuture<MetaApiConnection> connect(HistoryStorage historyStorage) {
         return CompletableFuture.supplyAsync(() -> {
-            try {
-                MetaApiConnection connection = ServiceProvider
-                    .createMetaApiConnection(metaApiWebsocketClient, this, historyStorage);
-                if (getSynchronizationMode().equals("user")) connection.initialize().get();
-                connection.subscribe().get();
-                return connection;
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            }
+            MetaApiConnection connection = ServiceProvider
+                .createMetaApiConnection(metaApiWebsocketClient, this, historyStorage);
+            connection.initialize().join();
+            connection.subscribe().join();
+            return connection;
         });
     }
     

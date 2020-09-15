@@ -52,9 +52,8 @@ public class ConfigurationClient extends MetaApiClient {
     }
     
     /**
-     * Retrieves new unused strategy id. Method is accessible only with API access token. See
-     * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/get_users_current_configuration_unused_strategy_id
-     * @return strategy id generated
+     * Generates random account id
+     * @return account id
      */
     public String generateAccountId() {
         return RandomStringUtils.randomAlphanumeric(64);

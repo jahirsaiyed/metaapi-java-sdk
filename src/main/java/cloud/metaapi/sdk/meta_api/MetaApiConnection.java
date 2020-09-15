@@ -49,22 +49,20 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Constructs MetaApi MetaTrader Api connection
      * @param websocketClient MetaApi websocket client
      * @param account MetaTrader account to connect to
-     * @param historyStorage optional local terminal history storage. Use for accounts in user synchronization mode.
-     * By default an instance of MemoryHistoryStorage will be used.
+     * @param historyStorage terminal history storage or {@code null}. By default an instance of MemoryHistoryStorage
+     * will be used.
      */
     public MetaApiConnection(
         MetaApiWebsocketClient websocketClient, MetatraderAccount account, HistoryStorage historyStorage
     ) {
         this.websocketClient = websocketClient;
         this.account = account;
-        if (account.getSynchronizationMode().equals("user")) {
-            this.terminalState = new TerminalState();
-            this.historyStorage = historyStorage != null ? historyStorage : new MemoryHistoryStorage(account.getId());
-            websocketClient.addSynchronizationListener(account.getId(), this);
-            websocketClient.addSynchronizationListener(account.getId(), this.terminalState);
-            websocketClient.addSynchronizationListener(account.getId(), this.historyStorage);
-            websocketClient.addReconnectListener(this);
-        }
+        this.terminalState = new TerminalState();
+        this.historyStorage = historyStorage != null ? historyStorage : new MemoryHistoryStorage(account.getId());
+        websocketClient.addSynchronizationListener(account.getId(), this);
+        websocketClient.addSynchronizationListener(account.getId(), this.terminalState);
+        websocketClient.addSynchronizationListener(account.getId(), this.historyStorage);
+        websocketClient.addReconnectListener(this);
     }
     
     /**
@@ -190,7 +188,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @return completable future resolving when the history is cleared
      */
     public CompletableFuture<Void> removeHistory() {
-        if (account.getSynchronizationMode().equals("user")) historyStorage.reset();
+        historyStorage.reset();
         return websocketClient.removeHistory(account.getId());
     }
     
@@ -459,14 +457,12 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     }
     
     /**
-     * Requests the terminal to start synchronization process. Use it if user synchronization mode is set to user for the
-     * account (see https://metaapi.cloud/docs/client/websocket/synchronizing/synchronize/). Use only for user
-     * synchronization mode.
+     * Requests the terminal to start synchronization process
+     * (see https://metaapi.cloud/docs/client/websocket/synchronizing/synchronize/)
      * @returns completable future which resolves when synchronization started
      */
     public CompletableFuture<Void> synchronize() {
         return CompletableFuture.runAsync(() -> {
-            if (!account.getSynchronizationMode().equals("user")) return;
             IsoTime startingHistoryOrderTime = historyStorage.getLastHistoryOrderTime().join();
             IsoTime startingDealTime = historyStorage.getLastDealTime().join();
             lastSynchronizationId = UUID.randomUUID().toString();
@@ -483,13 +479,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      */
     public CompletableFuture<Void> initialize() {
         return CompletableFuture.runAsync(() -> {
-            if (account.getSynchronizationMode().equals("user")) {
-                try {
-                    historyStorage.loadData().get();
-                } catch (InterruptedException | ExecutionException e) {
-                    throw new CompletionException(e);
-                }
-            }
+            historyStorage.loadData().join();
         });
     }
     
@@ -509,8 +499,6 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      */
     public CompletableFuture<Void> subscribeToMarketData(String symbol) {
         return CompletableFuture.runAsync(() -> {
-            if (!account.getSynchronizationMode().equals("user"))
-                throw new CompletionException(new InvalidSynchronizationModeException(account));
             websocketClient.subscribeToMarketData(account.getId(), symbol).join();
         });
     }
@@ -536,51 +524,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     }
     
     /**
-     * Returns local copy of terminal state. Use this method for accounts in user synchronization mode
+     * Returns local copy of terminal state
      * @returns local copy of terminal state
      */
-    public TerminalState getTerminalState() throws InvalidSynchronizationModeException {
-        if (!account.getSynchronizationMode().equals("user"))
-            throw new InvalidSynchronizationModeException(account);
+    public TerminalState getTerminalState() {
         return terminalState;
     }
     
     /**
-     * Returns local history storage. Use this method for accounts in user synchronization mode
+     * Returns local history storage
      * @returns local history storage
      */
-    public HistoryStorage getHistoryStorage() throws InvalidSynchronizationModeException {
-        if (!account.getSynchronizationMode().equals("user"))
-            throw new InvalidSynchronizationModeException(account);
+    public HistoryStorage getHistoryStorage() {
         return historyStorage;
     }
     
     /**
-     * Adds synchronization listener. Use this method for accounts in user synchronization mode
+     * Adds synchronization listener
      * @param listener synchronization listener to add
      */
-    public void addSynchronizationListener(SynchronizationListener listener) 
-        throws InvalidSynchronizationModeException
-    {
-        if (account.getSynchronizationMode().equals("user")) {
-            websocketClient.addSynchronizationListener(account.getId(), listener);
-        } else {
-            throw new InvalidSynchronizationModeException(account);
-        }
+    public void addSynchronizationListener(SynchronizationListener listener)  {
+        websocketClient.addSynchronizationListener(account.getId(), listener);
     }
     
     /**
-     * Removes synchronization listener for specific account. Use this method for accounts in user synchronization mode
+     * Removes synchronization listener for specific account
      * @param listener synchronization listener to remove
      */
-    public void removeSynchronizationListener(SynchronizationListener listener)
-        throws InvalidSynchronizationModeException
-    {
-        if (account.getSynchronizationMode().equals("user")) {
-            websocketClient.removeSynchronizationListener(account.getId(), listener);
-        } else {
-            throw new InvalidSynchronizationModeException(account);
-        }
+    public void removeSynchronizationListener(SynchronizationListener listener) {
+        websocketClient.removeSynchronizationListener(account.getId(), listener);
     }
     
     @Override
@@ -602,13 +574,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     public CompletableFuture<Void> onDealSynchronizationFinished(String synchronizationId) {
         return CompletableFuture.runAsync(() -> {
             dealsSynchronized.add(synchronizationId);
-            if (account.getSynchronizationMode().equals("user")) {
-                try {
-                    historyStorage.updateStorage().get();
-                } catch (InterruptedException | ExecutionException e) {
-                    throw new CompletionException(e);
-                }
-            }
+            historyStorage.updateStorage().join();
         });
     }
     
@@ -638,13 +604,23 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
         if (synchronizationId == null) synchronizationId = lastSynchronizationId;
         String finalSynchronizationId = synchronizationId;
         return CompletableFuture.supplyAsync(() -> {
-            if (account.getSynchronizationMode().equals("user")) 
-                return ordersSynchronized.contains(finalSynchronizationId) 
-                    && dealsSynchronized.contains(finalSynchronizationId);
-            return !getDealsByTimeRange(
-                new IsoTime(Date.from(Instant.now())),
-                new IsoTime(Date.from(Instant.now())), 0, 1000
-            ).join().synchronizing;
+            if (   ordersSynchronized.contains(finalSynchronizationId) 
+                && dealsSynchronized.contains(finalSynchronizationId))
+            {
+                try {
+                    return !getDealsByTimeRange(
+                        new IsoTime(Date.from(Instant.now())),
+                        new IsoTime(Date.from(Instant.now())), 0, 1000
+                    ).get().synchronizing;
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof TimeoutException) return false;
+                    throw new CompletionException(e.getCause());
+                } catch (InterruptedException e) {
+                    throw new CompletionException(e);
+                }
+
+            }
+            return false;
         });
     }
     
@@ -703,11 +679,9 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Closes the connection. The instance of the class should no longer be used after this method is invoked.
      */
     public void close() {
-        if (account.getSynchronizationMode().equals("user")) {
-            websocketClient.removeSynchronizationListener(account.getId(), this);
-            websocketClient.removeSynchronizationListener(account.getId(), terminalState);
-            websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
-        }
+        websocketClient.removeSynchronizationListener(account.getId(), this);
+        websocketClient.removeSynchronizationListener(account.getId(), terminalState);
+        websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
     }
     
     private void copyModelProperties(Object source, Object target) {

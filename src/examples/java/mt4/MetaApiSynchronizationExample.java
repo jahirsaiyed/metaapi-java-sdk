@@ -55,10 +55,8 @@ public class MetaApiSynchronizationExample {
             // Add test MetaTrader account
             List<MetatraderAccount> accounts = api.getMetatraderAccountApi().getAccounts().get();
             Optional<MetatraderAccount> account = accounts.stream()
-                .filter(   a -> a.getLogin().equals(login) 
-                        && a.getSynchronizationMode().equals("user") 
-                        && a.getType().startsWith("cloud")
-                ).findFirst();
+                .filter(a -> a.getLogin().equals(login) && a.getType().startsWith("cloud"))
+                .findFirst();
             if (account.isEmpty()) {
                 System.out.println("Adding MT4 account to MetaApi");
                 String mtLogin = login;
@@ -70,7 +68,6 @@ public class MetaApiSynchronizationExample {
                     login = mtLogin;
                     password = mtPassword;
                     server = serverName;
-                    synchronizationMode = "user";
                     provisioningProfileId = provisioningProfile.getId();
                     timeConverter = "icmarkets";
                     application = "MetaApi";

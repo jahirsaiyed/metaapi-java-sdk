@@ -46,18 +46,12 @@ public class HttpClient {
     
     /**
      * Performs a request. Completable future response errors are returned as ApiError or subclasses.
-     * Also see {@link #makeReqest(HttpRequestOptions)} for more information about the result completion cases.
+     * Also see {@link #makeRequest(HttpRequestOptions)} for more information about the result completion cases.
      * @param options request options
      * @return completable future with request results
      */
     public CompletableFuture<String> request(HttpRequestOptions options) {
-        return this.makeReqest(options).exceptionally(error -> {
-            throw new CompletionException(new ApiException(error.getMessage(), 0, error.getCause()));
-        }).thenApply((response) -> {
-            ApiException error = checkHttpError(response);
-            if (error == null) return response.getBody();
-            else throw new CompletionException(error);
-        });
+        return makeCheckedRequest(options).thenApply(response -> response.getBody());
     }
     
     /**
@@ -78,10 +72,26 @@ public class HttpClient {
     }
 
     /**
+     * Performs a request. Completable future response errors are returned as ApiError or subclasses.
+     * Also see {@link #makeRequest(HttpRequestOptions)} for more information about the result completion cases.
+     * @param options request options
+     * @return completable future with request response
+     */
+    protected CompletableFuture<HttpResponse<String>> makeCheckedRequest(HttpRequestOptions options) {
+        return this.makeRequest(options).exceptionally(error -> {
+            throw new CompletionException(new ApiException(error.getMessage(), 0, error.getCause()));
+        }).thenApply((response) -> {
+            ApiException error = checkHttpError(response);
+            if (error == null) return response;
+            else throw new CompletionException(error);
+        });
+    }
+    
+    /**
      * Makes request and returns HTTP response. If request fails, completable future completes exceptionally
      * with {@link UnirestException}.
      */
-    private CompletableFuture<HttpResponse<String>> makeReqest(HttpRequestOptions options) {
+    private CompletableFuture<HttpResponse<String>> makeRequest(HttpRequestOptions options) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 HttpRequest<?> request = null;

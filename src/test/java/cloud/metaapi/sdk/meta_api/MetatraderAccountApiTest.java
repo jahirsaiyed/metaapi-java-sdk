@@ -99,7 +99,6 @@ public class MetatraderAccountApiTest {
         newAccountDto.magic = accountDto.magic;
         newAccountDto.timeConverter = accountDto.timeConverter;
         newAccountDto.application = accountDto.application;
-        newAccountDto.synchronizationMode = accountDto.synchronizationMode;
         newAccountDto.type = accountDto.type;
         MetatraderAccountIdDto accountIdDto = new MetatraderAccountIdDto();
         accountIdDto.id = "id";
@@ -402,7 +401,6 @@ public class MetatraderAccountApiTest {
     @MethodSource("provideAccountDto")
     void testConnectsToAnMtTerminal(MetatraderAccountDto accountDto) throws Exception {
         // Common preparation
-        accountDto.synchronizationMode = "user";
         Mockito.when(metaApiWebsocketClient.subscribe("id")).thenReturn(CompletableFuture.completedFuture(null));
         Mockito.when(client.getAccount("id")).thenReturn(CompletableFuture.completedFuture(accountDto));
         MetatraderAccount account = api.getAccount("id").get();
@@ -438,13 +436,10 @@ public class MetatraderAccountApiTest {
         MetatraderAccountUpdateDto updateDto = new MetatraderAccountUpdateDto();
         updateDto.name = "mt5a__";
         updateDto.password = "moreSecurePass";
-        updateDto.server = "OtherMarkets-Demo";
-        updateDto.synchronizationMode = "user";
         initialAccount.connectionStatus = ConnectionStatus.CONNECTED;
         editedAccount.connectionStatus = ConnectionStatus.CONNECTED;
         editedAccount.name = updateDto.name;
-        editedAccount.server = updateDto.server;
-        editedAccount.synchronizationMode = updateDto.synchronizationMode;
+        editedAccount.server = "OtherMarkets-Demo";
         Mockito.when(client.getAccount("id"))
             .thenReturn(CompletableFuture.completedFuture(initialAccount))
             .thenReturn(CompletableFuture.completedFuture(editedAccount));
@@ -454,7 +449,6 @@ public class MetatraderAccountApiTest {
         account.update(updateDto).get();
         assertEquals(editedAccount.name, account.getName());
         assertEquals(editedAccount.server, account.getServer());
-        assertEquals(editedAccount.synchronizationMode, account.getSynchronizationMode());
         Mockito.verify(client, Mockito.times(2)).getAccount("id");
     }
     
@@ -470,7 +464,6 @@ public class MetatraderAccountApiTest {
         account.application = "MetaApi";
         account.connectionStatus = ConnectionStatus.DISCONNECTED;
         account.state = DeploymentState.DEPLOYED;
-        account.synchronizationMode = "automatic";
         account.type = "cloud";
         account.accessToken = "2RUnoH1ldGbnEneCoqRTgI4QO1XOmVzbH5EVoQsA";
         return Stream.of(Arguments.of(account));
