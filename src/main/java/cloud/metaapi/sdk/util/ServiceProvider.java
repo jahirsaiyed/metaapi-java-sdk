@@ -47,7 +47,7 @@ public class ServiceProvider {
      */
     public static MetaApiConnection createMetaApiConnection(
         MetaApiWebsocketClient websocketClient, MetatraderAccount account, HistoryStorage historyStorage
-    ) throws Exception {
+    ) {
         if (metaApiConnectionMock != null) return metaApiConnectionMock;
         return new MetaApiConnection(websocketClient, account, historyStorage);
     }

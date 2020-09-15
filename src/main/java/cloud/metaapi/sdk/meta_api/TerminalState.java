@@ -15,8 +15,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder.OrderType;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderPosition.PositionType;
 
 /**
- * Responsible for storing a local copy of remote terminal state. Intended to be used with accounts which have user
- * synchronization mode configured.
+ * Responsible for storing a local copy of remote terminal state
  */
 public class TerminalState extends SynchronizationListener {
 

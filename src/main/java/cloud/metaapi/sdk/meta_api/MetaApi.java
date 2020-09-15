@@ -1,6 +1,9 @@
 package cloud.metaapi.sdk.meta_api;
 
+import org.apache.log4j.Logger;
+
 import cloud.metaapi.sdk.clients.HttpClient;
+import cloud.metaapi.sdk.clients.HttpClientWithCookies;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
@@ -10,6 +13,7 @@ import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
  */
 public class MetaApi {
     
+    private static Logger logger = Logger.getLogger(MetaApi.class);
     private MetaApiWebsocketClient metaApiWebsocketClient;
     private ProvisioningProfileApi provisioningProfileApi;
     private MetatraderAccountApi metatraderAccountApi;
@@ -32,10 +36,17 @@ public class MetaApi {
      */
     public MetaApi(String token, String domain, int requestTimeout, int connectTimeout) {
         HttpClient httpClient = new HttpClient(requestTimeout * 1000, connectTimeout * 1000);
-        metaApiWebsocketClient = new MetaApiWebsocketClient(token, domain, requestTimeout * 1000, connectTimeout * 1000);
+        metaApiWebsocketClient = new MetaApiWebsocketClient(
+            new HttpClientWithCookies(), token, domain, 
+            requestTimeout * 1000, connectTimeout * 1000);
         provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, domain));
-        metatraderAccountApi = new MetatraderAccountApi(new MetatraderAccountClient(httpClient, token, domain),
+        metatraderAccountApi = new MetatraderAccountApi(
+            new MetatraderAccountClient(httpClient, token, domain),
             metaApiWebsocketClient);
+        metaApiWebsocketClient.connect().exceptionally(err -> {
+            logger.error("Failed to connect to MetaApi websocket API", err);
+            return null;
+        });
     }
     
     /**

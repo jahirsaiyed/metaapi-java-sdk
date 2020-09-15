@@ -104,10 +104,6 @@ MetatraderAccount account = api.getMetatraderAccountApi().createAccount(new NewM
   // password can be investor password for read-only access
   password = "qwerty";
   server = "ICMarketsSC-Demo";
-  // synchronizationMode can be "automatic" for RPC access or "user" if you
-  // want to keep track of terminal state in real-time (e.g. if you are
-  // developing a EA or trading strategy)
-  synchronizationMode = "automatic";
   provisioningProfileId = provisioningProfile.getId();
   //algorithm used to parse your broker timezone. Supported values are
   // icmarkets for America/New_York DST switch and roboforex for EET
@@ -142,10 +138,6 @@ account.update(new MetatraderAccountUpdateDto() {
   // password can be investor password for read-only access
   password = "qwerty";
   server = "ICMarketsSC-Demo";
-  // synchronizationMode can be "automatic" for RPC access or "user" if you
-  // want to keep track of terminal state in real-time (e.g. if you are
-  // developing a EA or trading strategy)
-  synchronizationMode = "automatic";
   quoteStreamingIntervalInSeconds = 2.5; // set to 0 to receive quote per tick
 }).get();
 ```
@@ -166,9 +158,6 @@ account.redeploy().get();
 RPC API let you query the trading terminal state. You should use
 RPC API if you develop trading monitoring apps like myfxbook or other
 simple trading apps.
-
-You should create your account with automatic synchronization mode if
-all you need is RPC API.
 
 ### Query account information, positions, orders and history via RPC API
 ```java
@@ -219,13 +208,9 @@ System.out.println(connection.getSymbolPrice("GBPUSD").get());
 Real-time streaming API is good for developing trading applications like trade copiers or automated trading strategies.
 The API synchronizes the terminal state locally so that you can query local copy of the terminal state really fast.
 
-In order to use this API you need to create an account with `user` synchronization mode.
-
 #### Synchronizing and reading teminal state
 ```java
 MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").get();
-
-// account.getSynchronizationMode() must be equal to "user" at this point
 
 // access local copy of terminal state
 TerminalState terminalState = connection.getTerminalState();

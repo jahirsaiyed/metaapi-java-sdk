@@ -57,10 +57,8 @@ public class MetaApiRpcExample {
             // Add test MetaTrader account
             List<MetatraderAccount> accounts = api.getMetatraderAccountApi().getAccounts().get();
             Optional<MetatraderAccount> account = accounts.stream()
-                .filter(   a -> a.getLogin().equals(login) 
-                        && a.getSynchronizationMode().equals("automatic") 
-                        && a.getType().startsWith("cloud")
-                ).findFirst();
+                .filter(a -> a.getLogin().equals(login) && a.getType().startsWith("cloud"))
+                .findFirst();
             if (account.isEmpty()) {
                 System.out.println("Adding MT5 account to MetaApi");
                 String mtLogin = login;
@@ -72,7 +70,6 @@ public class MetaApiRpcExample {
                     login = mtLogin;
                     password = mtPassword;
                     server = serverName;
-                    synchronizationMode = "automatic";
                     provisioningProfileId = provisioningProfile.getId();
                     timeConverter = "icmarkets";
                     application = "MetaApi";
