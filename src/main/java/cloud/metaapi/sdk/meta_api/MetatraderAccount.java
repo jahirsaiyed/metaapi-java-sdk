@@ -22,22 +22,24 @@ public class MetatraderAccount {
     
     private MetatraderAccountDto data;
     private MetatraderAccountClient metatraderAccountClient;
-    private MetaApiWebsocketClient metaApiWebsocketClient;
+    private ConnectionRegistry connectionRegistry;
     
     /**
      * Constructs a MetaTrader account entity
      * @param data MetaTrader account data
      * @param metatraderAccountClient MetaTrader account REST API client
      * @param metaApiWebsocketClient MetaApi websocket client
+     * @param connectionRegistry metatrader account connection registry
      */
     public MetatraderAccount(
         MetatraderAccountDto data,
         MetatraderAccountClient metatraderAccountClient,
-        MetaApiWebsocketClient metaApiWebsocketClient
+        MetaApiWebsocketClient metaApiWebsocketClient,
+        ConnectionRegistry connectionRegistry
     ) {
         this.data = data;
         this.metatraderAccountClient = metatraderAccountClient;
-        this.metaApiWebsocketClient = metaApiWebsocketClient;
+        this.connectionRegistry = connectionRegistry;
     }
     
     /**
@@ -162,6 +164,7 @@ public class MetatraderAccount {
      */
     public CompletableFuture<Void> remove() {
         return CompletableFuture.supplyAsync(() -> {
+            connectionRegistry.remove(getId());
             try {
                 metatraderAccountClient.deleteAccount(getId()).get();
                 HistoryFileManager fileManager = ServiceProvider.createHistoryFileManager(getId(), null);
@@ -205,17 +208,11 @@ public class MetatraderAccount {
      * @returns completable future resolving when account is scheduled for undeployment
      */
     public CompletableFuture<Void> undeploy() {
-        CompletableFuture<Void> result = new CompletableFuture<>();
-        CompletableFuture.runAsync(() -> {
-            try {
-                metatraderAccountClient.undeployAccount(getId()).get();
-                reload().get();
-                result.complete(null);
-            } catch (Exception e) {
-                result.completeExceptionally(e);
-            }
+        return CompletableFuture.runAsync(() -> {
+            connectionRegistry.remove(getId());
+            metatraderAccountClient.undeployAccount(getId()).join();
+            reload().join();
         });
-        return result;
     }
     
     /**
@@ -224,17 +221,10 @@ public class MetatraderAccount {
      * @returns completable future resolving when account is scheduled for redeployment
      */
     public CompletableFuture<Void> redeploy() {
-        CompletableFuture<Void> result = new CompletableFuture<>();
-        CompletableFuture.runAsync(() -> {
-            try {
-                metatraderAccountClient.redeployAccount(getId()).get();
-                reload().get();
-                result.complete(null);
-            } catch (Exception e) {
-                result.completeExceptionally(e);
-            }
+        return CompletableFuture.runAsync(() -> {
+            metatraderAccountClient.redeployAccount(getId()).join();
+            reload().join();
         });
-        return result;
     }
     
     /**
@@ -365,7 +355,8 @@ public class MetatraderAccount {
     }
     
     /**
-     * Connects to MetaApi with default history storage
+     * Connects to MetaApi with default history storage. There is only one connection per account.
+     * Subsequent calls to this method will return the same connection.
      * @returns MetaApi connection
      */
     public CompletableFuture<MetaApiConnection> connect() {
@@ -373,18 +364,13 @@ public class MetatraderAccount {
     }
     
     /**
-     * Connects to MetaApi
+     * Connects to MetaApi. There is only one connection per account. 
+     * Subsequent calls to this method will return the same connection.
      * @param historyStorage optional history storage
      * @returns MetaApi connection
      */
     public CompletableFuture<MetaApiConnection> connect(HistoryStorage historyStorage) {
-        return CompletableFuture.supplyAsync(() -> {
-            MetaApiConnection connection = ServiceProvider
-                .createMetaApiConnection(metaApiWebsocketClient, this, historyStorage);
-            connection.initialize().join();
-            connection.subscribe().join();
-            return connection;
-        });
+        return connectionRegistry.connect(this, historyStorage);
     }
     
     /**

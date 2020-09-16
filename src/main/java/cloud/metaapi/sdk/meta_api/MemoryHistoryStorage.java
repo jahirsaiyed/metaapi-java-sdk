@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder;
@@ -62,13 +61,9 @@ public class MemoryHistoryStorage extends HistoryStorage {
      */
     public CompletableFuture<Void> loadDataFromDisk() {
         return CompletableFuture.runAsync(() -> {
-            try {
-                History history = fileManager.getHistoryFromDisk().get();
-                deals = new ArrayList<>(history.deals);
-                historyOrders = new ArrayList<>(history.historyOrders);
-            } catch (Exception e) {
-                throw new CompletionException(e);
-            }
+            History history = fileManager.getHistoryFromDisk().join();
+            deals = new ArrayList<>(history.deals);
+            historyOrders = new ArrayList<>(history.historyOrders);
         });
     }
     

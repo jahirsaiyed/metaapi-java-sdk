@@ -4,7 +4,7 @@
 
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>7.0.0</version>
+  <version>7.1.1</version>
   <packaging>jar</packaging>
 
   <name>${project.groupId}:${project.artifactId}</name>
@@ -70,6 +70,26 @@
           <nexusUrl>https://oss.sonatype.org/</nexusUrl>
           <autoReleaseAfterClose>true</autoReleaseAfterClose>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.2.0</version>
+        <executions>
+          <execution>
+            <id>add-test-source</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>src/test/unit/java</source>
+                <source>src/test/integration/java</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
@@ -205,5 +225,10 @@
       <version>2.7</version>
       <scope>test</scope>
     </dependency>
+	  <dependency>
+	  <groupId>io.github.cdimascio</groupId>
+	  <artifactId>java-dotenv</artifactId>
+	  <version>5.2.2</version>
+	</dependency>
   </dependencies>
 </project>

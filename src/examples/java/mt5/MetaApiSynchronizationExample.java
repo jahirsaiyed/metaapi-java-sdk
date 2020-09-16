@@ -27,7 +27,7 @@ public class MetaApiSynchronizationExample {
     private static String login = getEnvOrDefault("LOGIN", "<put in your MT login here>");
     private static String password = getEnvOrDefault("PASSWORD", "<put in your MT password here>");
     private static String serverName = getEnvOrDefault("SERVER", "<put in your MT server name here>");
-    private static String brokerSrvFile = getEnvOrDefault("PATH_TO_BROKER_SRV", "/path/to/your/servers.dat");
+    private static String serverDatFile = getEnvOrDefault("PATH_TO_SERVERS_DAT", "/path/to/your/servers.dat");
 
     private static MetaApi api = new MetaApi(token);
     
@@ -43,11 +43,11 @@ public class MetaApiSynchronizationExample {
                 System.out.println("Creating account profile");
                 NewProvisioningProfileDto newDto = new NewProvisioningProfileDto() {{ name = serverName; version = 5; }};
                 profile = Optional.of(api.getProvisioningProfileApi().createProvisioningProfile(newDto).get());
-                profile.get().uploadFile("servers.dat", brokerSrvFile).get();
+                profile.get().uploadFile("servers.dat", serverDatFile).get();
             }
             if (profile.isPresent() && profile.get().getStatus().equals("new")) {
                 System.out.println("Uploading servers.dat");
-                profile.get().uploadFile("servers.dat", brokerSrvFile).get();
+                profile.get().uploadFile("servers.dat", serverDatFile).get();
             } else {
                 System.out.println("Account profile already created");
             }

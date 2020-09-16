@@ -17,18 +17,22 @@ public class MetatraderAccountApi {
     
     private MetatraderAccountClient metatraderAccountClient;
     private MetaApiWebsocketClient metaApiWebsocketClient;
+    private ConnectionRegistry connectionRegistry;
     
     /**
      * Constructs a MetaTrader account API instance
      * @param metatraderAccountClient MetaTrader account REST API client
      * @param metaApiWebsocketClient MetaApi websocket client
+     * @param connectionRegistry metatrader account connection registry
      */
     public MetatraderAccountApi(
         MetatraderAccountClient metatraderAccountClient,
-        MetaApiWebsocketClient metaApiWebsocketClient
+        MetaApiWebsocketClient metaApiWebsocketClient,
+        ConnectionRegistry connectionRegistry
     ) {
         this.metatraderAccountClient = metatraderAccountClient;
         this.metaApiWebsocketClient = metaApiWebsocketClient;
+        this.connectionRegistry = connectionRegistry;
     }
     
     /**
@@ -48,7 +52,7 @@ public class MetatraderAccountApi {
         return metatraderAccountClient.getAccounts(accountsFilter).thenApply(accounts -> {
             List<MetatraderAccount> result = new ArrayList<>();
             accounts.forEach(accountDto -> result.add(
-                new MetatraderAccount(accountDto, metatraderAccountClient, metaApiWebsocketClient)
+                new MetatraderAccount(accountDto, metatraderAccountClient, metaApiWebsocketClient, connectionRegistry)
             ));
             return result;
         });
@@ -61,7 +65,8 @@ public class MetatraderAccountApi {
      */
     public CompletableFuture<MetatraderAccount> getAccount(String accountId) {
         return metatraderAccountClient.getAccount(accountId).thenApply(accountDto -> {
-            return new MetatraderAccount(accountDto, metatraderAccountClient, metaApiWebsocketClient);
+            return new MetatraderAccount(accountDto, metatraderAccountClient, metaApiWebsocketClient,
+                connectionRegistry);
         });
     }
     
@@ -71,7 +76,8 @@ public class MetatraderAccountApi {
      */
     public CompletableFuture<MetatraderAccount> getAccountByToken() {
         return metatraderAccountClient.getAccountByToken().thenApply(accountDto -> {
-            return new MetatraderAccount(accountDto, metatraderAccountClient, metaApiWebsocketClient);
+            return new MetatraderAccount(accountDto, metatraderAccountClient, metaApiWebsocketClient,
+                connectionRegistry);
         });
     }
     

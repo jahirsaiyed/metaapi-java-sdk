@@ -216,6 +216,30 @@ public class HistoryFileManagerTest {
     }
     
     /**
+     * Tests {@link HistoryFileManager#updateDiskStorage()}
+     */
+    @Test
+    void testDoesNotCorruptsTheDiskStorageIfUpdateCalledMultipleTimes() throws JsonProcessingException, IOException {
+        Mockito.when(storage.getDeals()).thenReturn(List.of(testDeal, testDeal2));
+        Mockito.when(storage.getHistoryOrders()).thenReturn(List.of(testOrder, testOrder2));
+        fileManager.setStartNewDealIndex(0);
+        fileManager.setStartNewOrderIndex(0);
+        fileManager.updateDiskStorage().join();
+        Mockito.when(storage.getDeals()).thenReturn(List.of(testDeal, testDeal2, testDeal3));
+        Mockito.when(storage.getHistoryOrders()).thenReturn(List.of(testOrder, testOrder2, testOrder3));
+        fileManager.setStartNewDealIndex(2);
+        fileManager.setStartNewOrderIndex(2);
+        CompletableFuture.allOf(
+            fileManager.updateDiskStorage(),
+            fileManager.updateDiskStorage(),
+            fileManager.updateDiskStorage(),
+            fileManager.updateDiskStorage(),
+            fileManager.updateDiskStorage()
+        ).join();
+        JsonMapper.getInstance().readTree(new File("./.metaapi/accountId-historyOrders.bin"));
+    }
+    
+    /**
      * Tests {@link HistoryFileManager#deleteStorageFromDisk()}
      */
     @Test

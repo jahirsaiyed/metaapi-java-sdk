@@ -41,6 +41,7 @@ public class HistoryFileManager {
     private List<Integer> historyOrdersSize = new ArrayList<>();
     private int startNewOrderIndex = -1;
     private Timer updateDiskStorageJob = null;
+    private boolean isUpdating = false;
     
     /**
      * Defines interval between update jobs. Intended to be overriden in tests.
@@ -157,16 +158,20 @@ public class HistoryFileManager {
      */
     public CompletableFuture<Void> updateDiskStorage() {
         return CompletableFuture.runAsync(() -> {
-            try {
-                Files.createDirectories(Path.of("./.metaapi"));
-                dealsSize = updateDiskStorageWith(
-                    "deals", startNewDealIndex, historyStorage.getDeals(), dealsSize);
-                startNewDealIndex = -1;
-                historyOrdersSize = updateDiskStorageWith(
-                    "historyOrders", startNewOrderIndex, historyStorage.getHistoryOrders(), historyOrdersSize);
-                startNewOrderIndex = -1;
-            } catch (IOException e) {
-                throw new CompletionException(e);
+            if (!isUpdating) {
+                isUpdating = true;
+                try {
+                    Files.createDirectories(Path.of("./.metaapi"));
+                    dealsSize = updateDiskStorageWith(
+                        "deals", startNewDealIndex, historyStorage.getDeals(), dealsSize);
+                    startNewDealIndex = -1;
+                    historyOrdersSize = updateDiskStorageWith(
+                        "historyOrders", startNewOrderIndex, historyStorage.getHistoryOrders(), historyOrdersSize);
+                    startNewOrderIndex = -1;
+                } catch (IOException e) {
+                    logger.error("Error updating disk storage for account " + accountId, e);
+                }
+                isUpdating = false;
             }
         });
     }

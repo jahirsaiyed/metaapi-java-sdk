@@ -4,9 +4,10 @@ target
 # Logs directory
 logs
 
-# Metatrader files for examples testing
+# Files for testing
 broker.srv
 servers.dat
+.env
 
 # Internal MetaApi directory
 .metaapi
