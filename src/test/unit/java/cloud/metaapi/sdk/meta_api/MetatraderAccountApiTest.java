@@ -38,12 +38,14 @@ public class MetatraderAccountApiTest {
     private MetatraderAccountApi api;
     private MetatraderAccountClient client;
     private MetaApiWebsocketClient metaApiWebsocketClient;
+    private ConnectionRegistry connectionRegistry;
 
     @BeforeEach
     void setUp() throws Exception {
         client = Mockito.mock(MetatraderAccountClient.class);
         metaApiWebsocketClient = Mockito.mock(MetaApiWebsocketClient.class);
-        api = new MetatraderAccountApi(client, metaApiWebsocketClient);
+        connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
+        api = new MetatraderAccountApi(client, metaApiWebsocketClient, connectionRegistry);
     }
     
     /**
@@ -55,7 +57,7 @@ public class MetatraderAccountApiTest {
         AccountsFilter filter = new AccountsFilter() {{ provisioningProfileId = "profileId"; }};
         Mockito.when(client.getAccounts(filter)).thenReturn(CompletableFuture.completedFuture(List.of(accountDto)));
         List<MetatraderAccount> expectedAccounts = List.of(
-            new MetatraderAccount(accountDto, client, metaApiWebsocketClient));
+            new MetatraderAccount(accountDto, client, metaApiWebsocketClient, connectionRegistry));
         List<MetatraderAccount> actualAccounts = api.getAccounts(filter).get();
         assertThat(actualAccounts).usingRecursiveComparison().isEqualTo(expectedAccounts);
     }
@@ -67,7 +69,8 @@ public class MetatraderAccountApiTest {
     @MethodSource("provideAccountDto")
     void testRetrievesMtAccountById(MetatraderAccountDto accountDto) throws Exception {
         Mockito.when(client.getAccount("id")).thenReturn(CompletableFuture.completedFuture(accountDto));
-        MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient);
+        MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient,
+            connectionRegistry);
         MetatraderAccount actualAccount = api.getAccount("id").get();
         assertThat(actualAccount).usingRecursiveComparison().isEqualTo(expectedAccount);
     }
@@ -79,7 +82,8 @@ public class MetatraderAccountApiTest {
     @MethodSource("provideAccountDto")
     void testRetrievesMtAccountByToken(MetatraderAccountDto accountDto) throws Exception {
         Mockito.when(client.getAccountByToken()).thenReturn(CompletableFuture.completedFuture(accountDto));
-        MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient);
+        MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient,
+            connectionRegistry);
         MetatraderAccount actualAccount = api.getAccountByToken().get();
         assertThat(actualAccount).usingRecursiveComparison().isEqualTo(expectedAccount);
     }
@@ -104,7 +108,8 @@ public class MetatraderAccountApiTest {
         accountIdDto.id = "id";
         Mockito.when(client.createAccount(newAccountDto)).thenReturn(CompletableFuture.completedFuture(accountIdDto));
         Mockito.when(client.getAccount("id")).thenReturn(CompletableFuture.completedFuture(accountDto));
-        MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient);
+        MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient,
+            connectionRegistry);
         MetatraderAccount actualAccount = api.createAccount(newAccountDto).get();
         assertThat(actualAccount).usingRecursiveComparison().isEqualTo(expectedAccount);
     }
@@ -154,6 +159,7 @@ public class MetatraderAccountApiTest {
         ServiceProvider.setHistoryFileManagerMock(historyFileManagerMock);
         account.remove().get();
         assertEquals(DeploymentState.DELETING, account.getState());
+        Mockito.verify(connectionRegistry).remove("id");
         Mockito.verify(client, Mockito.times(2)).getAccount("id");
     }
     
@@ -200,6 +206,7 @@ public class MetatraderAccountApiTest {
         MetatraderAccount account = api.getAccount("id").get();
         account.undeploy().get();
         assertEquals(DeploymentState.UNDEPLOYING, account.getState());
+        Mockito.verify(connectionRegistry).remove("id");
         Mockito.verify(client, Mockito.times(2)).getAccount("id");
     }
     
@@ -399,11 +406,11 @@ public class MetatraderAccountApiTest {
      */
     @ParameterizedTest
     @MethodSource("provideAccountDto")
-    void testConnectsToAnMtTerminal(MetatraderAccountDto accountDto) throws Exception {
+    void testConnectsToAnMtTerminal(MetatraderAccountDto accountDto) {
         // Common preparation
         Mockito.when(metaApiWebsocketClient.subscribe("id")).thenReturn(CompletableFuture.completedFuture(null));
         Mockito.when(client.getAccount("id")).thenReturn(CompletableFuture.completedFuture(accountDto));
-        MetatraderAccount account = api.getAccount("id").get();
+        MetatraderAccount account = api.getAccount("id").join();
         // Stub storage
         HistoryStorage storage = Mockito.mock(HistoryStorage.class);
         Mockito.when(storage.getLastHistoryOrderTime())
@@ -411,17 +418,9 @@ public class MetatraderAccountApiTest {
         Mockito.when(storage.getLastDealTime())
             .thenReturn(CompletableFuture.completedFuture(new IsoTime("2020-01-02T00:00:00.000Z")));
         Mockito.when(storage.loadData()).thenReturn(CompletableFuture.completedFuture(null));
-        // Spy connection
-        MetaApiConnection spyConnection = Mockito.spy(new MetaApiConnection(metaApiWebsocketClient, account, storage));
-        ServiceProvider.setMetApiConnectionMock(spyConnection);
-        Mockito.doReturn(CompletableFuture.completedFuture(null)).when(spyConnection).initialize();
         
-        MetaApiConnection connection = account.connect(storage).get();
-        
-        assertEquals(storage, connection.getHistoryStorage());
-        Mockito.verify(metaApiWebsocketClient).addSynchronizationListener("id", storage);
-        Mockito.verify(metaApiWebsocketClient).subscribe("id");
-        Mockito.verify(spyConnection).initialize();
+        account.connect(storage).join();
+        Mockito.verify(connectionRegistry).connect(account, storage);
     }
     
     /**

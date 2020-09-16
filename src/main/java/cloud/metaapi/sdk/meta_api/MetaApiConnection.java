@@ -41,9 +41,11 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     private MetatraderAccount account;
     private HashSet<String> ordersSynchronized = new HashSet<>();
     private HashSet<String> dealsSynchronized = new HashSet<>();
+    private ConnectionRegistry connectionRegistry;
     private String lastSynchronizationId = null;
-    private TerminalState terminalState = null;
-    private HistoryStorage historyStorage = null;
+    private TerminalState terminalState;
+    private HistoryStorage historyStorage;
+    private boolean closed = false;
     
     /**
      * Constructs MetaApi MetaTrader Api connection
@@ -51,12 +53,17 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param account MetaTrader account to connect to
      * @param historyStorage terminal history storage or {@code null}. By default an instance of MemoryHistoryStorage
      * will be used.
+     * @param connectionRegistry metatrader account connection registry
      */
     public MetaApiConnection(
-        MetaApiWebsocketClient websocketClient, MetatraderAccount account, HistoryStorage historyStorage
+        MetaApiWebsocketClient websocketClient,
+        MetatraderAccount account,
+        HistoryStorage historyStorage,
+        ConnectionRegistry connectionRegistry
     ) {
         this.websocketClient = websocketClient;
         this.account = account;
+        this.connectionRegistry = connectionRegistry;
         this.terminalState = new TerminalState();
         this.historyStorage = historyStorage != null ? historyStorage : new MemoryHistoryStorage(account.getId());
         websocketClient.addSynchronizationListener(account.getId(), this);
@@ -679,9 +686,13 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Closes the connection. The instance of the class should no longer be used after this method is invoked.
      */
     public void close() {
-        websocketClient.removeSynchronizationListener(account.getId(), this);
-        websocketClient.removeSynchronizationListener(account.getId(), terminalState);
-        websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
+        if (!closed) {
+            websocketClient.removeSynchronizationListener(account.getId(), this);
+            websocketClient.removeSynchronizationListener(account.getId(), terminalState);
+            websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
+            connectionRegistry.remove(account.getId());
+            closed = true;
+        }
     }
     
     private void copyModelProperties(Object source, Object target) {

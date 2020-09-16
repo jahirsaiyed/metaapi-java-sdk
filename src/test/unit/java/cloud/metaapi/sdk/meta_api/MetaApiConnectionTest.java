@@ -19,10 +19,8 @@ import org.mockito.Mockito;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
-import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketTradeOptions;
-import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeals;
@@ -52,6 +50,7 @@ class MetaApiConnectionTest {
     private MetaApiConnection api;
     private MetaApiWebsocketClient client;
     private HistoryStorage storageMock;
+    private ConnectionRegistry connectionRegistry;
     
     @BeforeEach
     void setUp() throws Exception {
@@ -59,11 +58,12 @@ class MetaApiConnectionTest {
         Mockito.when(historyFileManagerMock.getHistoryFromDisk()).thenReturn(CompletableFuture.completedFuture(
             new History() {{ deals = List.of(); historyOrders = List.of(); }}));
         ServiceProvider.setHistoryFileManagerMock(historyFileManagerMock);
-        MetatraderAccountDto accountDto = new MetatraderAccountDto() {{ _id = "accountId"; }};
-        MetatraderAccountClient accountClient = Mockito.mock(MetatraderAccountClient.class);
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
         client = Mockito.mock(MetaApiWebsocketClient.class);
         storageMock = Mockito.mock(HistoryStorage.class);
-        api = new MetaApiConnection(client, new MetatraderAccount(accountDto, accountClient, client), storageMock);
+        connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
+        api = new MetaApiConnection(client, account, storageMock, connectionRegistry);
     }
 
     /**
@@ -552,16 +552,15 @@ class MetaApiConnectionTest {
     /**
      * Tests {@link MetaApiConnection#synchronize()}
      */
-    @ParameterizedTest
-    @MethodSource("provideAccountDto")
-    void testSynchronizesStateWithTerminal(MetatraderAccountDto userSyncModeAccount) throws Exception {
+    @Test
+    void testSynchronizesStateWithTerminal() throws Exception {
         IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
         IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
         Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.anyString(), Mockito.any(), Mockito.any()))
             .thenReturn(CompletableFuture.completedFuture(null));
-        MetatraderAccountClient accountClient = Mockito.mock(MetatraderAccountClient.class); 
-        MetatraderAccount account = new MetatraderAccount(userSyncModeAccount, accountClient, client);
-        MetaApiConnection api = new MetaApiConnection(client, account, null);
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
+        MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
         api.getHistoryStorage().onHistoryOrderAdded(new MetatraderOrder() {{
             doneTime = startingHistoryOrderTime;
         }});
@@ -627,14 +626,11 @@ class MetaApiConnectionTest {
      * Tests {@link MetaApiConnection#getTerminalState()}
      * Tests {@link MetaApiConnection#getHistoryStorage()}
      */
-    @ParameterizedTest
-    @MethodSource("provideAccountDto")
-    void testInitializesListenersAndTerminalStateAndHistoryStorageForAccountsWithUserSynchronizationMode(
-        MetatraderAccountDto userSyncModeAccount
-    ) throws Exception {
-        MetatraderAccountClient accountClient = Mockito.mock(MetatraderAccountClient.class); 
-        MetatraderAccount account = new MetatraderAccount(userSyncModeAccount, accountClient, client);
-        MetaApiConnection api = new MetaApiConnection(client, account, null);
+    @Test
+    void testInitializesListenersAndTerminalStateAndHistoryStorageForAccountsWithUserSynchronizationMode() {
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
+        MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
         assertNotNull(api.getTerminalState());
         assertNotNull(api.getHistoryStorage());
         Mockito.verify(client).addSynchronizationListener("accountId", api);
@@ -645,12 +641,11 @@ class MetaApiConnectionTest {
     /**
      * Tests {@link MetaApiConnection#addSynchronizationListener(SynchronizationListener)}
      */
-    @ParameterizedTest
-    @MethodSource("provideAccountDto")
-    void testAddsSynchronizationListeners(MetatraderAccountDto userAccount) {
-        MetatraderAccountClient accountClient = Mockito.mock(MetatraderAccountClient.class); 
-        MetatraderAccount account = new MetatraderAccount(userAccount, accountClient, client);
-        MetaApiConnection api = new MetaApiConnection(client, account, null);
+    @Test
+    void testAddsSynchronizationListeners() {
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
+        MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
         SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
         api.addSynchronizationListener(listener);
         Mockito.verify(client).addSynchronizationListener("accountId", listener);
@@ -659,12 +654,11 @@ class MetaApiConnectionTest {
     /**
      * Tests {@link MetaApiConnection#removeSynchronizationListener(SynchronizationListener)}
      */
-    @ParameterizedTest
-    @MethodSource("provideAccountDto")
-    void testRemovesSynchronizationListeners(MetatraderAccountDto userAccount) {
-        MetatraderAccountClient accountClient = Mockito.mock(MetatraderAccountClient.class); 
-        MetatraderAccount account = new MetatraderAccount(userAccount, accountClient, client);
-        MetaApiConnection api = new MetaApiConnection(client, account, null);
+    @Test
+    void testRemovesSynchronizationListeners() {
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
+        MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
         SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
         api.removeSynchronizationListener(listener);
         Mockito.verify(client).removeSynchronizationListener("accountId", listener);
@@ -673,16 +667,15 @@ class MetaApiConnectionTest {
     /**
      * Tests {@link MetaApiConnection#onConnected()}
      */
-    @ParameterizedTest
-    @MethodSource("provideAccountDto")
-    void testSynchronizesOnConnection(MetatraderAccountDto userSyncModeAccount) throws Exception {
+    @Test
+    void testSynchronizesOnConnection() throws Exception {
         IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
         IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
         Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.anyString(), Mockito.any(), Mockito.any()))
             .thenReturn(CompletableFuture.completedFuture(null));
-        MetatraderAccountClient accountClient = Mockito.mock(MetatraderAccountClient.class); 
-        MetatraderAccount account = new MetatraderAccount(userSyncModeAccount, accountClient, client);
-        MetaApiConnection api = new MetaApiConnection(client, account, null);
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
+        MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
         api.getHistoryStorage().onHistoryOrderAdded(new MetatraderOrder() {{
             doneTime = startingHistoryOrderTime;
         }});
@@ -702,14 +695,11 @@ class MetaApiConnectionTest {
     /**
      * Tests {@link MetaApiConnection#close()}
      */
-    @ParameterizedTest
-    @MethodSource("provideAccountDto")
-    void testUnsubscribesFromEventsOnClose(
-        MetatraderAccountDto userSyncModeAccount
-    ) throws Exception {
-        MetatraderAccountClient accountClient = Mockito.mock(MetatraderAccountClient.class); 
-        MetatraderAccount account = new MetatraderAccount(userSyncModeAccount, accountClient, client);
-        MetaApiConnection api = new MetaApiConnection(client, account, null);
+    @Test
+    void testUnsubscribesFromEventsOnClose() {
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
+        MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
         api.close();
         Mockito.verify(client).removeSynchronizationListener("accountId", api);
         Mockito.verify(client).removeSynchronizationListener("accountId", api.getTerminalState());
@@ -870,11 +860,5 @@ class MetaApiConnectionTest {
         result.stringCode = "TRADE_RETCODE_DONE";
         result.positionId = "46870472";
         return Stream.of(Arguments.of(result));
-    }
-    
-    private static Stream<Arguments> provideAccountDto() {
-        MetatraderAccountDto accountDto = new MetatraderAccountDto();
-        accountDto._id = "accountId";
-        return Stream.of(Arguments.of(accountDto));
     }
 }
