@@ -1,3 +1,9 @@
+7.1.3
+  - Adjust CopyFactory defaults
+
+7.1.2
+  - Changes to load balancing algorithm
+
 7.1.1
   - fix simultaneous multiple file writes by one connection
 

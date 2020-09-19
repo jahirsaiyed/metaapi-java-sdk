@@ -144,10 +144,10 @@ class ConfigurationClientTest {
     }
     
     /**
-     * Tests {@link ConfigurationClient#deleteAccount(String)}
+     * Tests {@link ConfigurationClient#removeAccount(String)}
      */
     @Test
-    void testDeletesCopyFactoryAccountViaApi() throws Exception {
+    void testRemovesCopyFactoryAccountViaApi() throws Exception {
         httpClient.setRequestMock((actualOptions) -> {
             HttpRequestOptions expectedOptions = new HttpRequestOptions(
                 copyFactoryApiUrl + "/users/current/configuration/accounts/" + 
@@ -156,20 +156,20 @@ class ConfigurationClientTest {
             assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
             return CompletableFuture.completedFuture(null);
         });
-        copyFactoryClient.deleteAccount("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").get();
+        copyFactoryClient.removeAccount("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").get();
     }
     
     /**
-     * Tests {@link ConfigurationClient#deleteAccount(String)}
+     * Tests {@link ConfigurationClient#removeAccount(String)}
      */
     @Test
-    void testDoesNotDeletesCopyFactoryAccountViaApiWithAccountToken() throws Exception {
+    void testDoesNotRemoveCopyFactoryAccountViaApiWithAccountToken() throws Exception {
         copyFactoryClient = new ConfigurationClient(httpClient, "token");
         try {
-            copyFactoryClient.deleteAccount("id").get();
+            copyFactoryClient.removeAccount("id").get();
         } catch (ExecutionException e) {
             assertEquals(
-                "You can not invoke deleteAccount method, because you have connected with account access token. "
+                "You can not invoke removeAccount method, because you have connected with account access token. "
                 + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
                 e.getCause().getMessage()
             );
@@ -329,10 +329,10 @@ class ConfigurationClientTest {
     }
     
     /**
-     * Tests {@link ConfigurationClient#deleteStrategy(String)}
+     * Tests {@link ConfigurationClient#removeStrategy(String)}
      */
     @Test
-    void testDeletesStrategyViaApi() throws Exception {
+    void testRemovesStrategyViaApi() throws Exception {
         httpClient.setRequestMock((actualOptions) -> {
             HttpRequestOptions expectedOptions = new HttpRequestOptions(
                 copyFactoryApiUrl + "/users/current/configuration/strategies/ABCD", Method.DELETE);
@@ -340,20 +340,20 @@ class ConfigurationClientTest {
             assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
             return CompletableFuture.completedFuture(null);
         });
-        copyFactoryClient.deleteStrategy("ABCD").get();
+        copyFactoryClient.removeStrategy("ABCD").get();
     }
     
     /**
-     * Tests {@link ConfigurationClient#deleteStrategy(String)}
+     * Tests {@link ConfigurationClient#removeStrategy(String)}
      */
     @Test
-    void testDoesNotDeletesStrategyViaApiWithAccountToken() throws Exception {
+    void testDoesNotRemoveStrategyViaApiWithAccountToken() throws Exception {
         copyFactoryClient = new ConfigurationClient(httpClient, "token");
         try {
-            copyFactoryClient.deleteStrategy("id").get();
+            copyFactoryClient.removeStrategy("id").get();
         } catch (ExecutionException e) {
             assertEquals(
-                "You can not invoke deleteStrategy method, because you have connected with account access token. "
+                "You can not invoke removeStrategy method, because you have connected with account access token. "
                 + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
                 e.getCause().getMessage()
             );

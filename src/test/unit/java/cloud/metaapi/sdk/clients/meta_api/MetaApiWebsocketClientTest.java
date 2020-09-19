@@ -8,13 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,14 +20,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import com.corundumstudio.socketio.listener.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import cloud.metaapi.sdk.clients.HttpClientWithCookies;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.*;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
@@ -49,8 +45,6 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade.*;
 import cloud.metaapi.sdk.clients.mocks.SynchronizationListenerMock;
 import cloud.metaapi.sdk.clients.models.*;
 import cloud.metaapi.sdk.util.JsonMapper;
-import kong.unirest.Cookie;
-import kong.unirest.Cookies;
 
 import com.corundumstudio.socketio.*;
 
@@ -71,12 +65,7 @@ class MetaApiWebsocketClientTest {
     
     @BeforeAll
     static void setUpBeforeClass() {
-        Cookies cookies = new Cookies();
-        cookies.add(new Cookie("route", "some-value"));
-        HttpClientWithCookies httpClientWithCookies = Mockito.mock(HttpClientWithCookies.class);
-        Mockito.when(httpClientWithCookies.request(Mockito.any()))
-            .thenReturn(CompletableFuture.completedFuture(Pair.of("empty-body", cookies)));
-        client = new MetaApiWebsocketClient(httpClientWithCookies, "token");
+        client = new MetaApiWebsocketClient("token", "project-stock.agiliumlabs.cloud", 60000, 60000);
         client.setUrl("http://localhost:6784");
     }
 
@@ -111,8 +100,10 @@ class MetaApiWebsocketClientTest {
      * Tests {@link MetaApiWebsocketClient#connect()}
      */
     @Test
-    void testSendsCookiesWhenConnects() {
-        assertEquals("route=some-value", socket.getHandshakeData().getHttpHeaders().get("Cookie"));
+    void testSendsClientIdWhenConnects() {
+        String clientId = socket.getHandshakeData().getHttpHeaders().get("Client-id");
+        assertTrue(clientId != null);
+        assertTrue(Float.valueOf(clientId) >= 0 && Float.valueOf(clientId) < 1);
     }
 
     /**

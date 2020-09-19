@@ -92,10 +92,10 @@ public class ConfigurationClient extends MetaApiClient {
      * Deletes a CopyFactory trade copying account. See
      * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/delete_users_current_configuration_accounts_accountId
      * @param id copy trading account id
-     * @return completable future resolving when account is deleted
+     * @return completable future resolving when account is removed
      */
-    public CompletableFuture<Void> deleteAccount(String id) {
-        if (isNotJwtToken()) return handleNoAccessError("deleteAccount");
+    public CompletableFuture<Void> removeAccount(String id) {
+        if (isNotJwtToken()) return handleNoAccessError("removeAccount");
         HttpRequestOptions opts = new HttpRequestOptions(
             host + "/users/current/configuration/accounts/" + id, Method.DELETE);
         opts.getHeaders().put("auth-token", token);
@@ -135,10 +135,10 @@ public class ConfigurationClient extends MetaApiClient {
      * Deletes a CopyFactory strategy. See
      * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/delete_users_current_configuration_strategies_strategyId
      * @param id strategy id
-     * @return completable future resolving when strategy is deleted
+     * @return completable future resolving when strategy is removed
      */
-    public CompletableFuture<Void> deleteStrategy(String id) {
-        if (isNotJwtToken()) return handleNoAccessError("deleteStrategy");
+    public CompletableFuture<Void> removeStrategy(String id) {
+        if (isNotJwtToken()) return handleNoAccessError("removeStrategy");
         HttpRequestOptions opts = new HttpRequestOptions(
             host + "/users/current/configuration/strategies/" + id, Method.DELETE);
         opts.getHeaders().put("auth-token", token);

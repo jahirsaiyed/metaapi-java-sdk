@@ -7,13 +7,13 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -23,9 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import cloud.metaapi.sdk.clients.HttpClientWithCookies;
-import cloud.metaapi.sdk.clients.HttpRequestOptions;
-import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.*;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
@@ -44,8 +41,7 @@ import io.socket.client.IO;
 import io.socket.client.Manager;
 import io.socket.client.Socket;
 import io.socket.engineio.client.Transport;
-import kong.unirest.Cookie;
-import kong.unirest.Cookies;
+import io.socket.engineio.client.transports.WebSocket;
 
 /**
  * MetaApi websocket API client (see https://metaapi.cloud/docs/client/websocket/overview/)
@@ -59,7 +55,6 @@ public class MetaApiWebsocketClient {
     private Socket socket;
     private long requestTimeout;
     private long connectTimeout;
-    private HttpClientWithCookies httpClientWithCookies;
     private ObjectMapper jsonMapper = JsonMapper.getInstance();
     private Map<String, CompletableFuture<JsonNode>> requestResolves;
     private Map<String, List<SynchronizationListener>> synchronizationListeners;
@@ -70,24 +65,20 @@ public class MetaApiWebsocketClient {
     /**
      * Constructs MetaApi websocket API client instance. Domain is {@code agiliumtrade.agiliumtrade.ai},
      * timeout for socket requests is {@code 1 minute}, timeout for connecting to server is {@code 1 minute}.
-     * @param httpClient HTTP client with cookies
      * @param token authorization token
      */
-    public MetaApiWebsocketClient(HttpClientWithCookies httpClient, String token) {
-        this(httpClient, token, "agiliumtrade.agiliumtrade.ai", 60000, 60000);
+    public MetaApiWebsocketClient(String token) {
+        this(token, "agiliumtrade.agiliumtrade.ai", 60000, 60000);
     }
     
     /**
      * Constructs MetaApi websocket API client instance
-     * @param httpClient HTTP client with cookies
      * @param token authorization token
      * @param domain domain to connect to
      * @param requestTimeout timeout for socket requests in milliseconds
      * @param connectTimeout timeout for connecting to server in milliseconds
      */
-    public MetaApiWebsocketClient(
-        HttpClientWithCookies httpClient, String token, String domain, long requestTimeout, long connectTimeout
-    ) {
+    public MetaApiWebsocketClient(String token, String domain, long requestTimeout, long connectTimeout) {
         this.url = "https://mt-client-api-v1." + domain;
         this.token = token;
         this.requestResolves = new HashMap<>();
@@ -95,7 +86,6 @@ public class MetaApiWebsocketClient {
         this.reconnectListeners = new LinkedList<>();
         this.requestTimeout = requestTimeout;
         this.connectTimeout = connectTimeout;
-        this.httpClientWithCookies = httpClient;
     }
     
     /**
@@ -117,11 +107,6 @@ public class MetaApiWebsocketClient {
             requestResolves.clear();
             CompletableFuture<Void> result = new CompletableFuture<>();
             
-            // get cookies
-            HttpRequestOptions options = new HttpRequestOptions(this.url + "/health", Method.GET);
-            Pair<String, Cookies> response = httpClientWithCookies.request(options).join();
-            Cookie routeCookie = response.getRight().getNamed("route");
-            
             String url = this.url + "?auth-token=" + token;
             IO.Options socketOptions = new IO.Options();
             socketOptions.path = "/ws";
@@ -130,19 +115,22 @@ public class MetaApiWebsocketClient {
             socketOptions.reconnectionDelayMax = 5000;
             socketOptions.reconnectionAttempts = Integer.MAX_VALUE;
             socketOptions.timeout = connectTimeout;
+            socketOptions.transports = new String[] { WebSocket.NAME };
             isSocketConnecting = true;
             try {
                 socket = IO.socket(url, socketOptions);
                 
+                // Every EVENT_TRANSPORT during one session the same clientId must be used
+                Random random = new Random();
+                float clientId = random.nextFloat();
+
                 // Adding extra headers
                 socket.io().on(Manager.EVENT_TRANSPORT, (Object[] socketEventArgs) -> {
                     Transport transport = (Transport) socketEventArgs[0];
                     transport.on(Transport.EVENT_REQUEST_HEADERS, (Object[] transportEventArgs) -> {
                         @SuppressWarnings("unchecked")
                         Map<String, List<String>> headers = (Map<String, List<String>>) transportEventArgs[0];
-                        if (routeCookie != null) {
-                            headers.put("Cookie", Arrays.asList("route=" + routeCookie.getValue()));
-                        }
+                        headers.put("Client-id", Arrays.asList(String.valueOf(clientId)));
                     });
                 });
                 
