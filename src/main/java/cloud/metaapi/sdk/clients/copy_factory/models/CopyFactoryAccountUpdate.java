@@ -27,7 +27,7 @@ public class CopyFactoryAccountUpdate {
     /**
      * Optional value of minimal trade size allowed, expressed in amount of account currency, or {@code null}. 
      * Can be useful if your broker charges a fixed fee per transaction so that you can skip small trades with
-     * high broker commission rates. Default is 1000
+     * high broker commission rates. Default is 100
      */
     public Double minTradeAmount;
     /**
