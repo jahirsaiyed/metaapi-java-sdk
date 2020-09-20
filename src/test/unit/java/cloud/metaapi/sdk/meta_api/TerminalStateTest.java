@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.stream.Stream;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -78,7 +78,7 @@ class TerminalStateTest {
     @Test
     void testReturnsAccountInformation() {
         MetatraderAccountInformation expected = new MetatraderAccountInformation() {{ balance = 1000; }};
-        assertTrue(state.getAccountInformation().isEmpty());
+        assertTrue(!state.getAccountInformation().isPresent());
         state.onAccountInformationUpdated(expected);
         assertEquals(expected, state.getAccountInformation().get());
     }
@@ -97,7 +97,7 @@ class TerminalStateTest {
         state.onPositionUpdated(new MetatraderPosition() {{ id = "1"; profit = 11; }});
         state.onPositionRemoved("2");
         assertEquals(1, state.getPositions().size());
-        assertThat(state.getPositions()).usingRecursiveComparison().isEqualTo(List.of(
+        assertThat(state.getPositions()).usingRecursiveComparison().isEqualTo(Lists.list(
             new MetatraderPosition() {{ id = "1"; profit = 11; }}
         ));
     }
@@ -116,7 +116,7 @@ class TerminalStateTest {
         state.onOrderUpdated(new MetatraderOrder() {{ id = "1"; openPrice = 11.0; }});
         state.onOrderCompleted("2");
         assertEquals(1, state.getOrders().size());
-        assertThat(state.getOrders()).usingRecursiveComparison().isEqualTo(List.of(
+        assertThat(state.getOrders()).usingRecursiveComparison().isEqualTo(Lists.list(
             new MetatraderOrder() {{ id = "1"; openPrice = 11.0; }}
         ));
     }
@@ -134,7 +134,7 @@ class TerminalStateTest {
         state.onSymbolSpecificationUpdated(new MetatraderSymbolSpecification() {{ symbol = "GBPUSD"; }});
         state.onSymbolSpecificationUpdated(new MetatraderSymbolSpecification() {{ symbol = "EURUSD"; tickSize = 0.0001; }});
         assertEquals(2, state.getSpecifications().size());
-        assertThat(state.getSpecifications()).usingRecursiveComparison().isEqualTo(List.of(
+        assertThat(state.getSpecifications()).usingRecursiveComparison().isEqualTo(Lists.list(
             new MetatraderSymbolSpecification() {{ symbol = "EURUSD"; tickSize = 0.0001; }},
             new MetatraderSymbolSpecification() {{ symbol = "GBPUSD"; }}
         ));
@@ -150,7 +150,7 @@ class TerminalStateTest {
      */
     @Test
     void testReturnsPrice() {
-        assertTrue(state.getPrice("EURUSD").isEmpty());
+        assertTrue(!state.getPrice("EURUSD").isPresent());
         state.onSymbolPriceUpdated(new MetatraderSymbolPrice() {{ symbol = "EURUSD"; bid = 1; ask = 1.1; }});
         state.onSymbolPriceUpdated(new MetatraderSymbolPrice() {{ symbol = "GBPUSD"; }});
         state.onSymbolPriceUpdated(new MetatraderSymbolPrice() {{ symbol = "EURUSD"; bid = 1; ask = 1.2; }});

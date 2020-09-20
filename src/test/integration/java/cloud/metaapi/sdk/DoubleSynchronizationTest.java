@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -39,11 +39,11 @@ class DoubleSynchronizationTest {
     private String password = dotenv.get("PASSWORD");
     private String serverName = dotenv.get("SERVER");
     private String serverDatFile = dotenv.get("PATH_TO_SERVERS_DAT");
-    private MetaApi api = new MetaApi(token, "project-stock.agiliumlabs.cloud");
+    private MetaApi api = new MetaApi(token);
     
     @BeforeAll
     static void setUpBeforeClass() throws IOException {
-        Files.createDirectories(Path.of("./.metaapi"));
+        Files.createDirectories(FileSystems.getDefault().getPath(".", ".metaapi"));
     }
 
     @AfterEach
@@ -110,10 +110,10 @@ class DoubleSynchronizationTest {
                 MetaApiWebsocketClient websocketClient = ((MetaApiWebsocketClient) FieldUtils
                     .readField(api, "metaApiWebsocketClient", true));
                 websocketClient.removeAllListeners();
-                if (Files.exists(Path.of("./.metaapi/" + account.getId() + "-deals.bin"))) {
+                if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-deals.bin"))) {
                     JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-deals.bin"));
                 }
-                if (Files.exists(Path.of("./.metaapi/" + account.getId() + "-historyOrders.bin"))) {
+                if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-historyOrders.bin"))) {
                     JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-historyOrders.bin"));
                 }
             });

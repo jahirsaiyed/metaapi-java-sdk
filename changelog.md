@@ -1,14 +1,9 @@
-7.1.3
-  - Adjust CopyFactory defaults
-
-7.1.2
-  - Changes to load balancing algorithm
-
-7.1.1
-  - fix simultaneous multiple file writes by one connection
-
 7.1.0
   - now only one MetaApiConnection can be created per account at the same time to avoid history storage errors
+  - fix simultaneous multiple file writes by one connection
+  - сhanges to load balancing algorithm
+  - adjust CopyFactory defaults
+  - fix minimum compatible Java SDK version
 
 7.0.0
   - Prepared for upcoming breaking change in API: added sticky session support

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +58,7 @@ class ConfigurationClientTest {
                 name = "Demo account";
                 connectionId = "e8867baa-5ec2-45ae-9930-4d5cea18d0d6";
                 reservedMarginFraction = 0.25;
-                subscriptions = List.of(new CopyFactoryStrategySubscription() {{
+                subscriptions = Lists.list(new CopyFactoryStrategySubscription() {{
                     strategyId = "ABCD";
                     multiplier = 1.0;
                 }});
@@ -70,7 +71,7 @@ class ConfigurationClientTest {
                 name = "Demo account";
                 connectionId = "e8867baa-5ec2-45ae-9930-4d5cea18d0d6";
                 reservedMarginFraction = 0.25;
-                subscriptions = List.of(new CopyFactoryStrategySubscription() {{
+                subscriptions = Lists.list(new CopyFactoryStrategySubscription() {{
                     strategyId = "ABCD";
                     multiplier = 1.0;
                 }});
@@ -100,12 +101,12 @@ class ConfigurationClientTest {
      */
     @Test
     void testRetrieveCopyFactoryAccountsFromApi() throws Exception {
-        List<CopyFactoryAccount> expectedAccounts = List.of(new CopyFactoryAccount() {{
+        List<CopyFactoryAccount> expectedAccounts = Lists.list(new CopyFactoryAccount() {{
             _id = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
             name = "Demo account";
             connectionId = "e8867baa-5ec2-45ae-9930-4d5cea18d0d6";
             reservedMarginFraction = 0.25;
-            subscriptions = List.of(new CopyFactoryStrategySubscription() {{
+            subscriptions = Lists.list(new CopyFactoryStrategySubscription() {{
                 strategyId = "ABCD";
                 multiplier = 1.0;
             }});
@@ -279,7 +280,7 @@ class ConfigurationClientTest {
      */
     @Test
     void testRetrieveStrategiesFromApi() throws Exception {
-        List<CopyFactoryStrategy> expectedStrategies = List.of(new CopyFactoryStrategy() {{
+        List<CopyFactoryStrategy> expectedStrategies = Lists.list(new CopyFactoryStrategy() {{
             _id = "ABCD";
             platformCommissionRate = 0.01;
             name = "Test strategy";

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -45,12 +46,12 @@ class TradingClientTest {
                 copyFactoryApiUrl + "/users/current/accounts/"
                     + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/resynchronize", Method.POST);
             expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
-            expectedOptions.getQueryParameters().put("strategyId", List.of("ABCD"));
+            expectedOptions.getQueryParameters().put("strategyId", Lists.list("ABCD"));
             assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
             return CompletableFuture.completedFuture(null);
         });
         tradingClient
-            .resynchronize("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", List.of("ABCD")).get();
+            .resynchronize("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", Lists.list("ABCD")).get();
     }
     
     /**
@@ -75,7 +76,7 @@ class TradingClientTest {
      */
     @Test
     void testRetrieveStopouts() throws Exception {
-        List<CopyFactoryStrategyStopout> expectedStopouts = List.of(new CopyFactoryStrategyStopout() {{
+        List<CopyFactoryStrategyStopout> expectedStopouts = Lists.list(new CopyFactoryStrategyStopout() {{
             reason = "max-drawdown";
             stoppedAt = new IsoTime("2020-08-08T07:57:30.328Z");
             strategy = new CopyFactoryStrategyIdAndName() {{

@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -40,8 +41,8 @@ class ProvisioningProfileApiTest {
     @MethodSource("provideProvisioningProfile")
     void testRetrievesProvisioningProfiles(ProvisioningProfileDto expectedDto) throws Exception {
         Mockito.when(client.getProvisioningProfiles(4, "new"))
-            .thenReturn(CompletableFuture.completedFuture(List.of(expectedDto)));
-        List<ProvisioningProfile> expectedProfiles = List.of(new ProvisioningProfile(expectedDto, client));
+            .thenReturn(CompletableFuture.completedFuture(Lists.list(expectedDto)));
+        List<ProvisioningProfile> expectedProfiles = Lists.list(new ProvisioningProfile(expectedDto, client));
         List<ProvisioningProfile> actualProfiles = api.getProvisioningProfiles(4, "new").get();
         assertThat(actualProfiles).usingRecursiveComparison().isEqualTo(expectedProfiles);
     }

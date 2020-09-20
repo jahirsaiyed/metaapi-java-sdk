@@ -20,11 +20,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>7.1.3</version>
+  <version>7.1.0</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/7.1.3/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/7.1.0/jar).
 
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.

@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -56,7 +57,7 @@ class MetaApiConnectionTest {
     void setUp() throws Exception {
         HistoryFileManager historyFileManagerMock = Mockito.mock(HistoryFileManager.class);
         Mockito.when(historyFileManagerMock.getHistoryFromDisk()).thenReturn(CompletableFuture.completedFuture(
-            new History() {{ deals = List.of(); historyOrders = List.of(); }}));
+            new History() {{ deals = Lists.list(); historyOrders = Lists.list(); }}));
         ServiceProvider.setHistoryFileManagerMock(historyFileManagerMock);
         MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
         Mockito.when(account.getId()).thenReturn("accountId");
@@ -92,7 +93,7 @@ class MetaApiConnectionTest {
     @ParameterizedTest
     @MethodSource("providePosition")
     void testRetrivesPositions(MetatraderPosition position) throws Exception {
-        List<MetatraderPosition> expected = List.of(position);
+        List<MetatraderPosition> expected = Lists.list(position);
         Mockito.when(client.getPositions("accountId")).thenReturn(CompletableFuture.completedFuture(expected));
         List<MetatraderPosition> actual = api.getPositions().get();
         assertThat(actual).usingRecursiveComparison().isEqualTo(expected);
@@ -116,7 +117,7 @@ class MetaApiConnectionTest {
     @ParameterizedTest
     @MethodSource("provideOrder")
     void testRetrivesPositions(MetatraderOrder order) throws Exception {
-        List<MetatraderOrder> expected = List.of(order);
+        List<MetatraderOrder> expected = Lists.list(order);
         Mockito.when(client.getOrders("accountId")).thenReturn(CompletableFuture.completedFuture(expected));
         List<MetatraderOrder> actual = api.getOrders().get();
         assertThat(actual).usingRecursiveComparison().isEqualTo(expected);
@@ -818,7 +819,7 @@ class MetaApiConnectionTest {
         order.type = OrderType.ORDER_TYPE_BUY;
         order.volume = 0.07;
         MetatraderHistoryOrders history = new MetatraderHistoryOrders();
-        history.historyOrders = List.of(order);
+        history.historyOrders = Lists.list(order);
         history.synchronizing = false;
         return Stream.of(Arguments.of(history));
     }
@@ -841,7 +842,7 @@ class MetaApiConnectionTest {
         deal.type = DealType.DEAL_TYPE_BUY;
         deal.volume = 0.07;
         MetatraderDeals deals = new MetatraderDeals();
-        deals.deals = List.of(deal);
+        deals.deals = Lists.list(deal);
         deals.synchronizing = false;
         return Stream.of(Arguments.of(deals));
     }

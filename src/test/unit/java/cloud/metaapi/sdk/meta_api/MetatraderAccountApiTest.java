@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -55,8 +56,8 @@ public class MetatraderAccountApiTest {
     @MethodSource("provideAccountDto")
     void testRetrievesMtAccounts(MetatraderAccountDto accountDto) throws Exception {
         AccountsFilter filter = new AccountsFilter() {{ provisioningProfileId = "profileId"; }};
-        Mockito.when(client.getAccounts(filter)).thenReturn(CompletableFuture.completedFuture(List.of(accountDto)));
-        List<MetatraderAccount> expectedAccounts = List.of(
+        Mockito.when(client.getAccounts(filter)).thenReturn(CompletableFuture.completedFuture(Lists.list(accountDto)));
+        List<MetatraderAccount> expectedAccounts = Lists.list(
             new MetatraderAccount(accountDto, client, metaApiWebsocketClient, connectionRegistry));
         List<MetatraderAccount> actualAccounts = api.getAccounts(filter).get();
         assertThat(actualAccounts).usingRecursiveComparison().isEqualTo(expectedAccounts);

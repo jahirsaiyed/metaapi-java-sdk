@@ -12,11 +12,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -48,7 +50,7 @@ class ProvisioningProfileClientTest {
     @ParameterizedTest
     @MethodSource("provideProvisioningProfileDto")
     void testRetrievesProvisioningProfilesFromApi(ProvisioningProfileDto profile) throws Exception {
-        List<ProvisioningProfileDto> expectedResponse = List.of(profile);
+        List<ProvisioningProfileDto> expectedResponse = Lists.list(profile);
         httpClient.setRequestMock((actualOptions) -> {
             try {
                 HttpRequestOptions expectedOptions = new HttpRequestOptions(
@@ -193,7 +195,7 @@ class ProvisioningProfileClientTest {
     void testDoesNotUploadProvisioningProfileFileViaApiWithAccountToken() throws Exception {
         provisioningClient = new ProvisioningProfileClient(httpClient, "token");
         try {
-            provisioningClient.uploadProvisioningProfileFile("id", "servers.dat", InputStream.nullInputStream()).get();
+            provisioningClient.uploadProvisioningProfileFile("id", "servers.dat", Mockito.mock(InputStream.class)).get();
         } catch (ExecutionException e) {
             assertEquals(
                 "You can not invoke uploadProvisioningProfileFile method, because you have connected with account access token. "
