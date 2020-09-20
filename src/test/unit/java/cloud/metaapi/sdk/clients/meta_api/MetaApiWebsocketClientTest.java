@@ -13,6 +13,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.assertj.core.util.Lists;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,8 +57,8 @@ class MetaApiWebsocketClientTest {
 
     private static ObjectMapper jsonMapper = JsonMapper.getInstance();
     private static MetaApiWebsocketClient client;
-    private SocketIOServer server;
-    private SocketIOClient socket;
+    private static SocketIOServer server;
+    private static SocketIOClient socket;
     
     // Some variables that cannot be written from request callbacks 
     // if they are local test variables
@@ -65,12 +67,6 @@ class MetaApiWebsocketClientTest {
     
     @BeforeAll
     static void setUpBeforeClass() {
-        client = new MetaApiWebsocketClient("token", "project-stock.agiliumlabs.cloud", 60000, 60000);
-        client.setUrl("http://localhost:6784");
-    }
-
-    @BeforeEach
-    void setUp() throws Throwable {
         Configuration serverConfiguration = new Configuration();
         serverConfiguration.setPort(6784);
         serverConfiguration.setContext("/ws");
@@ -86,15 +82,27 @@ class MetaApiWebsocketClientTest {
             }
         });
         server.start();
+        client = new MetaApiWebsocketClient("token", "project-stock.agiliumlabs.cloud", 60000, 60000);
+        client.setUrl("http://localhost:6784");
+    }
+    
+    @AfterAll
+    static void tearDownAfterClass() {
+    	server.stop();
+    }
+
+    @BeforeEach
+    void setUp() throws Throwable {
         client.connect().get();
     }
 
     @AfterEach
     void tearDown() {
+    	server.removeAllListeners("request");
         client.removeAllListeners();
         client.close();
-        server.stop();
     }
+    
     
     /**
      * Tests {@link MetaApiWebsocketClient#connect()}
@@ -138,7 +146,7 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderPosition")
     void testRetrievesMetaTraderPositionsFromApi(MetatraderPosition position) throws Exception {
-        List<MetatraderPosition> expected = List.of(position);
+        List<MetatraderPosition> expected = Lists.list(position);
         server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
             public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
@@ -192,7 +200,7 @@ class MetaApiWebsocketClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderOrder")
     void testRetrievesMetaTraderOrdersFromApi(MetatraderOrder order) throws Exception {
-        List<MetatraderOrder> expected = List.of(order);
+        List<MetatraderOrder> expected = Lists.list(order);
         server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
             public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
@@ -340,7 +348,7 @@ class MetaApiWebsocketClientTest {
         server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
             public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.valueToTree(data);
+            	JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getDealsByTicket")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("ticket").asText().equals(expected.deals.get(0).orderId)
@@ -702,7 +710,7 @@ class MetaApiWebsocketClientTest {
         ValidationDetails expectedDetail = new ValidationDetails();
         expectedDetail.parameter = "volume";
         expectedDetail.message = "Required value.";
-        List<ValidationDetails> expectedDetails = List.of(expectedDetail);
+        List<ValidationDetails> expectedDetails = Lists.list(expectedDetail);
         server.addEventListener("request", Object.class, new DataListener<Object>() {
             @Override
             public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
@@ -930,7 +938,7 @@ class MetaApiWebsocketClientTest {
         ObjectNode packet = jsonMapper.createObjectNode();
         packet.put("type", "positions");
         packet.put("accountId", "accountId");
-        packet.set("positions", jsonMapper.valueToTree(List.of(expected)));
+        packet.set("positions", jsonMapper.valueToTree(Lists.list(expected)));
         socket.sendEvent("synchronization", packet.toString());
         assertThat(listener.onPositionUpdatedResult.get()).usingRecursiveComparison().isEqualTo(expected);
     }
@@ -946,7 +954,7 @@ class MetaApiWebsocketClientTest {
         ObjectNode packet = jsonMapper.createObjectNode();
         packet.put("type", "orders");
         packet.put("accountId", "accountId");
-        packet.set("orders", jsonMapper.valueToTree(List.of(expected)));
+        packet.set("orders", jsonMapper.valueToTree(Lists.list(expected)));
         socket.sendEvent("synchronization", packet.toString());
         assertThat(listener.onOrderUpdatedResult.get()).usingRecursiveComparison().isEqualTo(expected);
     }
@@ -998,10 +1006,10 @@ class MetaApiWebsocketClientTest {
         packet.put("type", "update");
         packet.put("accountId", "accountId");
         packet.set("accountInformation", jsonMapper.valueToTree(accountInformation));
-        packet.set("updatedPositions", jsonMapper.valueToTree(List.of(position)));
-        packet.set("removedPositionIds", jsonMapper.valueToTree(List.of("1234")));
-        packet.set("updatedOrders", jsonMapper.valueToTree(List.of(order)));
-        packet.set("completedOrderIds", jsonMapper.valueToTree(List.of("2345")));
+        packet.set("updatedPositions", jsonMapper.valueToTree(Lists.list(position)));
+        packet.set("removedPositionIds", jsonMapper.valueToTree(Lists.list("1234")));
+        packet.set("updatedOrders", jsonMapper.valueToTree(Lists.list(order)));
+        packet.set("completedOrderIds", jsonMapper.valueToTree(Lists.list("2345")));
         packet.set("historyOrders", jsonMapper.valueToTree(historyOrders.historyOrders));
         packet.set("deals", jsonMapper.valueToTree(deals.deals));
         socket.sendEvent("synchronization", packet.toString());
@@ -1077,7 +1085,7 @@ class MetaApiWebsocketClientTest {
         ObjectNode packet = jsonMapper.createObjectNode();
         packet.put("type", "specifications");
         packet.put("accountId", "accountId");
-        packet.set("specifications", jsonMapper.valueToTree(List.of(expected)));
+        packet.set("specifications", jsonMapper.valueToTree(Lists.list(expected)));
         socket.sendEvent("synchronization", packet.toString());
         assertThat(listener.onSymbolSpecificationUpdatedResult.get()).usingRecursiveComparison().isEqualTo(expected);
     }
@@ -1093,7 +1101,7 @@ class MetaApiWebsocketClientTest {
         ObjectNode packet = jsonMapper.createObjectNode();
         packet.put("type", "prices");
         packet.put("accountId", "accountId");
-        packet.set("prices", jsonMapper.valueToTree(List.of(expected)));
+        packet.set("prices", jsonMapper.valueToTree(Lists.list(expected)));
         socket.sendEvent("synchronization", packet.toString());
         assertThat(listener.onSymbolPriceUpdatedResult.get()).usingRecursiveComparison().isEqualTo(expected);
     }
@@ -1168,7 +1176,7 @@ class MetaApiWebsocketClientTest {
         order.type = OrderType.ORDER_TYPE_BUY;
         order.volume = 0.07;
         MetatraderHistoryOrders history = new MetatraderHistoryOrders();
-        history.historyOrders = List.of(order);
+        history.historyOrders = Lists.list(order);
         history.synchronizing = false;
         return Stream.of(Arguments.of(history));
     }
@@ -1191,7 +1199,7 @@ class MetaApiWebsocketClientTest {
         deal.type = DealType.DEAL_TYPE_BUY;
         deal.volume = 0.07;
         MetatraderDeals deals = new MetatraderDeals();
-        deals.deals = List.of(deal);
+        deals.deals = Lists.list(deal);
         deals.synchronizing = false;
         return Stream.of(Arguments.of(deals));
     }

@@ -5,10 +5,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Instant;
 import java.util.Date;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -35,7 +35,7 @@ class MemoryHistoryStorageTest {
     void setUp() throws Exception {
         storageFileManagerMock = Mockito.mock(HistoryFileManager.class);
         Mockito.when(storageFileManagerMock.getHistoryFromDisk()).thenReturn(CompletableFuture.completedFuture(
-            new History() {{ deals = List.of(); historyOrders = List.of(); }}));
+            new History() {{ deals = Lists.list(); historyOrders = Lists.list(); }}));
         ServiceProvider.setHistoryFileManagerMock(storageFileManagerMock);
         storage = new MemoryHistoryStorage("accountId");
         testDeal = new MetatraderDeal() {{ id = "37863643"; type = DealType.DEAL_TYPE_BALANCE; magic = 0;
@@ -54,10 +54,10 @@ class MemoryHistoryStorageTest {
     @Test
     void testLoadsDataFromTheFileManager() throws Exception {
         Mockito.when(storageFileManagerMock.getHistoryFromDisk()).thenReturn(CompletableFuture.completedFuture(
-            new History() {{ deals = List.of(testDeal); historyOrders = List.of(testOrder); }}));
+            new History() {{ deals = Lists.list(testDeal); historyOrders = Lists.list(testOrder); }}));
         storage.loadDataFromDisk().get();
-        assertThat(storage.getDeals()).usingRecursiveComparison().isEqualTo(List.of(testDeal));
-        assertThat(storage.getHistoryOrders()).usingRecursiveComparison().isEqualTo(List.of(testOrder));
+        assertThat(storage.getDeals()).usingRecursiveComparison().isEqualTo(Lists.list(testDeal));
+        assertThat(storage.getHistoryOrders()).usingRecursiveComparison().isEqualTo(Lists.list(testOrder));
     }
     
     /**
@@ -111,7 +111,7 @@ class MemoryHistoryStorageTest {
         storage.onDealAdded(createDeal("2", "2020-08-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
         storage.onDealAdded(createDeal("10", null,  DealType.DEAL_TYPE_SELL));
         storage.onDealAdded(createDeal("12", null,  DealType.DEAL_TYPE_BUY));
-        assertThat(storage.getDeals()).usingRecursiveComparison().isEqualTo(List.of(
+        assertThat(storage.getDeals()).usingRecursiveComparison().isEqualTo(Lists.list(
             createDeal("10", null,  DealType.DEAL_TYPE_SELL),
             createDeal("11", null, DealType.DEAL_TYPE_SELL),
             createDeal("12", null,  DealType.DEAL_TYPE_BUY),
@@ -143,7 +143,7 @@ class MemoryHistoryStorageTest {
         storage.onHistoryOrderAdded(createOrder("2", "2020-08-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
         storage.onHistoryOrderAdded(createOrder("10", null,  OrderType.ORDER_TYPE_SELL));
         storage.onHistoryOrderAdded(createOrder("12", null,  OrderType.ORDER_TYPE_BUY));
-        assertThat(storage.getHistoryOrders()).usingRecursiveComparison().isEqualTo(List.of(
+        assertThat(storage.getHistoryOrders()).usingRecursiveComparison().isEqualTo(Lists.list(
             createOrder("10", null,  OrderType.ORDER_TYPE_SELL),
             createOrder("11", null, OrderType.ORDER_TYPE_SELL),
             createOrder("12", null,  OrderType.ORDER_TYPE_BUY),

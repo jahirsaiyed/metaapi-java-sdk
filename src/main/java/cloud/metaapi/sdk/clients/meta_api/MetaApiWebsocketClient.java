@@ -279,19 +279,16 @@ public class MetaApiWebsocketClient {
      * @return completable future resolving with MetaTrader position found
      */
     public CompletableFuture<MetatraderPosition> getPosition(String accountId, String positionId) {
-        CompletableFuture<MetatraderPosition> result = new CompletableFuture<>();
         ObjectNode request = JsonMapper.getInstance().createObjectNode();
         request.put("type", "getPosition");
         request.put("positionId", positionId);
-        rpcRequest(accountId, request).handle((response, error) -> {
-            if (error != null) return result.completeExceptionally(error);
+        return rpcRequest(accountId, request).thenApply(response -> {
             try {
-                return result.complete(jsonMapper.treeToValue(response.get("position"), MetatraderPosition.class));
+                return jsonMapper.treeToValue(response.get("position"), MetatraderPosition.class);
             } catch (JsonProcessingException e) {
-                return result.completeExceptionally(e);
+            	throw new CompletionException(e);
             }
         });
-        return result;
     }
     
     /**
@@ -754,21 +751,20 @@ public class MetaApiWebsocketClient {
         String requestId = request.has("requestId") ? request.get("requestId").asText() : UUID.randomUUID().toString();
         return CompletableFuture.supplyAsync(() -> {
             try {
-                if (!connected) connect().get();
+                if (!connected) connect().join();
                 CompletableFuture<JsonNode> result = new CompletableFuture<>();
                 requestResolves.put(requestId, result);
                 request.put("accountId", accountId);
                 if (!request.has("requestId")) request.put("requestId", requestId);
                 socket.emit("request", new JSONObject(jsonMapper.writeValueAsString(request)));
-                return result.orTimeout(requestTimeout, TimeUnit.MILLISECONDS).get();
-            } catch (ExecutionException e) {
-                if (e.getCause() instanceof java.util.concurrent.TimeoutException) {
-                  throw new CompletionException(new TimeoutException("MetaApi websocket client request " 
-                      + requestId + " of type " + request.get("type").asText() + " timed out"));
-                }
-                throw new CompletionException(e.getCause());
+                return result.get(requestTimeout, TimeUnit.MILLISECONDS);
+            } catch (java.util.concurrent.TimeoutException e) {
+            	throw new CompletionException(new TimeoutException("MetaApi websocket client request " 
+                    + requestId + " of type " + request.get("type").asText() + " timed out"));
             } catch (InterruptedException | JsonProcessingException | JSONException e) {
                 throw new CompletionException(e);
+            } catch (ExecutionException e) {
+            	throw new CompletionException(e.getCause());
             }
         });
     }

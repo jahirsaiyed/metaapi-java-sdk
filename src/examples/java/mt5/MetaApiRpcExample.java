@@ -41,7 +41,7 @@ public class MetaApiRpcExample {
             Optional<ProvisioningProfile> profile = profiles.stream()
                 .filter(p -> p.getName().equals(serverName))
                 .findFirst();
-            if (profile.isEmpty()) {
+            if (!profile.isPresent()) {
                 System.out.println("Creating account profile");
                 NewProvisioningProfileDto newDto = new NewProvisioningProfileDto() {{ name = serverName; version = 5; }};
                 profile = Optional.of(api.getProvisioningProfileApi().createProvisioningProfile(newDto).get());
@@ -59,7 +59,7 @@ public class MetaApiRpcExample {
             Optional<MetatraderAccount> account = accounts.stream()
                 .filter(a -> a.getLogin().equals(login) && a.getType().startsWith("cloud"))
                 .findFirst();
-            if (account.isEmpty()) {
+            if (!account.isPresent()) {
                 System.out.println("Adding MT5 account to MetaApi");
                 String mtLogin = login;
                 String mtPassword = password;

@@ -4,10 +4,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -161,7 +162,7 @@ public class HistoryFileManager {
             if (!isUpdating) {
                 isUpdating = true;
                 try {
-                    Files.createDirectories(Path.of("./.metaapi"));
+                    Files.createDirectories(FileSystems.getDefault().getPath(".", ".metaapi"));
                     dealsSize = updateDiskStorageWith(
                         "deals", startNewDealIndex, historyStorage.getDeals(), dealsSize);
                     startNewDealIndex = -1;
@@ -191,7 +192,6 @@ public class HistoryFileManager {
         });
     }
     
-    @SuppressWarnings("unchecked")
     private <T> Pair<List<T>, List<Integer>> readHistoryItemsAndSizes(
         Class<T> itemType, String type
     ) throws IOException {
@@ -200,7 +200,10 @@ public class HistoryFileManager {
             List<T> items;
             List<Integer> sizes;
             try {
-                items = Arrays.asList((T[]) jsonMapper.readValue(Files.readString(path), itemType.arrayType()));
+                String fileContent = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+                items = jsonMapper.readValue(
+                    fileContent, jsonMapper.getTypeFactory().constructCollectionType(List.class, itemType)
+                );
                 sizes = readItemSizes(items, type);
                 return Pair.of(items, sizes);
             } catch (IOException e) {
@@ -208,7 +211,9 @@ public class HistoryFileManager {
                 Files.delete(path);
             }
         }
-        return Pair.of(List.of(), List.of());
+        List<T> emptyTypedList = new ArrayList<>();
+        List<Integer> emptyIntegerList = new ArrayList<>();
+        return Pair.of(emptyTypedList, emptyIntegerList);
     }
     
     private <T> List<Integer> updateDiskStorageWith(
@@ -270,6 +275,6 @@ public class HistoryFileManager {
     }
     
     private Path getFilePath(String type) {
-        return Path.of("./.metaapi/" + accountId + "-" + type + ".bin");
+        return FileSystems.getDefault().getPath(".", ".metaapi", accountId + "-" + type + ".bin");
     }
 }

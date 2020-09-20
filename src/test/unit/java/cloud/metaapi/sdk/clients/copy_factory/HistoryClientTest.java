@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -43,10 +44,10 @@ class HistoryClientTest {
      */
     @Test
     void testRetrieveProvidersFromApi() throws Exception {
-        List<CopyFactorySubscriberOrProvider> expectedProviders = List.of(new CopyFactorySubscriberOrProvider() {{
+        List<CopyFactorySubscriberOrProvider> expectedProviders = Lists.list(new CopyFactorySubscriberOrProvider() {{
             id = "577f095ab64b4d1710de34f6a28ab3bd";
             name = "First Last";
-            strategies = List.of(new CopyFactoryStrategyIdAndName() {{
+            strategies = Lists.list(new CopyFactoryStrategyIdAndName() {{
                 id = "ABCD";
                 name = "Test strategy";
             }});
@@ -89,10 +90,10 @@ class HistoryClientTest {
      */
     @Test
     void testRetrieveSubscribersFromApi() throws Exception {
-        List<CopyFactorySubscriberOrProvider> expectedSubscribers = List.of(new CopyFactorySubscriberOrProvider() {{
+        List<CopyFactorySubscriberOrProvider> expectedSubscribers = Lists.list(new CopyFactorySubscriberOrProvider() {{
             id = "577f095ab64b4d1710de34f6a28ab3bd";
             name = "First Last";
-            strategies = List.of(new CopyFactoryStrategyIdAndName() {{
+            strategies = Lists.list(new CopyFactoryStrategyIdAndName() {{
                 id = "ABCD";
                 name = "Test strategy";
             }});
@@ -135,7 +136,7 @@ class HistoryClientTest {
      */
     @Test
     void testRetrieveStrategiesSubscribedToFromApi() throws Exception {
-        List<CopyFactoryStrategyIdAndName> expectedStrategies = List.of(new CopyFactoryStrategyIdAndName() {{
+        List<CopyFactoryStrategyIdAndName> expectedStrategies = Lists.list(new CopyFactoryStrategyIdAndName() {{
             id = "ABCD";
             name = "Test strategy";
         }});
@@ -177,7 +178,7 @@ class HistoryClientTest {
      */
     @Test
     void testRetrieveProvidedStrategiesFromApi() throws Exception {
-        List<CopyFactoryStrategyIdAndName> expectedStrategies = List.of(new CopyFactoryStrategyIdAndName() {{
+        List<CopyFactoryStrategyIdAndName> expectedStrategies = Lists.list(new CopyFactoryStrategyIdAndName() {{
             id = "ABCD";
             name = "Test strategy";
         }});
@@ -219,7 +220,7 @@ class HistoryClientTest {
      */
     @Test
     void testRetrieveTransactionsPerformedOnProvidedStrategiesFromApi() throws Exception {
-        List<CopyFactoryTransaction> expectedTransactions = List.of(new CopyFactoryTransaction() {{
+        List<CopyFactoryTransaction> expectedTransactions = Lists.list(new CopyFactoryTransaction() {{
             id = "64664661:close";
             type = DealType.DEAL_TYPE_SELL;
             time = new IsoTime("2020-08-02T21:01:01.830Z");
@@ -257,8 +258,8 @@ class HistoryClientTest {
                 expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
                 expectedOptions.getQueryParameters().put("from", from);
                 expectedOptions.getQueryParameters().put("till", till);
-                expectedOptions.getQueryParameters().put("strategyId", List.of("ABCD"));
-                expectedOptions.getQueryParameters().put("subscriberId", List.of("subscriberId"));
+                expectedOptions.getQueryParameters().put("strategyId", Lists.list("ABCD"));
+                expectedOptions.getQueryParameters().put("subscriberId", Lists.list("subscriberId"));
                 expectedOptions.getQueryParameters().put("offset", 100);
                 expectedOptions.getQueryParameters().put("limit", 200);
                 assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
@@ -269,7 +270,7 @@ class HistoryClientTest {
             }
         });
         List<CopyFactoryTransaction> actualStrategies = copyFactoryClient
-            .getProvidedStrategiesTransactions(from, till, List.of("ABCD"), List.of("subscriberId"), 100, 200).get();
+            .getProvidedStrategiesTransactions(from, till, Lists.list("ABCD"), Lists.list("subscriberId"), 100, 200).get();
         assertThat(actualStrategies).usingRecursiveComparison().isEqualTo(expectedTransactions);
     }
     
@@ -297,7 +298,7 @@ class HistoryClientTest {
      */
     @Test
     void testRetrieveTransactionsPerformedOnStrategiesCurrentUserIsSubscribedToFromApi() throws Exception {
-        List<CopyFactoryTransaction> expectedTransactions = List.of(new CopyFactoryTransaction() {{
+        List<CopyFactoryTransaction> expectedTransactions = Lists.list(new CopyFactoryTransaction() {{
             id = "64664661:close";
             type = DealType.DEAL_TYPE_SELL;
             time = new IsoTime("2020-08-02T21:01:01.830Z");
@@ -335,8 +336,8 @@ class HistoryClientTest {
                 expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
                 expectedOptions.getQueryParameters().put("from", from);
                 expectedOptions.getQueryParameters().put("till", till);
-                expectedOptions.getQueryParameters().put("strategyId", List.of("ABCD"));
-                expectedOptions.getQueryParameters().put("providerId", List.of("providerId"));
+                expectedOptions.getQueryParameters().put("strategyId", Lists.list("ABCD"));
+                expectedOptions.getQueryParameters().put("providerId", Lists.list("providerId"));
                 expectedOptions.getQueryParameters().put("offset", 100);
                 expectedOptions.getQueryParameters().put("limit", 200);
                 assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
@@ -347,7 +348,7 @@ class HistoryClientTest {
             }
         });
         List<CopyFactoryTransaction> actualStrategies = copyFactoryClient
-            .getStrategiesSubscribedTransactions(from, till, List.of("ABCD"), List.of("providerId"), 100, 200).get();
+            .getStrategiesSubscribedTransactions(from, till, Lists.list("ABCD"), Lists.list("providerId"), 100, 200).get();
         assertThat(actualStrategies).usingRecursiveComparison().isEqualTo(expectedTransactions);
     }
     

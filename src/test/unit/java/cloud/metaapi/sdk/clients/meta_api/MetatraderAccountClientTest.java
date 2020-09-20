@@ -8,6 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,7 +45,7 @@ class MetatraderAccountClientTest {
     @ParameterizedTest
     @MethodSource("provideMetatraderAccountDto")
     void testRetrievesMetatraderAccountsFromApi(MetatraderAccountDto account) throws Exception {
-        List<MetatraderAccountDto> expectedResponse = List.of(account);
+        List<MetatraderAccountDto> expectedResponse = Lists.list(account);
         httpClient.setRequestMock((actualOptions) -> {
             try {
                 HttpRequestOptions expectedOptions = new HttpRequestOptions(

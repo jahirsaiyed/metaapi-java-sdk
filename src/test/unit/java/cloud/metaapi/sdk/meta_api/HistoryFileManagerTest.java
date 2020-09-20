@@ -6,15 +6,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.io.FileUtils;
+import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,7 +51,7 @@ public class HistoryFileManagerTest {
     
     @BeforeAll
     static void setUpBeforeClass() throws IOException {
-        Files.createDirectories(Path.of("./.metaapi"));
+        Files.createDirectories(FileSystems.getDefault().getPath(".", ".metaapi"));
     }
     
     @AfterAll
@@ -59,7 +61,7 @@ public class HistoryFileManagerTest {
     
     @BeforeEach
     void setUp() throws IOException {
-        Files.createDirectories(Path.of("./.metaapi"));
+        Files.createDirectories(FileSystems.getDefault().getPath(".", ".metaapi"));
         storage = Mockito.mock(HistoryStorage.class);
         fileManager = Mockito.spy(new HistoryFileManager("accountId", storage) {{
             updateJobIntervalInMilliseconds = 500; }});
@@ -88,8 +90,8 @@ public class HistoryFileManagerTest {
     
     @AfterEach
     void tearDown() throws IOException {
-        Files.deleteIfExists(Path.of("./.metaapi/accountId-deals.bin"));
-        Files.deleteIfExists(Path.of("./.metaapi/accountId-historyOrders.bin"));
+        Files.deleteIfExists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin"));
+        Files.deleteIfExists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin"));
     }
     
     /**
@@ -119,11 +121,11 @@ public class HistoryFileManagerTest {
      */
     @Test
     void testReadsHistoryFromFile() throws Exception {
-        Files.write(Path.of("./.metaapi/accountId-deals.bin"), jsonMapper.writeValueAsBytes(List.of(testDeal)));
-        Files.write(Path.of("./.metaapi/accountId-historyOrders.bin"), jsonMapper.writeValueAsBytes(List.of(testOrder)));
+        Files.write(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin"), jsonMapper.writeValueAsBytes(Lists.list(testDeal)));
+        Files.write(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin"), jsonMapper.writeValueAsBytes(Lists.list(testOrder)));
         History history = fileManager.getHistoryFromDisk().get();
-        assertThat(history.deals).usingRecursiveComparison().isEqualTo(List.of(testDeal));
-        assertThat(history.historyOrders).usingRecursiveComparison().isEqualTo(List.of(testOrder));
+        assertThat(history.deals).usingRecursiveComparison().isEqualTo(Lists.list(testDeal));
+        assertThat(history.historyOrders).usingRecursiveComparison().isEqualTo(Lists.list(testOrder));
     }
     
     /**
@@ -134,14 +136,14 @@ public class HistoryFileManagerTest {
         throws InterruptedException, ExecutionException, 
             JsonMappingException, JsonProcessingException, IOException
     {
-        Mockito.when(storage.getDeals()).thenReturn(List.of(testDeal, testDeal2));
-        Mockito.when(storage.getHistoryOrders()).thenReturn(List.of(testOrder, testOrder2));
+        Mockito.when(storage.getDeals()).thenReturn(Lists.list(testDeal, testDeal2));
+        Mockito.when(storage.getHistoryOrders()).thenReturn(Lists.list(testOrder, testOrder2));
         fileManager.setStartNewDealIndex(0);
         fileManager.setStartNewOrderIndex(0);
         fileManager.updateDiskStorage().get();
         History savedData = readHistoryStorageFile();
-        assertThat(savedData.deals).usingRecursiveComparison().isEqualTo(List.of(testDeal, testDeal2));
-        assertThat(savedData.historyOrders).usingRecursiveComparison().isEqualTo(List.of(testOrder, testOrder2));
+        assertThat(savedData.deals).usingRecursiveComparison().isEqualTo(Lists.list(testDeal, testDeal2));
+        assertThat(savedData.historyOrders).usingRecursiveComparison().isEqualTo(Lists.list(testOrder, testOrder2));
     }
     
     /**
@@ -152,8 +154,8 @@ public class HistoryFileManagerTest {
         throws InterruptedException, ExecutionException,
             JsonMappingException, JsonProcessingException, IOException
     {
-        Mockito.when(storage.getDeals()).thenReturn(List.of(testDeal, testDeal2));
-        Mockito.when(storage.getHistoryOrders()).thenReturn(List.of(testOrder, testOrder2));
+        Mockito.when(storage.getDeals()).thenReturn(Lists.list(testDeal, testDeal2));
+        Mockito.when(storage.getHistoryOrders()).thenReturn(Lists.list(testOrder, testOrder2));
         fileManager.setStartNewDealIndex(0);
         fileManager.setStartNewOrderIndex(0);
         fileManager.updateDiskStorage().get();
@@ -163,8 +165,8 @@ public class HistoryFileManagerTest {
         fileManager.setStartNewOrderIndex(1);
         fileManager.updateDiskStorage().get();
         History savedData = readHistoryStorageFile();
-        assertThat(savedData.deals).usingRecursiveComparison().isEqualTo(List.of(testDeal, testDeal2));
-        assertThat(savedData.historyOrders).usingRecursiveComparison().isEqualTo(List.of(testOrder, testOrder2));
+        assertThat(savedData.deals).usingRecursiveComparison().isEqualTo(Lists.list(testDeal, testDeal2));
+        assertThat(savedData.historyOrders).usingRecursiveComparison().isEqualTo(Lists.list(testOrder, testOrder2));
     }
     
     /**
@@ -175,8 +177,8 @@ public class HistoryFileManagerTest {
         throws InterruptedException, ExecutionException,
             JsonMappingException, JsonProcessingException, IOException
     {
-        Mockito.when(storage.getDeals()).thenReturn(List.of(testDeal, testDeal2));
-        Mockito.when(storage.getHistoryOrders()).thenReturn(List.of(testOrder, testOrder2));
+        Mockito.when(storage.getDeals()).thenReturn(Lists.list(testDeal, testDeal2));
+        Mockito.when(storage.getHistoryOrders()).thenReturn(Lists.list(testOrder, testOrder2));
         fileManager.setStartNewDealIndex(0);
         fileManager.setStartNewOrderIndex(0);
         fileManager.updateDiskStorage().get();
@@ -188,8 +190,8 @@ public class HistoryFileManagerTest {
         fileManager.setStartNewOrderIndex(0);
         fileManager.updateDiskStorage().get();
         History savedData = readHistoryStorageFile();
-        assertThat(savedData.deals).usingRecursiveComparison().isEqualTo(List.of(testDeal, testDeal2));
-        assertThat(savedData.historyOrders).usingRecursiveComparison().isEqualTo(List.of(testOrder, testOrder2));
+        assertThat(savedData.deals).usingRecursiveComparison().isEqualTo(Lists.list(testDeal, testDeal2));
+        assertThat(savedData.historyOrders).usingRecursiveComparison().isEqualTo(Lists.list(testOrder, testOrder2));
     }
     
     /**
@@ -200,19 +202,19 @@ public class HistoryFileManagerTest {
         throws InterruptedException, ExecutionException,
             JsonMappingException, JsonProcessingException, IOException
     {
-        Mockito.when(storage.getDeals()).thenReturn(List.of(testDeal, testDeal2));
-        Mockito.when(storage.getHistoryOrders()).thenReturn(List.of(testOrder, testOrder2));
+        Mockito.when(storage.getDeals()).thenReturn(Lists.list(testDeal, testDeal2));
+        Mockito.when(storage.getHistoryOrders()).thenReturn(Lists.list(testOrder, testOrder2));
         fileManager.setStartNewDealIndex(0);
         fileManager.setStartNewOrderIndex(0);
         fileManager.updateDiskStorage().get();
-        Mockito.when(storage.getDeals()).thenReturn(List.of(testDeal, testDeal2, testDeal3));
-        Mockito.when(storage.getHistoryOrders()).thenReturn(List.of(testOrder, testOrder2, testOrder3));
+        Mockito.when(storage.getDeals()).thenReturn(Lists.list(testDeal, testDeal2, testDeal3));
+        Mockito.when(storage.getHistoryOrders()).thenReturn(Lists.list(testOrder, testOrder2, testOrder3));
         fileManager.setStartNewDealIndex(2);
         fileManager.setStartNewOrderIndex(2);
         fileManager.updateDiskStorage().get();
         History savedData = readHistoryStorageFile();
-        assertThat(savedData.deals).usingRecursiveComparison().isEqualTo(List.of(testDeal, testDeal2, testDeal3));
-        assertThat(savedData.historyOrders).usingRecursiveComparison().isEqualTo(List.of(testOrder, testOrder2, testOrder3));
+        assertThat(savedData.deals).usingRecursiveComparison().isEqualTo(Lists.list(testDeal, testDeal2, testDeal3));
+        assertThat(savedData.historyOrders).usingRecursiveComparison().isEqualTo(Lists.list(testOrder, testOrder2, testOrder3));
     }
     
     /**
@@ -220,13 +222,13 @@ public class HistoryFileManagerTest {
      */
     @Test
     void testDoesNotCorruptsTheDiskStorageIfUpdateCalledMultipleTimes() throws JsonProcessingException, IOException {
-        Mockito.when(storage.getDeals()).thenReturn(List.of(testDeal, testDeal2));
-        Mockito.when(storage.getHistoryOrders()).thenReturn(List.of(testOrder, testOrder2));
+        Mockito.when(storage.getDeals()).thenReturn(Lists.list(testDeal, testDeal2));
+        Mockito.when(storage.getHistoryOrders()).thenReturn(Lists.list(testOrder, testOrder2));
         fileManager.setStartNewDealIndex(0);
         fileManager.setStartNewOrderIndex(0);
         fileManager.updateDiskStorage().join();
-        Mockito.when(storage.getDeals()).thenReturn(List.of(testDeal, testDeal2, testDeal3));
-        Mockito.when(storage.getHistoryOrders()).thenReturn(List.of(testOrder, testOrder2, testOrder3));
+        Mockito.when(storage.getDeals()).thenReturn(Lists.list(testDeal, testDeal2, testDeal3));
+        Mockito.when(storage.getHistoryOrders()).thenReturn(Lists.list(testOrder, testOrder2, testOrder3));
         fileManager.setStartNewDealIndex(2);
         fileManager.setStartNewOrderIndex(2);
         CompletableFuture.allOf(
@@ -244,13 +246,13 @@ public class HistoryFileManagerTest {
      */
     @Test
     void testRemovesHistoryFromDisk() throws IOException, InterruptedException, ExecutionException {
-        Files.createFile(Path.of("./.metaapi/accountId-deals.bin"));
-        Files.createFile(Path.of("./.metaapi/accountId-historyOrders.bin"));
-        assertTrue(Files.exists(Path.of("./.metaapi/accountId-deals.bin")));
-        assertTrue(Files.exists(Path.of("./.metaapi/accountId-historyOrders.bin")));
+        Files.createFile(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin"));
+        Files.createFile(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin"));
+        assertTrue(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin")));
+        assertTrue(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin")));
         fileManager.deleteStorageFromDisk().get();
-        assertFalse(Files.exists(Path.of("./.metaapi/accountId-deals.bin")));
-        assertFalse(Files.exists(Path.of("./.metaapi/accountId-historyOrders.bin")));
+        assertFalse(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin")));
+        assertFalse(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin")));
     }
     
     /**
@@ -258,14 +260,18 @@ public class HistoryFileManagerTest {
      */
     private History readHistoryStorageFile() throws JsonMappingException, JsonProcessingException, IOException {
         History result = new History();
-        Path dealsPath = Path.of("./.metaapi/accountId-deals.bin");
-        Path historyOrdersPath = Path.of("./.metaapi/accountId-historyOrders.bin");
+        Path dealsPath = FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin");
+        Path historyOrdersPath = FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin");
         result.deals = Files.exists(dealsPath)
-            ? Arrays.asList(jsonMapper.readValue(Files.readString(dealsPath), MetatraderDeal[].class))
-            : List.of();
+            ? Arrays.asList(jsonMapper.readValue(
+                new String(Files.readAllBytes(dealsPath), StandardCharsets.UTF_8), 
+                MetatraderDeal[].class
+            )) : Lists.list();
         result.historyOrders = Files.exists(historyOrdersPath)
-            ? Arrays.asList(jsonMapper.readValue(Files.readString(historyOrdersPath), MetatraderOrder[].class))
-            : List.of();
+            ? Arrays.asList(jsonMapper.readValue(
+                new String(Files.readAllBytes(historyOrdersPath), StandardCharsets.UTF_8),
+                MetatraderOrder[].class
+            )) : Lists.list();
         return result;
     }
 }

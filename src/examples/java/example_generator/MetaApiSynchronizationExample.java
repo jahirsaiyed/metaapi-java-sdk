@@ -1,5 +1,6 @@
 package example_generator;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -29,7 +30,9 @@ public class MetaApiSynchronizationExample {
         try {
             MetatraderAccount account = api.getMetatraderAccountApi().getAccount(accountId).get();
             DeploymentState initialState = account.getState();
-            List<DeploymentState> deployedStates = List.of(DeploymentState.DEPLOYING, DeploymentState.DEPLOYED);
+            List<DeploymentState> deployedStates = new ArrayList<>();
+            deployedStates.add(DeploymentState.DEPLOYING);
+            deployedStates.add(DeploymentState.DEPLOYED);
             
             if (!deployedStates.contains(initialState)) {
                 // wait until account is deployed and connected to broker
