@@ -40,6 +40,10 @@ public class MetatraderPosition {
      */
     public IsoTime time;
     /**
+     * Time position was opened at, in broker timezone, YYYY-MM-DD HH:mm:ss.SSS format
+     */
+    public String brokerTime;
+    /**
      * Last position modification time
      */
     public IsoTime updateTime;
@@ -90,19 +94,23 @@ public class MetatraderPosition {
      */
     public String clientId;
     /**
-     * Profit of the part of the position which is not yet closed, including swap, or {@code null}
+     * Profit of the part of the position which is not yet closed, including swap
      */
     public Double unrealizedProfit;
     /**
-     * Profit of the already closed part, including commissions and swap, or {@code null}
+     * Profit of the already closed part, including commissions and swap
      */
     public Double realizedProfit;
     /**
      * Position commission
      */
-    public Double commission;
+    public double commission;
     /**
      * Position opening reason
      */
     public PositionReason reason;
+    /**
+     * Current exchange rate of account currency into USD, or {@code null}
+     */
+    public Double accountCurrencyExchangeRate;
 }

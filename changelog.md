@@ -1,3 +1,8 @@
+7.2.0  
+  - Added time fields in broker timezone to objects
+  - Added time fields to MetatraderSymbolPrice model
+  - Added accountCurrencyExchangeRate fields to models
+
 7.1.0
   - now only one MetaApiConnection can be created per account at the same time to avoid history storage errors
   - fix simultaneous multiple file writes by one connection
