@@ -57,6 +57,10 @@ public class MetatraderDeal {
      */
     public IsoTime time;
     /**
+     * Time the deal was conducted at, in broker timezone, YYYY-MM-DD HH:mm:ss.SSS format
+     */
+    public String brokerTime;
+    /**
      * Deal volume or {@code null}
      */
     public Double volume;
@@ -114,4 +118,8 @@ public class MetatraderDeal {
      * Optional deal execution reason or {@code null}
      */
     public DealReason reason;
+    /**
+     * Current exchange rate of account currency into USD, or {@code null}
+     */
+    public Double accountCurrencyExchangeRate;
 }

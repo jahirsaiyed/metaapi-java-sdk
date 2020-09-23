@@ -1,5 +1,7 @@
 package cloud.metaapi.sdk.clients.meta_api.models;
 
+import cloud.metaapi.sdk.clients.models.IsoTime;
+
 /**
  * MetaTrader symbol price. Contains current price for a symbol (see
  * https://metaapi.cloud/docs/client/models/metatraderSymbolPrice/)
@@ -25,4 +27,16 @@ public class MetatraderSymbolPrice {
      * Tick value for a losing position
      */
     public double lossTickValue;
+    /**
+     * Current exchange rate of account currency into USD, or {@code null}
+     */
+    public Double accountCurrencyExchangeRate;
+    /**
+     * Quote time, in ISO format
+     */
+    public IsoTime time;
+    /**
+     * Quote time, in broker timezone, YYYY-MM-DD HH:mm:ss.SSS format
+     */
+    public String brokerTime;
 }

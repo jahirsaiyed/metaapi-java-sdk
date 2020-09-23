@@ -61,9 +61,18 @@ public class MetatraderOrder {
      */
     public IsoTime time;
     /**
+     * Time order was created at, in broker timezone, YYYY-MM-DD HH:mm:ss.SSS format
+     */
+    public String brokerTime;
+    /**
      * Time order was executed or canceled at or {@code null}. Will be specified for completed orders only
      */
     public IsoTime doneTime;
+    /**
+     * Time order was executed or canceled at, in broker timezone, YYYY-MM-DD HH:mm:ss.SSS format, or {@code null}.
+     * Will be specified for completed orders only
+     */
+    public String doneBrokerTime;
     /**
      * Order symbol
      */
@@ -139,4 +148,8 @@ public class MetatraderOrder {
      * Optional order expiration time or {@code null}
      */
     public IsoTime expirationTime;
+    /**
+     * Current exchange rate of account currency into USD, or {@code null}
+     */
+    public Double accountCurrencyExchangeRate;
 }
