@@ -63,7 +63,7 @@ public class MetaApi {
     
     /**
      * Returns provisioning profile API
-     * @returns provisioning profile API
+     * @return provisioning profile API
      */
     public ProvisioningProfileApi getProvisioningProfileApi() {
         return provisioningProfileApi;

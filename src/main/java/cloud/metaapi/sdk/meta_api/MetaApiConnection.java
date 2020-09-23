@@ -75,7 +75,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     /**
      * Returns account information (see
      * https://metaapi.cloud/docs/client/websocket/api/readTradingTerminalState/readAccountInformation/).
-     * @returns completable future resolving with account information
+     * @return completable future resolving with account information
      */
     public CompletableFuture<MetatraderAccountInformation> getAccountInformation() {
         return websocketClient.getAccountInformation(account.getId());
@@ -84,7 +84,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     /**
      * Returns positions (see
      * https://metaapi.cloud/docs/client/websocket/api/readTradingTerminalState/readPositions/).
-     * @returns completable future resolving with array of open positions
+     * @return completable future resolving with array of open positions
      */
     public CompletableFuture<List<MetatraderPosition>> getPositions() {
         return websocketClient.getPositions(account.getId());
@@ -123,7 +123,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Returns the history of completed orders for a specific ticket number (see
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readHistoryOrdersByTicket/).
      * @param ticket ticket number (order id)
-     * @returns completable future resolving with request results containing history orders found
+     * @return completable future resolving with request results containing history orders found
      */
     public CompletableFuture<MetatraderHistoryOrders> getHistoryOrdersByTicket(String ticket) {
         return websocketClient.getHistoryOrdersByTicket(account.getId(), ticket);
@@ -133,7 +133,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Returns the history of completed orders for a specific position id (see
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readHistoryOrdersByPosition/)
      * @param positionId position id
-     * @returns completable future resolving with request results containing history orders found
+     * @return completable future resolving with request results containing history orders found
      */
     public CompletableFuture<MetatraderHistoryOrders> getHistoryOrdersByPosition(String positionId) {
         return websocketClient.getHistoryOrdersByPosition(account.getId(), positionId);
@@ -146,7 +146,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param endTime end of time range, exclusive
      * @param offset pagination offset
      * @param limit pagination limit
-     * @returns completable future resolving with request results containing history orders found
+     * @return completable future resolving with request results containing history orders found
      */
     public CompletableFuture<MetatraderHistoryOrders> getHistoryOrdersByTimeRange(
         IsoTime startTime, IsoTime endTime, int offset, int limit
@@ -158,7 +158,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Returns history deals with a specific ticket number (see
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readDealsByTicket/).
      * @param ticket ticket number (deal id for MT5 or order id for MT4)
-     * @returns completable future resolving with request results containing deals found
+     * @return completable future resolving with request results containing deals found
      */
     public CompletableFuture<MetatraderDeals> getDealsByTicket(String ticket) {
         return websocketClient.getDealsByTicket(account.getId(), ticket);
@@ -168,7 +168,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Returns history deals for a specific position id (see
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readDealsByPosition/).
      * @param positionId position id
-     * @returns completable future resolving with request results containing deals found
+     * @return completable future resolving with request results containing deals found
      */
     public CompletableFuture<MetatraderDeals> getDealsByPosition(String positionId) {
         return websocketClient.getDealsByPosition(account.getId(), positionId);
@@ -181,7 +181,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param endTime end of time range, exclusive
      * @param offset pagination offset
      * @param limit pagination limit
-     * @returns completable future resolving with request results containing deals found
+     * @return completable future resolving with request results containing deals found
      */
     public CompletableFuture<MetatraderDeals> getDealsByTimeRange(
         IsoTime startTime, IsoTime endTime, int offset, int limit
@@ -206,7 +206,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param stopLoss optional stop loss price or {@code null}
      * @param takeProfit optional take profit price or {@code null}
      * @param options optional trade options or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> createMarketBuyOrder(
@@ -229,7 +229,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param stopLoss optional stop loss price or {@code null}
      * @param takeProfit optional take profit price or {@code null}
      * @param options optional trade options or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> createMarketSellOrder(
@@ -253,7 +253,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param stopLoss optional stop loss price or {@code null}
      * @param takeProfit optional take profit price or {@code null}
      * @param options optional trade options or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> createLimitBuyOrder(
@@ -279,7 +279,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param stopLoss optional stop loss price or {@code null}
      * @param takeProfit optional take profit price or {@code null}
      * @param options optional trade options or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> createLimitSellOrder(
@@ -305,7 +305,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param stopLoss optional stop loss price or {@code null}
      * @param takeProfit optional take profit price or {@code null}
      * @param options optional trade options or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> createStopBuyOrder(
@@ -331,7 +331,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param stopLoss optional stop loss price or {@code null}
      * @param takeProfit optional take profit price or {@code null}
      * @param options optional trade options or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> createStopSellOrder(
@@ -354,7 +354,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param positionId position id to modify
      * @param stopLoss optional stop loss price or {@code null}
      * @param takeProfit optional take profit price or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> modifyPosition(
@@ -373,7 +373,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param positionId position id to modify
      * @param volume volume to close
      * @param options optional trade options or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> closePositionPartially(
@@ -391,7 +391,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Fully closes a position (see https://metaapi.cloud/docs/client/websocket/api/trade/).
      * @param positionId position id to modify
      * @param options optional trade options or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> closePosition(
@@ -408,7 +408,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Closes position by a symbol (see https://metaapi.cloud/docs/client/websocket/api/trade/)
      * @param symbol symbol to trade
      * @param options optional trade options or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> closePositionsBySymbol(
@@ -427,7 +427,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @param openPrice order stop price
      * @param stopLoss optional stop loss price or {@code null}
      * @param takeProfit optional take profit price or {@code null}
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> modifyOrder(
@@ -445,7 +445,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     /**
      * Cancels order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
      * @param orderId order id (ticket number)
-     * @returns completable future resolving with trade result or completing exceptionally with {@link TradeException},
+     * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
      * check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> cancelOrder(String orderId) {
@@ -457,7 +457,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     
     /**
      * Reconnects to the Metatrader terminal (see https://metaapi.cloud/docs/client/websocket/api/reconnect/).
-     * @returns completable future which resolves when reconnection started
+     * @return completable future which resolves when reconnection started
      */
     public CompletableFuture<Void> reconnect() {
         return websocketClient.reconnect(account.getId());
@@ -466,7 +466,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     /**
      * Requests the terminal to start synchronization process
      * (see https://metaapi.cloud/docs/client/websocket/synchronizing/synchronize/)
-     * @returns completable future which resolves when synchronization started
+     * @return completable future which resolves when synchronization started
      */
     public CompletableFuture<Void> synchronize() {
         return CompletableFuture.runAsync(() -> {
@@ -492,7 +492,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     
     /**
      * Initiates subscription to MetaTrader terminal
-     * @returns completable future which resolves when subscription is initiated
+     * @return completable future which resolves when subscription is initiated
      */
     public CompletableFuture<Void> subscribe() {
         return websocketClient.subscribe(account.getId());
@@ -502,7 +502,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Subscribes on market data of specified symbol (see
      * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/subscribeToMarketData/).
      * @param symbol symbol (e.g. currency pair or an index)
-     * @returns completable future which resolves when subscription request was processed
+     * @return completable future which resolves when subscription request was processed
      */
     public CompletableFuture<Void> subscribeToMarketData(String symbol) {
         return CompletableFuture.runAsync(() -> {
@@ -514,7 +514,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Retrieves specification for a symbol (see
      * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/getSymbolSpecification/).
      * @param symbol symbol to retrieve specification for
-     * @returns completable future which resolves with specification retrieved
+     * @return completable future which resolves with specification retrieved
      */
     public CompletableFuture<MetatraderSymbolSpecification> getSymbolSpecification(String symbol) {
         return websocketClient.getSymbolSpecification(account.getId(), symbol);
@@ -524,7 +524,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Retrieves specification for a symbol (see
      * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/getSymbolPrice/).
      * @param symbol symbol to retrieve price for
-     * @returns completable future which resolves with price retrieved
+     * @return completable future which resolves with price retrieved
      */
     public CompletableFuture<MetatraderSymbolPrice> getSymbolPrice(String symbol) {
         return websocketClient.getSymbolPrice(account.getId(), symbol);
@@ -532,7 +532,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     
     /**
      * Returns local copy of terminal state
-     * @returns local copy of terminal state
+     * @return local copy of terminal state
      */
     public TerminalState getTerminalState() {
         return terminalState;
@@ -540,7 +540,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     
     /**
      * Returns local history storage
-     * @returns local history storage
+     * @return local history storage
      */
     public HistoryStorage getHistoryStorage() {
         return historyStorage;

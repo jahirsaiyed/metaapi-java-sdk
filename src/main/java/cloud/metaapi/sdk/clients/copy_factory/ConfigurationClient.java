@@ -119,7 +119,6 @@ public class ConfigurationClient extends MetaApiClient {
      * Updates a CopyFactory strategy. See
      * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/put_users_current_configuration_strategies_strategyId
      * @param id copy trading strategy id
-     * @param account trading strategy update
      * @return completable future resolving when strategy is updated
      */
     public CompletableFuture<Void> updateStrategy(String id, CopyFactoryStrategyUpdate strategy) {

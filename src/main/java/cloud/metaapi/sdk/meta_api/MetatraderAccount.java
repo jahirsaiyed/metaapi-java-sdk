@@ -124,8 +124,8 @@ public class MetatraderAccount {
     }
     
     /**
-     * Returns terminal & broker connection status
-     * @return terminal & broker connection status
+     * Returns terminal and broker connection status
+     * @return terminal and broker connection status
      */
     public ConnectionStatus getConnectionStatus() {
         return data.connectionStatus;
@@ -186,7 +186,7 @@ public class MetatraderAccount {
     /**
      * Schedules account for deployment. It takes some time for API server to be started and account 
      * to reach the DEPLOYED state
-     * @returns completable future resolving when account is scheduled for deployment
+     * @return completable future resolving when account is scheduled for deployment
      */
     public CompletableFuture<Void> deploy() {
         CompletableFuture<Void> result = new CompletableFuture<>();
@@ -205,7 +205,7 @@ public class MetatraderAccount {
     /**
      * Schedules account for undeployment. It takes some time for API server to be stopped and account 
      * to reach the UNDEPLOYED state
-     * @returns completable future resolving when account is scheduled for undeployment
+     * @return completable future resolving when account is scheduled for undeployment
      */
     public CompletableFuture<Void> undeploy() {
         return CompletableFuture.runAsync(() -> {
@@ -218,7 +218,7 @@ public class MetatraderAccount {
     /**
      * Schedules account for redeployment. It takes some time for API server to be restarted and account
      * to reach the DEPLOYED state
-     * @returns completable future resolving when account is scheduled for redeployment
+     * @return completable future resolving when account is scheduled for redeployment
      */
     public CompletableFuture<Void> redeploy() {
         return CompletableFuture.runAsync(() -> {
@@ -357,7 +357,7 @@ public class MetatraderAccount {
     /**
      * Connects to MetaApi with default history storage. There is only one connection per account.
      * Subsequent calls to this method will return the same connection.
-     * @returns MetaApi connection
+     * @return MetaApi connection
      */
     public CompletableFuture<MetaApiConnection> connect() {
         return connect(null);
@@ -367,7 +367,7 @@ public class MetatraderAccount {
      * Connects to MetaApi. There is only one connection per account. 
      * Subsequent calls to this method will return the same connection.
      * @param historyStorage optional history storage
-     * @returns MetaApi connection
+     * @return MetaApi connection
      */
     public CompletableFuture<MetaApiConnection> connect(HistoryStorage historyStorage) {
         return connectionRegistry.connect(this, historyStorage);

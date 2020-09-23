@@ -11,7 +11,7 @@ public class MetatraderAccountDto {
     public enum DeploymentState { CREATED, DEPLOYING, DEPLOYED, UNDEPLOYING, UNDEPLOYED, DELETING }
     
     /**
-     * Terminal & broker connection status enum
+     * Terminal and broker connection status enum
      */
     public enum ConnectionStatus { CONNECTED, DISCONNECTED, DISCONNECTED_FROM_BROKER }
     
@@ -57,7 +57,7 @@ public class MetatraderAccountDto {
      */
     public DeploymentState state;
     /**
-     * Terminal & broker connection status
+     * Terminal and broker connection status
      */
     public ConnectionStatus connectionStatus;
     /**
