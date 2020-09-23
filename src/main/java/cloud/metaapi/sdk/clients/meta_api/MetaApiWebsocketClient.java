@@ -98,7 +98,7 @@ public class MetaApiWebsocketClient {
     
     /**
      * Connects to MetaApi server via socket.io protocol
-     * @returns completable future which resolves when connection is established
+     * @return completable future which resolves when connection is established
      */
     public CompletableFuture<Void> connect() {
         return CompletableFuture.supplyAsync(() -> {
@@ -228,7 +228,7 @@ public class MetaApiWebsocketClient {
      * Returns account information for a specified MetaTrader account (see
      * https://metaapi.cloud/docs/client/websocket/api/readTradingTerminalState/readAccountInformation/).
      * @param accountId id of the MetaTrader account to return information for
-     * @returns completable future resolving with account information
+     * @return completable future resolving with account information
      */
     public CompletableFuture<MetatraderAccountInformation> getAccountInformation(String accountId) {
         CompletableFuture<MetatraderAccountInformation> result = new CompletableFuture<>();
@@ -252,7 +252,7 @@ public class MetaApiWebsocketClient {
      * Returns positions for a specified MetaTrader account (see
      * https://metaapi.cloud/docs/client/websocket/api/readTradingTerminalState/readPositions/).
      * @param accountId id of the MetaTrader account to return information for
-     * @returns completable future resolving with list of open positions
+     * @return completable future resolving with list of open positions
      */
     public CompletableFuture<List<MetatraderPosition>> getPositions(String accountId) {
         CompletableFuture<List<MetatraderPosition>> result = new CompletableFuture<>();
@@ -342,7 +342,7 @@ public class MetaApiWebsocketClient {
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readHistoryOrdersByTicket/).
      * @param accountId id of the MetaTrader account to return information for
      * @param ticket ticket number (order id)
-     * @returns completable future resolving with request results containing history orders found
+     * @return completable future resolving with request results containing history orders found
      */
     public CompletableFuture<MetatraderHistoryOrders> getHistoryOrdersByTicket(String accountId, String ticket) {
         CompletableFuture<MetatraderHistoryOrders> result = new CompletableFuture<>();
@@ -369,7 +369,7 @@ public class MetaApiWebsocketClient {
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readHistoryOrdersByPosition/)
      * @param accountId id of the MetaTrader account to return information for
      * @param positionId position id
-     * @returns completable future resolving with request results containing history orders found
+     * @return completable future resolving with request results containing history orders found
      */
     public CompletableFuture<MetatraderHistoryOrders> getHistoryOrdersByPosition(String accountId, String positionId) {
         CompletableFuture<MetatraderHistoryOrders> result = new CompletableFuture<>();
@@ -399,7 +399,7 @@ public class MetaApiWebsocketClient {
      * @param endTime end of time range, exclusive
      * @param offset pagination offset
      * @param limit pagination limit
-     * @returns completable future resolving with request results containing history orders found
+     * @return completable future resolving with request results containing history orders found
      */
     public CompletableFuture<MetatraderHistoryOrders> getHistoryOrdersByTimeRange(
         String accountId, IsoTime startTime, IsoTime endTime, int offset, int limit
@@ -431,7 +431,7 @@ public class MetaApiWebsocketClient {
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readDealsByTicket/).
      * @param accountId id of the MetaTrader account to return information for
      * @param ticket ticket number (deal id for MT5 or order id for MT4)
-     * @returns completable future resolving with request results containing deals found
+     * @return completable future resolving with request results containing deals found
      */
     public CompletableFuture<MetatraderDeals> getDealsByTicket(String accountId, String ticket) {
         CompletableFuture<MetatraderDeals> result = new CompletableFuture<>();
@@ -458,7 +458,7 @@ public class MetaApiWebsocketClient {
      * https://metaapi.cloud/docs/client/websocket/api/retrieveHistoricalData/readDealsByPosition/).
      * @param accountId id of the MetaTrader account to return information for
      * @param positionId position id
-     * @returns completable future resolving with request results containing deals found
+     * @return completable future resolving with request results containing deals found
      */
     public CompletableFuture<MetatraderDeals> getDealsByPosition(String accountId, String positionId) {
         CompletableFuture<MetatraderDeals> result = new CompletableFuture<>();
@@ -488,7 +488,7 @@ public class MetaApiWebsocketClient {
      * @param endTime end of time range, exclusive
      * @param offset pagination offset
      * @param limit pagination limit
-     * @returns completable future resolving with request results containing deals found
+     * @return completable future resolving with request results containing deals found
      */
     public CompletableFuture<MetatraderDeals> getDealsByTimeRange(
         String accountId, IsoTime startTime, IsoTime endTime, int offset, int limit
@@ -531,7 +531,7 @@ public class MetaApiWebsocketClient {
      * Execute a trade on a connected MetaTrader account (see https://metaapi.cloud/docs/client/websocket/api/trade/).
      * @param accountId id of the MetaTrader account to execute trade for
      * @param trade trade to execute (see docs for possible trade types)
-     * @returns completable future resolving with trade result, or in case of trade error can be completed exceptionally
+     * @return completable future resolving with trade result, or in case of trade error can be completed exceptionally
      * with {@link TradeException}, check error properties for error code details
      */
     public CompletableFuture<MetatraderTradeResponse> trade(String accountId, MetatraderTrade trade) {
@@ -564,7 +564,7 @@ public class MetaApiWebsocketClient {
     /**
      * Subscribes to the Metatrader terminal events (see https://metaapi.cloud/docs/client/websocket/api/subscribe/).
      * @param accountId id of the MetaTrader account to subscribe to
-     * @returns completable future which resolves when subscription started
+     * @return completable future which resolves when subscription started
      */
     public CompletableFuture<Void> subscribe(String accountId) {
         ObjectNode request = jsonMapper.createObjectNode();
@@ -580,7 +580,7 @@ public class MetaApiWebsocketClient {
     /**
      * Reconnects to the Metatrader terminal (see https://metaapi.cloud/docs/client/websocket/api/reconnect/).
      * @param accountId id of the MetaTrader account to reconnect
-     * @returns completable future which resolves when reconnection started
+     * @return completable future which resolves when reconnection started
      */
     public CompletableFuture<Void> reconnect(String accountId) {
         ObjectNode request = jsonMapper.createObjectNode();
@@ -597,7 +597,7 @@ public class MetaApiWebsocketClient {
      * the entire order history will be downloaded.
      * @param startingDealTime from what date to start deal synchronization from. If not specified, then all
      * history deals will be downloaded.
-     * @returns completable future which resolves when synchronization started
+     * @return completable future which resolves when synchronization started
      */
     public CompletableFuture<Void> synchronize(
         String accountId, String synchronizationId, IsoTime startingHistoryOrderTime, IsoTime startingDealTime
@@ -617,7 +617,7 @@ public class MetaApiWebsocketClient {
      * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/subscribeToMarketData/).
      * @param accountId id of the MetaTrader account
      * @param symbol symbol (e.g. currency pair or an index)
-     * @returns completable future which resolves when subscription request was processed
+     * @return completable future which resolves when subscription request was processed
      */
     public CompletableFuture<Void> subscribeToMarketData(String accountId, String symbol) {
         ObjectNode request = jsonMapper.createObjectNode();
@@ -631,7 +631,7 @@ public class MetaApiWebsocketClient {
      * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/getSymbolSpecification/).
      * @param accountId id of the MetaTrader account to retrieve symbol specification for
      * @param symbol symbol to retrieve specification for
-     * @returns completable future resolving with specification retrieved
+     * @return completable future resolving with specification retrieved
      */
     public CompletableFuture<MetatraderSymbolSpecification> getSymbolSpecification(String accountId, String symbol) {
         CompletableFuture<MetatraderSymbolSpecification> result = new CompletableFuture<>();
@@ -656,7 +656,7 @@ public class MetaApiWebsocketClient {
      * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/getSymbolPrice/).
      * @param accountId id of the MetaTrader account to retrieve symbol price for
      * @param symbol symbol to retrieve price for
-     * @returns completable future which resolves when price is retrieved
+     * @return completable future which resolves when price is retrieved
      */
     public CompletableFuture<MetatraderSymbolPrice> getSymbolPrice(String accountId, String symbol) {
         CompletableFuture<MetatraderSymbolPrice> result = new CompletableFuture<>();

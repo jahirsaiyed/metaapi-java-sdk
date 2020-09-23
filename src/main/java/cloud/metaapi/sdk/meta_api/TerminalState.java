@@ -54,7 +54,7 @@ public class TerminalState extends SynchronizationListener {
     
     /**
      * Returns a local copy of account information
-     * @returns local copy of account information
+     * @return local copy of account information
      */
     public Optional<MetatraderAccountInformation> getAccountInformation() {
         return accountInformation;
@@ -62,7 +62,7 @@ public class TerminalState extends SynchronizationListener {
     
     /**
      * Returns a local copy of MetaTrader positions opened
-     * @returns a local copy of MetaTrader positions opened
+     * @return a local copy of MetaTrader positions opened
      */
     public List<MetatraderPosition> getPositions() {
         return positions;
@@ -70,7 +70,7 @@ public class TerminalState extends SynchronizationListener {
     
     /**
      * Returns a local copy of MetaTrader orders opened
-     * @returns a local copy of MetaTrader orders opened
+     * @return a local copy of MetaTrader orders opened
      */
     public List<MetatraderOrder> getOrders() {
         return orders;
@@ -78,7 +78,7 @@ public class TerminalState extends SynchronizationListener {
     
     /**
      * Returns a local copy of symbol specifications available in MetaTrader trading terminal
-     * @returns a local copy of symbol specifications available in MetaTrader trading terminal
+     * @return a local copy of symbol specifications available in MetaTrader trading terminal
      */
     public List<MetatraderSymbolSpecification> getSpecifications() {
         return specifications;

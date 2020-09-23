@@ -39,7 +39,7 @@ public class CopyFactory {
     
     /**
      * Returns CopyFactory configuration API
-     * @returns configuration API
+     * @return configuration API
      */
     public ConfigurationClient getConfigurationApi() {
         return configurationClient;

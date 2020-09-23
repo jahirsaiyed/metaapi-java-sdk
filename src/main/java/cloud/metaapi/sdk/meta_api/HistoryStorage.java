@@ -63,13 +63,13 @@ public abstract class HistoryStorage extends SynchronizationListener {
     
     /**
      * Returns the time of the last history order record stored in the history storage
-     * @returns the time of the last history order record stored in the history storage
+     * @return the time of the last history order record stored in the history storage
      */
     public abstract CompletableFuture<IsoTime> getLastHistoryOrderTime();
     
     /**
      * Returns the time of the last history deal record stored in the history storage
-     * @returns the time of the last history deal record stored in the history storage
+     * @return the time of the last history deal record stored in the history storage
      */
     public abstract CompletableFuture<IsoTime> getLastDealTime();
     

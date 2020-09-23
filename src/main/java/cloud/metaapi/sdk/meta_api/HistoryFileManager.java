@@ -104,7 +104,7 @@ public class HistoryFileManager {
     
     /**
      * Helper function to calculate object size in bytes in utf-8 encoding
-     * @returns size of object in bytes
+     * @return size of object in bytes
      */
     public int getItemSize(Object item) throws JsonProcessingException {
         return jsonMapper.writeValueAsBytes(item).length;
