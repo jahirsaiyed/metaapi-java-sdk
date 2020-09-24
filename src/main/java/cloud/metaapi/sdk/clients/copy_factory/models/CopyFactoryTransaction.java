@@ -84,4 +84,8 @@ public class CopyFactoryTransaction {
      * Trade profit
      */
     public Double profit;
+    /**
+     * Trade copying metrics such as slippage and latencies, or {@code null}. Measured selectively for copied trades
+     */
+    public CopyFactoryTransactionMetrics metrics;
 }
