@@ -1,3 +1,6 @@
+7.3.0
+  - added latency and slippage metrics to CopyFactory trade copying API
+
 7.2.0  
   - Added time fields in broker timezone to objects
   - Added time fields to MetatraderSymbolPrice model
