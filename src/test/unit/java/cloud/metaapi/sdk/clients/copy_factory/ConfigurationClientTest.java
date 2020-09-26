@@ -360,4 +360,49 @@ class ConfigurationClientTest {
             );
         };
     }
+    
+    /**
+     * Tests {@link ConfigurationClient#getActiveResynchronizationTasks(String)}
+     */
+    @Test
+    void testRetrievesActiveResynchronizationTasksFromApi() {
+        List<ResynchronizationTask> expectedTasks = Lists.list(new ResynchronizationTask() {{
+            _id = "ABCD";
+            type = TaskType.CREATE_STRATEGY;
+            createdAt = new IsoTime("2020-08-25T00:00:00.000Z");
+            status = TaskStatus.EXECUTING;
+        }});
+        httpClient.setRequestMock((actualOptions) -> {
+            try {
+                HttpRequestOptions expectedOptions = new HttpRequestOptions(
+                    copyFactoryApiUrl + "/users/current/configuration/connections/" + 
+                        "accountId/active-resynchronization-tasks", Method.GET);
+                expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
+                assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
+                return CompletableFuture.completedFuture(jsonMapper.writeValueAsString(expectedTasks));
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+                return null;
+            }
+        });
+        List<ResynchronizationTask> actualTasks = copyFactoryClient.getActiveResynchronizationTasks("accountId").join();
+        assertThat(actualTasks).usingRecursiveComparison().isEqualTo(expectedTasks);
+    }
+    
+    /**
+     * Tests {@link ConfigurationClient#getActiveResynchronizationTasks(String)}
+     */
+    @Test
+    void testDoesNotRetrieveActiveResynchronizationTasksFromApiWithAccountToken() throws Exception {
+        copyFactoryClient = new ConfigurationClient(httpClient, "token");
+        try {
+            copyFactoryClient.getActiveResynchronizationTasks("accountId").get();
+        } catch (ExecutionException e) {
+            assertEquals(
+                "You can not invoke getActiveResynchronizationTasks method, because you have connected with account access token. "
+                + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
+                e.getCause().getMessage()
+            );
+        };
+    }
 }

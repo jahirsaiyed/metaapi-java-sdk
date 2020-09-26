@@ -143,4 +143,18 @@ public class ConfigurationClient extends MetaApiClient {
         opts.getHeaders().put("auth-token", token);
         return httpClient.request(opts).thenApply((response) -> null);
     }
+    
+    /**
+     * Returns list of active resynchronization tasks for a specified connection. See
+     * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/get_users_current_configuration_connections_connectionId_active_resynchronization_tasks
+     * @param connectionId MetaApi account id to return tasks for
+     * @return completable future resolving with list of active resynchronization tasks
+     */
+    public CompletableFuture<List<ResynchronizationTask>> getActiveResynchronizationTasks(String connectionId) {
+        if (isNotJwtToken()) return handleNoAccessError("getActiveResynchronizationTasks");
+        HttpRequestOptions opts = new HttpRequestOptions(host + "/users/current/configuration/connections/" 
+            + connectionId + "/active-resynchronization-tasks", Method.GET);
+        opts.getHeaders().put("auth-token", token);
+        return httpClient.requestJson(opts, ResynchronizationTask[].class).thenApply(array -> Arrays.asList(array));
+    }
 }
