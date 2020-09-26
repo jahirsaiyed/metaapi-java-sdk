@@ -456,8 +456,8 @@ System.out.println(historyApi.getStrategiesSubscribed().get());
 System.out.println(historyApi.getStrategiesSubscribedTransactions(new IsoTime("2020-08-01T00:00:00.000Z"), new IsoTime("2020-09-01T00:00:00.000Z")).get();
 ```
 
-#### Resynchronizing slave accounts to maters
-Sometimes trades can not open in time due to broker errors or trading session time discrepancy.
+#### Resynchronizing slave accounts to masters
+There is a configurable time limit during which the trades can be opened. Sometimes trades can not open in time due to broker errors or trading session time discrepancy.
 You can resynchronize a slave account to place such late trades. Please note that positions which were
 closed manually on a slave account will also be reopened during resynchronization.
 
