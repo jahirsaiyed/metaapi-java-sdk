@@ -25,11 +25,11 @@ public class MetaApiRpcExample {
 
     private static String token = getEnvOrDefault("NAME", "<put in your token here>");
     private static String accountId = getEnvOrDefault("ACCOUNT_ID", "<put in your account id here>");
-  
-    private static MetaApi api = new MetaApi(token);
     
     public static void main(String[] args) {
         try {
+            MetaApi api = new MetaApi(token);
+            
             MetatraderAccount account = api.getMetatraderAccountApi().getAccount(accountId).get();
             DeploymentState initialState = account.getState();
             List<DeploymentState> deployedStates = new ArrayList<>();

@@ -82,7 +82,7 @@ class MetaApiWebsocketClientTest {
             }
         });
         server.start();
-        client = new MetaApiWebsocketClient("token", "project-stock.agiliumlabs.cloud", 60000, 60000);
+        client = new MetaApiWebsocketClient("token", "application", "project-stock.agiliumlabs.cloud", 60000L, 60000L);
         client.setUrl("http://localhost:6784");
     }
     
@@ -126,6 +126,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getAccountInformation") 
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                  ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -153,6 +154,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getPositions") 
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -180,6 +182,7 @@ class MetaApiWebsocketClientTest {
                 if (	request.get("type").asText().equals("getPosition") 
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("positionId").asText().equals(expected.id)
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -207,6 +210,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("getOrders")
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -234,6 +238,7 @@ class MetaApiWebsocketClientTest {
                 if (    request.get("type").asText().equals("getOrder")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("orderId").asText().equals(expected.id)
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -261,6 +266,7 @@ class MetaApiWebsocketClientTest {
                 if (    request.get("type").asText().equals("getHistoryOrdersByTicket")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("ticket").asText().equals(expected.historyOrders.get(0).id)
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -290,6 +296,7 @@ class MetaApiWebsocketClientTest {
                 if (    request.get("type").asText().equals("getHistoryOrdersByPosition")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("positionId").asText().equals(expected.historyOrders.get(0).positionId)
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -321,6 +328,7 @@ class MetaApiWebsocketClientTest {
                      && request.get("startTime").asText().equals("2020-04-15T02:45:00Z")
                      && request.get("endTime").asText().equals("2020-04-15T02:46:00Z")
                      && request.get("offset").asInt() == 1 && request.get("limit").asInt() == 100
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -352,6 +360,7 @@ class MetaApiWebsocketClientTest {
                 if (    request.get("type").asText().equals("getDealsByTicket")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("ticket").asText().equals(expected.deals.get(0).orderId)
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -380,6 +389,7 @@ class MetaApiWebsocketClientTest {
                 if (    request.get("type").asText().equals("getDealsByPosition")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("positionId").asText().equals(expected.deals.get(0).positionId)
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -410,6 +420,7 @@ class MetaApiWebsocketClientTest {
                      && request.get("startTime").asText().equals("2020-04-15T02:45:00Z")
                      && request.get("endTime").asText().equals("2020-04-15T02:46:00Z")
                      && request.get("offset").asInt() == 1 && request.get("limit").asInt() == 100
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -440,6 +451,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("removeHistory")
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     requestReceived = true;
                     ObjectNode response = jsonMapper.createObjectNode();
@@ -451,6 +463,33 @@ class MetaApiWebsocketClientTest {
             }
         });
         client.removeHistory("accountId").get();
+        assertTrue(requestReceived);
+    }
+    
+    /**
+     * Tests {@link MetaApiWebsocketClient#removeApplication(String)}
+     */
+    @Test
+    void testRemovesApplicationFromApi() throws Exception {
+        requestReceived = false;
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
+            @Override
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
+                if (    request.get("type").asText().equals("removeApplication")
+                     && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
+                ) {
+                    requestReceived = true;
+                    ObjectNode response = jsonMapper.createObjectNode();
+                    response.put("type", "response");
+                    response.set("accountId", request.get("accountId"));
+                    response.set("requestId", request.get("requestId"));
+                    client.sendEvent("response", response.toString());
+                }
+            }
+        });
+        client.removeApplication("accountId").get();
         assertTrue(requestReceived);
     }
     
@@ -474,6 +513,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("trade")
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     actualTrade = jsonMapper.treeToValue(request.get("trade"), MetatraderTrade.class);
                     ObjectNode response = jsonMapper.createObjectNode();
@@ -513,6 +553,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("trade")
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -547,6 +588,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("subscribe")
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     requestReceived = true;
                     ObjectNode response = jsonMapper.createObjectNode();
@@ -573,6 +615,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("subscribe")
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     requestReceived = true;
                     ObjectNode response = jsonMapper.createObjectNode();
@@ -588,7 +631,7 @@ class MetaApiWebsocketClientTest {
     }
     
     /**
-     * Tests {@link MetaApiWebsocketClient#connect()}
+     * Tests {@link MetaApiWebsocketClient#subscribe(String)}
      */
     @Test
     void testReturnsErrorIfConnectToMetatarderTerminalFailed() throws Exception {
@@ -599,6 +642,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("subscribe")
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     requestReceived = true;
                 }
@@ -631,6 +675,7 @@ class MetaApiWebsocketClientTest {
                 JsonNode request = jsonMapper.valueToTree(data);
                 if (    request.get("type").asText().equals("reconnect")
                      && request.get("accountId").asText().equals("accountId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     requestReceived = true;
                     ObjectNode response = jsonMapper.createObjectNode();
@@ -658,6 +703,7 @@ class MetaApiWebsocketClientTest {
                 if (    request.get("type").asText().equals("getSymbolSpecification")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("symbol").asText().equals(expected.symbol)
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -685,6 +731,7 @@ class MetaApiWebsocketClientTest {
                 if (    request.get("type").asText().equals("getSymbolPrice")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("symbol").asText().equals(expected.symbol)
+                     && request.get("application").asText().equals("application")
                 ) {
                     ObjectNode response = jsonMapper.createObjectNode();
                     response.put("type", "response");
@@ -892,6 +939,7 @@ class MetaApiWebsocketClientTest {
                      && request.get("startingHistoryOrderTime").asText().equals("2020-01-01T00:00:00Z")
                      && request.get("startingDealTime").asText().equals("2020-01-02T00:00:00Z")
                      && request.get("requestId").asText().equals("synchronizationId")
+                     && request.get("application").asText().equals("application")
                 ) {
                     requestReceived = true;
                     ObjectNode response = jsonMapper.createObjectNode();
@@ -1025,7 +1073,7 @@ class MetaApiWebsocketClientTest {
     }
     
     /**
-     * Tests {@link MetaApiWebsocketClient#trade(String, MetatraderTrade)
+     * Tests {@link MetaApiWebsocketClient#trade(String, MetatraderTrade)}
      */
     @Test
     void testReturnsTimeoutExceptionIfNoServerResponseReceived() throws Exception {
@@ -1060,6 +1108,7 @@ class MetaApiWebsocketClientTest {
                 if (    request.get("type").asText().equals("subscribeToMarketData")
                      && request.get("accountId").asText().equals("accountId")
                      && request.get("symbol").asText().equals("EURUSD")
+                     && request.get("application").asText().equals("application")
                 ) {
                     requestReceived = true;
                     ObjectNode response = jsonMapper.createObjectNode();

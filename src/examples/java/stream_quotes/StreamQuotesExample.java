@@ -20,8 +20,6 @@ public class StreamQuotesExample {
     private static String token = getEnvOrDefault("NAME", "<put in your token here>");
     private static String accountId = getEnvOrDefault("ACCOUNT_ID", "<put in your account id here>");
     
-    private static MetaApi api = new MetaApi(token);
-    
     private static class EURUSDListener extends SynchronizationListener {
         @Override
         public CompletableFuture<Void> onSymbolPriceUpdated(MetatraderSymbolPrice price) {
@@ -37,6 +35,7 @@ public class StreamQuotesExample {
     
     public static void main(String[] args) {
         try {
+            MetaApi api = new MetaApi(token);
             MetatraderAccount account = api.getMetatraderAccountApi().getAccount(accountId).get();
             
             // wait until account is deployed and connected to broker

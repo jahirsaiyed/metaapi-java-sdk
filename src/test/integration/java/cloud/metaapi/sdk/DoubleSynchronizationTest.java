@@ -16,6 +16,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.models.NewMetatraderAccountDto;
 import cloud.metaapi.sdk.clients.meta_api.models.NewProvisioningProfileDto;
@@ -39,7 +40,6 @@ class DoubleSynchronizationTest {
     private String password = dotenv.get("PASSWORD");
     private String serverName = dotenv.get("SERVER");
     private String serverDatFile = dotenv.get("PATH_TO_SERVERS_DAT");
-    private MetaApi api = new MetaApi(token);
     
     @BeforeAll
     static void setUpBeforeClass() throws IOException {
@@ -52,7 +52,8 @@ class DoubleSynchronizationTest {
     }
 
     @Test
-    void testDoesNotCorruptFilesAfterSimultaneousSynchronization() {
+    void testDoesNotCorruptFilesAfterSimultaneousSynchronization() throws ValidationException {
+        MetaApi api = new MetaApi(token);
         final ProvisioningProfileApi profileApi = api.getProvisioningProfileApi();
         final MetatraderAccountApi accountApi = api.getMetatraderAccountApi();
         if (token != null) {
@@ -110,11 +111,11 @@ class DoubleSynchronizationTest {
                 MetaApiWebsocketClient websocketClient = ((MetaApiWebsocketClient) FieldUtils
                     .readField(api, "metaApiWebsocketClient", true));
                 websocketClient.removeAllListeners();
-                if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-deals.bin"))) {
-                    JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-deals.bin"));
+                if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-MetaApi-deals.bin"))) {
+                    JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-MetaApi-deals.bin"));
                 }
-                if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-historyOrders.bin"))) {
-                    JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-historyOrders.bin"));
+                if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-MetaApi-historyOrders.bin"))) {
+                    JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-MetaApi-historyOrders.bin"));
                 }
             });
         }

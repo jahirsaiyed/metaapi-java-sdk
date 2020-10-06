@@ -167,7 +167,7 @@ public class MetatraderAccount {
             connectionRegistry.remove(getId());
             try {
                 metatraderAccountClient.deleteAccount(getId()).get();
-                HistoryFileManager fileManager = ServiceProvider.createHistoryFileManager(getId(), null);
+                HistoryFileManager fileManager = ServiceProvider.createHistoryFileManager(getId(), "MetaApi", null);
                 fileManager.deleteStorageFromDisk().get();
                 if (!getType().equals("self-hosted")) {
                     try {

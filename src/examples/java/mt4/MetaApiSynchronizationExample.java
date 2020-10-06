@@ -29,10 +29,9 @@ public class MetaApiSynchronizationExample {
     private static String serverName = getEnvOrDefault("SERVER", "<put in your MT server name here>");
     private static String brokerSrvFile = getEnvOrDefault("PATH_TO_BROKER_SRV", "/path/to/your/broker.srv");
     
-    private static MetaApi api = new MetaApi(token);
-    
     public static void main(String[] args) {
         try {
+            MetaApi api = new MetaApi(token);
             List<ProvisioningProfile> profiles = api.getProvisioningProfileApi().getProvisioningProfiles().get();
             
             // create test MetaTrader account profile

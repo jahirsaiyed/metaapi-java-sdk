@@ -223,6 +223,17 @@ class MetaApiConnectionTest {
     }
     
     /**
+     * Tests {@link MetaApiConnection#removeApplication()}
+     */
+    @Test
+    void testRemovesApplication() throws Exception {
+        Mockito.when(client.removeApplication("accountId")).thenReturn(CompletableFuture.completedFuture(null));
+        api.removeApplication().get();
+        Mockito.verify(client).removeApplication("accountId");
+        Mockito.verify(storageMock).reset();
+    }
+    
+    /**
      * Tests {@link MetaApiConnection#createMarketBuyOrder(String, double, Double, Double, TradeOptions)}
      */
     @ParameterizedTest

@@ -29,7 +29,7 @@ public class MemoryHistoryStorage extends HistoryStorage {
     public MemoryHistoryStorage(String accountId) {
         super();
         this.accountId = accountId;
-        fileManager = ServiceProvider.createHistoryFileManager(this.accountId, this);
+        fileManager = ServiceProvider.createHistoryFileManager(this.accountId, "MetaApi", this);
         fileManager.startUpdateJob();
     }
     

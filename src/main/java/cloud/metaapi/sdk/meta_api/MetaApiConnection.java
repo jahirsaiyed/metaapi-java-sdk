@@ -190,13 +190,23 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     }
     
     /**
-     * Clears the order and transaction history of a specified account so that it can be synchronized from scratch 
+     * Clears the order and transaction history of a specified application so that it can be synchronized from scratch 
      * (see https://metaapi.cloud/docs/client/websocket/api/removeHistory/).
      * @return completable future resolving when the history is cleared
      */
     public CompletableFuture<Void> removeHistory() {
         historyStorage.reset();
         return websocketClient.removeHistory(account.getId());
+    }
+    
+    /**
+     * Clears the order and transaction history of a specified application and removes application (see
+     * https://metaapi.cloud/docs/client/websocket/api/removeApplication/).
+     * @return completable future resolving when the history is cleared and application is removed
+     */
+    public CompletableFuture<Void> removeApplication() {
+        historyStorage.reset();
+        return websocketClient.removeApplication(account.getId());
     }
     
     /**

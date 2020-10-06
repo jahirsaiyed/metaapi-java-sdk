@@ -63,7 +63,7 @@ public class HistoryFileManagerTest {
     void setUp() throws IOException {
         Files.createDirectories(FileSystems.getDefault().getPath(".", ".metaapi"));
         storage = Mockito.mock(HistoryStorage.class);
-        fileManager = Mockito.spy(new HistoryFileManager("accountId", storage) {{
+        fileManager = Mockito.spy(new HistoryFileManager("accountId", "application", storage) {{
             updateJobIntervalInMilliseconds = 500; }});
         testDeal = new MetatraderDeal() {{ id = "37863643"; type = DealType.DEAL_TYPE_BALANCE; magic = 0;
             time = new IsoTime(new Date(100)); commission = 0.0; swap = 0.0; profit = 10000;
@@ -90,8 +90,8 @@ public class HistoryFileManagerTest {
     
     @AfterEach
     void tearDown() throws IOException {
-        Files.deleteIfExists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin"));
-        Files.deleteIfExists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin"));
+        Files.deleteIfExists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-deals.bin"));
+        Files.deleteIfExists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-historyOrders.bin"));
     }
     
     /**
@@ -121,8 +121,8 @@ public class HistoryFileManagerTest {
      */
     @Test
     void testReadsHistoryFromFile() throws Exception {
-        Files.write(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin"), jsonMapper.writeValueAsBytes(Lists.list(testDeal)));
-        Files.write(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin"), jsonMapper.writeValueAsBytes(Lists.list(testOrder)));
+        Files.write(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-deals.bin"), jsonMapper.writeValueAsBytes(Lists.list(testDeal)));
+        Files.write(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-historyOrders.bin"), jsonMapper.writeValueAsBytes(Lists.list(testOrder)));
         History history = fileManager.getHistoryFromDisk().get();
         assertThat(history.deals).usingRecursiveComparison().isEqualTo(Lists.list(testDeal));
         assertThat(history.historyOrders).usingRecursiveComparison().isEqualTo(Lists.list(testOrder));
@@ -238,7 +238,7 @@ public class HistoryFileManagerTest {
             fileManager.updateDiskStorage(),
             fileManager.updateDiskStorage()
         ).join();
-        JsonMapper.getInstance().readTree(new File("./.metaapi/accountId-historyOrders.bin"));
+        JsonMapper.getInstance().readTree(new File("./.metaapi/accountId-application-historyOrders.bin"));
     }
     
     /**
@@ -246,13 +246,13 @@ public class HistoryFileManagerTest {
      */
     @Test
     void testRemovesHistoryFromDisk() throws IOException, InterruptedException, ExecutionException {
-        Files.createFile(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin"));
-        Files.createFile(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin"));
-        assertTrue(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin")));
-        assertTrue(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin")));
+        Files.createFile(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-deals.bin"));
+        Files.createFile(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-historyOrders.bin"));
+        assertTrue(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-deals.bin")));
+        assertTrue(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-historyOrders.bin")));
         fileManager.deleteStorageFromDisk().get();
-        assertFalse(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin")));
-        assertFalse(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin")));
+        assertFalse(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-deals.bin")));
+        assertFalse(Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-historyOrders.bin")));
     }
     
     /**
@@ -260,8 +260,8 @@ public class HistoryFileManagerTest {
      */
     private History readHistoryStorageFile() throws JsonMappingException, JsonProcessingException, IOException {
         History result = new History();
-        Path dealsPath = FileSystems.getDefault().getPath(".", ".metaapi", "accountId-deals.bin");
-        Path historyOrdersPath = FileSystems.getDefault().getPath(".", ".metaapi", "accountId-historyOrders.bin");
+        Path dealsPath = FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-deals.bin");
+        Path historyOrdersPath = FileSystems.getDefault().getPath(".", ".metaapi", "accountId-application-historyOrders.bin");
         result.deals = Files.exists(dealsPath)
             ? Arrays.asList(jsonMapper.readValue(
                 new String(Files.readAllBytes(dealsPath), StandardCharsets.UTF_8), 
