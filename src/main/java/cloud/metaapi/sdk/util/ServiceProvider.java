@@ -42,13 +42,14 @@ public class ServiceProvider {
     /**
      * Constructs history file manager with its corresponding constructor or returns a mock if it is set.
      * @param accountId account id
+     * @param application MetaApi application id
      * @param storage storage
      * @return normal or mocked history file manager
      * @see #setHistoryFileManagerMock(HistoryFileManager)
      */
-    public static HistoryFileManager createHistoryFileManager(String accountId, HistoryStorage storage) {
+    public static HistoryFileManager createHistoryFileManager(String accountId, String application, HistoryStorage storage) {
         if (historyFileManagerMock != null) return historyFileManagerMock;
-        return new HistoryFileManager(accountId, storage);
+        return new HistoryFileManager(accountId, application, storage);
     }
     
     /**

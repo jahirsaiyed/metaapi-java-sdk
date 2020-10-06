@@ -53,39 +53,51 @@ public class MetaApiWebsocketClient {
     private String url;
     private String token;
     private Socket socket;
+    private String application;
     private long requestTimeout;
     private long connectTimeout;
     private ObjectMapper jsonMapper = JsonMapper.getInstance();
     private Map<String, CompletableFuture<JsonNode>> requestResolves;
     private Map<String, List<SynchronizationListener>> synchronizationListeners;
     private List<ReconnectListener> reconnectListeners;
+    private CompletableFuture<Void> connectFuture = null;
     private boolean isSocketConnecting = false;
     private boolean connected = false;
     
     /**
-     * Constructs MetaApi websocket API client instance. Domain is {@code agiliumtrade.agiliumtrade.ai},
-     * timeout for socket requests is {@code 1 minute}, timeout for connecting to server is {@code 1 minute}.
+     * Constructs MetaApi websocket API client instance with default parameters
      * @param token authorization token
      */
     public MetaApiWebsocketClient(String token) {
-        this(token, "agiliumtrade.agiliumtrade.ai", 60000, 60000);
+        this(token, null, null, null, null);
+    }
+    
+    /**
+     * Constructs MetaApi websocket API client instance with default parameters
+     * @param token authorization token
+     * @param application application id or {@code null}. By default is {@code MetaApi}
+     */
+    public MetaApiWebsocketClient(String token, String application) {
+        this(token, application, null, null, null);
     }
     
     /**
      * Constructs MetaApi websocket API client instance
      * @param token authorization token
-     * @param domain domain to connect to
-     * @param requestTimeout timeout for socket requests in milliseconds
-     * @param connectTimeout timeout for connecting to server in milliseconds
+     * @param application application id or {@code null}. By default is {@code MetaApi}
+     * @param domain domain to connect to {@code null}. By default is {@code agiliumtrade.agiliumtrade.ai}
+     * @param requestTimeout timeout for socket requests in milliseconds or {@code null}. By default is {@code 1 minute}
+     * @param connectTimeout timeout for connecting to server in milliseconds or {@code null}. By default is {@code 1 minute}
      */
-    public MetaApiWebsocketClient(String token, String domain, long requestTimeout, long connectTimeout) {
-        this.url = "https://mt-client-api-v1." + domain;
+    public MetaApiWebsocketClient(String token, String application, String domain, Long requestTimeout, Long connectTimeout) {
+        this.application = (application != null ? application : "MetaApi");
+        this.url = "https://mt-client-api-v1." + (domain != null ? domain : "agiliumtrade.agiliumtrade.ai");
         this.token = token;
         this.requestResolves = new HashMap<>();
         this.synchronizationListeners = new HashMap<>();
         this.reconnectListeners = new LinkedList<>();
-        this.requestTimeout = requestTimeout;
-        this.connectTimeout = connectTimeout;
+        this.requestTimeout = (requestTimeout != null ? requestTimeout : 60000);
+        this.connectTimeout = (connectTimeout != null ? connectTimeout : 60000);
     }
     
     /**
@@ -106,6 +118,7 @@ public class MetaApiWebsocketClient {
             connected = true;
             requestResolves.clear();
             CompletableFuture<Void> result = new CompletableFuture<>();
+            connectFuture = result;
             
             String url = this.url + "?auth-token=" + token;
             IO.Options socketOptions = new IO.Options();
@@ -516,14 +529,26 @@ public class MetaApiWebsocketClient {
     }
     
     /**
-     * Clears the order and transaction history of a specified account so that it can be synchronized from scratch (see
-     * https://metaapi.cloud/docs/client/websocket/api/removeHistory/).
+     * Clears the order and transaction history of a specified application so that it can be synchronized from scratch
+     * (see https://metaapi.cloud/docs/client/websocket/api/removeHistory/).
      * @param accountId id of the MetaTrader account to remove history for
      * @return completable future resolving when the history is cleared
      */
     public CompletableFuture<Void> removeHistory(String accountId) {
         ObjectNode request = jsonMapper.createObjectNode();
         request.put("type", "removeHistory");
+        return rpcRequest(accountId, request).thenApply((response) -> null);
+    }
+    
+    /**
+     * Clears the order and transaction history of a specified application and removes the application (see
+     * https://metaapi.cloud/docs/client/websocket/api/removeApplication/).
+     * @param accountId id of the MetaTrader account to remove history and application for
+     * @return completable future resolving when the history is cleared
+     */
+    public CompletableFuture<Void> removeApplication(String accountId) {
+        ObjectNode request = jsonMapper.createObjectNode();
+        request.put("type", "removeApplication");
         return rpcRequest(accountId, request).thenApply((response) -> null);
     }
     
@@ -752,9 +777,11 @@ public class MetaApiWebsocketClient {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 if (!connected) connect().join();
+                else connectFuture.join();
                 CompletableFuture<JsonNode> result = new CompletableFuture<>();
                 requestResolves.put(requestId, result);
                 request.put("accountId", accountId);
+                request.put("application", this.application);
                 if (!request.has("requestId")) request.put("requestId", requestId);
                 socket.emit("request", new JSONObject(jsonMapper.writeValueAsString(request)));
                 return result.get(requestTimeout, TimeUnit.MILLISECONDS);

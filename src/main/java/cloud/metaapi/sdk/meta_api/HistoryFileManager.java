@@ -36,6 +36,7 @@ public class HistoryFileManager {
     private static Logger logger = Logger.getLogger(HistoryFileManager.class);
     
     private String accountId;
+    private String application;
     private HistoryStorage historyStorage;
     private List<Integer> dealsSize = new ArrayList<>();
     private int startNewDealIndex = -1;
@@ -66,10 +67,12 @@ public class HistoryFileManager {
     /**
      * Constructs the history file manager instance
      * @param accountId accound id
+     * @param application MetaApi application id
      * @param historyStorage history storage
      */
-    public HistoryFileManager(String accountId, HistoryStorage historyStorage) {
+    public HistoryFileManager(String accountId, String application, HistoryStorage historyStorage) {
         this.accountId = accountId;
+        this.application = application;
         this.historyStorage = historyStorage;
     }
     
@@ -275,6 +278,6 @@ public class HistoryFileManager {
     }
     
     private Path getFilePath(String type) {
-        return FileSystems.getDefault().getPath(".", ".metaapi", accountId + "-" + type + ".bin");
+        return FileSystems.getDefault().getPath(".", ".metaapi", accountId + "-" + application + "-" + type + ".bin");
     }
 }

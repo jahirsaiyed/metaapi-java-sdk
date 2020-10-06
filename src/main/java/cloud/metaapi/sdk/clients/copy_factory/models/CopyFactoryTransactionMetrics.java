@@ -10,10 +10,10 @@ public class CopyFactoryTransactionMetrics {
      */
     public Double tradeCopyingLatency;
     /**
-     * Trade copying slippage, measured in percent points based
-     * on transaction price provided by broker, or {@code null}
+     * Trade copying slippage, measured in basis points (0.01 percent)
+     * based on transaction price provided by broker, or {@code null}
      */
-    public Double tradeCopyingSlippageInPercentPoints;
+    public Double tradeCopyingSlippageInBasisPoints;
     /**
      * Trade copying slippage, measured in account currency
      * based on transaction price provided by broker, or {@code null}
