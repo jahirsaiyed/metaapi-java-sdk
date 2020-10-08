@@ -1,12 +1,14 @@
-7.4.0
+8.0.0
   - added latency and slippage metrics to CopyFactory trade copying API
   - added CopyFactory configuration client method retrieving active resynchronization tasks
   - improved description of CopyFactory account resynchronizing in readme
   - made it possible to use MetaApi class in interaction tests
   - renamed tradeCopyingSlippageInPercentPoints -> tradeCopyingSlippageInBasisPoints in CopyFactory history API
   - added application setting to MetaApi class to make it possible to launch several MetaApi applications in parallel on the same account
+  - breaking change: removed the `timeConverter` field from the account, replaced it with `brokerTimezone` and `brokerDSTTimezone` fields in the provisioning profile instead
+  - added originalComment and clientId fields to MetatraderPosition
 
-7.2.0  
+7.2.0
   - Added time fields in broker timezone to objects
   - Added time fields to MetatraderSymbolPrice model
   - Added accountCurrencyExchangeRate fields to models

@@ -56,6 +56,23 @@ public class ProvisioningProfile {
     public String getStatus() {
         return data.status;
     }
+
+    /**
+     * Returns broker timezone name from Time Zone Database
+     * @return broker timezone name
+     */
+
+    public String getBrokerTimezone() {
+        return data.brokerTimezone;
+    }
+    
+    /**
+     * Returns broker DST timezone name from Time Zone Database
+     * @return broker DST timezone name
+     */
+    public String getBrokerDSTTimezone() {
+        return data.brokerDSTTimezone;
+    }
     
     /**
      * Reloads provisioning profile from API

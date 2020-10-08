@@ -43,6 +43,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     private HashSet<String> dealsSynchronized = new HashSet<>();
     private ConnectionRegistry connectionRegistry;
     private String lastSynchronizationId = null;
+    private String lastDisconnectedSynchronizationId = null;
     private TerminalState terminalState;
     private HistoryStorage historyStorage;
     private boolean closed = false;
@@ -65,7 +66,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
         this.account = account;
         this.connectionRegistry = connectionRegistry;
         this.terminalState = new TerminalState();
-        this.historyStorage = historyStorage != null ? historyStorage : new MemoryHistoryStorage(account.getId());
+        this.historyStorage = historyStorage != null 
+            ? historyStorage : new MemoryHistoryStorage(account.getId(), connectionRegistry.getApplication());
         websocketClient.addSynchronizationListener(account.getId(), this);
         websocketClient.addSynchronizationListener(account.getId(), this.terminalState);
         websocketClient.addSynchronizationListener(account.getId(), this.historyStorage);
@@ -583,6 +585,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
 
     @Override
     public CompletableFuture<Void> onDisconnected() {
+        lastDisconnectedSynchronizationId = lastSynchronizationId;
         lastSynchronizationId = null;
         return CompletableFuture.completedFuture(null);
     }
@@ -683,8 +686,11 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
                 };
                 if (!isSynchronized(synchronizationId).get()) throw new TimeoutException(
                     "Timed out waiting for account MetApi to synchronize to MetaTrader account " 
-                    + account.getId() + ", synchronization id " + (synchronizationId != null
-                        ? synchronizationId : lastSynchronizationId)
+                    + account.getId() + ", synchronization id " + (
+                        synchronizationId != null ? synchronizationId
+                        : (lastSynchronizationId != null ? lastSynchronizationId 
+                            : lastDisconnectedSynchronizationId)
+                    )
                 );
             } catch (Exception e) {
                 throw new CompletionException(e);

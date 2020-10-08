@@ -113,4 +113,13 @@ public class MetatraderPosition {
      * Current exchange rate of account currency into USD, or {@code null}
      */
     public Double accountCurrencyExchangeRate;
+    /**
+     * Position original comment, or {@code null} (present if possible to restore from history)
+     */
+    public String originalComment;
+    /**
+     * Flag indicating that position original comment and clientId was not identified
+     * yet and will be updated in a future packet, or {@code null}
+     */
+    public String updatePending;
 }

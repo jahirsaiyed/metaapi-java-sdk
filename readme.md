@@ -20,11 +20,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>7.4.0</version>
+  <version>8.0.0</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/7.4.0/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/8.0.0/jar).
 
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.
@@ -74,6 +74,10 @@ ProvisioningProfile provisioningProfile = api.getProvisioningProfileApi()
     .createProvisioningProfile(new NewProvisioningProfileDto() {{
         name = "My profile";
         version = 5;
+        // TODO: description
+        brokerTimezone = "EET";
+        // TODO: description
+        brokerDSTTimezone = "EET";
     }}).get();
 // servers.dat file is required for MT5 profile and can be found inside
 // config directory of your MetaTrader terminal data folder. It contains
@@ -117,10 +121,6 @@ MetatraderAccount account = api.getMetatraderAccountApi().createAccount(new NewM
   password = "qwerty";
   server = "ICMarketsSC-Demo";
   provisioningProfileId = provisioningProfile.getId();
-  //algorithm used to parse your broker timezone. Supported values are
-  // icmarkets for America/New_York DST switch and roboforex for EET
-  // DST switch (the values will be changed soon)
-  timeConverter = "roboforex";
   application = "MetaApi";
   magic = 123456;
   quoteStreamingIntervalInSeconds = 2.5; // set to 0 to receive quote per tick

@@ -14,13 +14,24 @@ public class ConnectionRegistry {
     
     private MetaApiWebsocketClient metaApiWebsocketClient;
     private Map<String, MetaApiConnection> connections;
+    private String application;
+    
+    /**
+     * Constructs a MetaTrader connection registry instance with default parameters
+     * @param metaApiWebsocketClient MetaApi websocket client
+     */
+    public ConnectionRegistry(MetaApiWebsocketClient metaApiWebsocketClient) {
+        this(metaApiWebsocketClient, null);
+    }
     
     /**
      * Constructs a MetaTrader connection registry instance
      * @param metaApiWebsocketClient MetaApi websocket client
+     * @param application id, or {@code null}. By default is {@code MetaApi}
      */
-    public ConnectionRegistry(MetaApiWebsocketClient metaApiWebsocketClient) {
+    public ConnectionRegistry(MetaApiWebsocketClient metaApiWebsocketClient, String application) {
         this.metaApiWebsocketClient = metaApiWebsocketClient;
+        this.application = (application != null ? application : "MetaApi");
         this.connections = new HashMap<>();
     }
     
@@ -50,5 +61,13 @@ public class ConnectionRegistry {
      */
     public void remove(String accountId) {
         connections.remove(accountId);
+    }
+    
+    /**
+     * Returns application type
+     * @return application type
+     */
+    public String getApplication() {
+        return application;
     }
 }

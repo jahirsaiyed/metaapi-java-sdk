@@ -20,4 +20,12 @@ public class ProvisioningProfileDto {
      * Provisioning profile status (allowed values are new and active)
      */
     public String status;
+    /**
+     * Broker timezone name from Time Zone Database
+     */
+    public String brokerTimezone;
+    /**
+     * Broker DST timezone name from Time Zone Database
+     */
+    public String brokerDSTTimezone;
 }

@@ -23,7 +23,7 @@ import cloud.metaapi.sdk.util.JsonMapper;
  */
 public class MetaApiSynchronizationExample {
 
-    private static String token = getEnvOrDefault("NAME", "<put in your token here>");
+    private static String token = getEnvOrDefault("TOKEN", "<put in your token here>");
     private static String login = getEnvOrDefault("LOGIN", "<put in your MT login here>");
     private static String password = getEnvOrDefault("PASSWORD", "<put in your MT password here>");
     private static String serverName = getEnvOrDefault("SERVER", "<put in your MT server name here>");
@@ -40,7 +40,12 @@ public class MetaApiSynchronizationExample {
                 .findFirst();
             if (!profile.isPresent()) {
                 System.out.println("Creating account profile");
-                NewProvisioningProfileDto newDto = new NewProvisioningProfileDto() {{ name = serverName; version = 4; }};
+                NewProvisioningProfileDto newDto = new NewProvisioningProfileDto() {{
+                    name = serverName;
+                    version = 4;
+                    brokerTimezone = "EET";
+                    brokerDSTTimezone = "EET";
+                }};
                 profile = Optional.of(api.getProvisioningProfileApi().createProvisioningProfile(newDto).get());
                 profile.get().uploadFile("broker.srv", brokerSrvFile).get();
             }
@@ -68,7 +73,6 @@ public class MetaApiSynchronizationExample {
                     password = mtPassword;
                     server = serverName;
                     provisioningProfileId = provisioningProfile.getId();
-                    timeConverter = "icmarkets";
                     application = "MetaApi";
                     magic = 1000;
                 }}).get());

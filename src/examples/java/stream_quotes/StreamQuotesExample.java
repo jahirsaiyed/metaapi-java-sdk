@@ -17,7 +17,7 @@ import cloud.metaapi.sdk.util.JsonMapper;
  */
 public class StreamQuotesExample {
 
-    private static String token = getEnvOrDefault("NAME", "<put in your token here>");
+    private static String token = getEnvOrDefault("TOKEN", "<put in your token here>");
     private static String accountId = getEnvOrDefault("ACCOUNT_ID", "<put in your account id here>");
     
     private static class EURUSDListener extends SynchronizationListener {

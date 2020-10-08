@@ -73,7 +73,7 @@ public class MetaApi {
         HttpClient httpClient = new HttpClient(requestTimeout * 1000, connectTimeout * 1000);
         metaApiWebsocketClient = new MetaApiWebsocketClient(token, application, domain, requestTimeout * 1000L, connectTimeout * 1000L);
         provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, domain));
-        connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient);
+        connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, application);
         metatraderAccountApi = new MetatraderAccountApi(
             new MetatraderAccountClient(httpClient, token, domain),
             metaApiWebsocketClient, connectionRegistry);

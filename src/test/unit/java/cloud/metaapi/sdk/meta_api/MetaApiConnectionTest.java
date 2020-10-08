@@ -64,6 +64,7 @@ class MetaApiConnectionTest {
         client = Mockito.mock(MetaApiWebsocketClient.class);
         storageMock = Mockito.mock(HistoryStorage.class);
         connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
+        Mockito.when(connectionRegistry.getApplication()).thenReturn("MetaApi");
         api = new MetaApiConnection(client, account, storageMock, connectionRegistry);
     }
 
