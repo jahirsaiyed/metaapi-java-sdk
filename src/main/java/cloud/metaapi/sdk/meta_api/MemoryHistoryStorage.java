@@ -23,13 +23,23 @@ public class MemoryHistoryStorage extends HistoryStorage {
     private List<MetatraderOrder> historyOrders = new ArrayList<>();
     
     /**
-     * Constructs the in-memory history store instance
+     * Constructs the in-memory history store instance with default parameters
      * @param accountId account id
      */
     public MemoryHistoryStorage(String accountId) {
+        this(accountId, null);
+    }
+    
+    /**
+     * Constructs the in-memory history store instance
+     * @param accountId account id
+     * @param application id, or {@code null}. By default is {@code MetaApi}
+     */
+    public MemoryHistoryStorage(String accountId, String application) {
         super();
         this.accountId = accountId;
-        fileManager = ServiceProvider.createHistoryFileManager(this.accountId, "MetaApi", this);
+        if (application == null) application = "MetaApi";
+        fileManager = ServiceProvider.createHistoryFileManager(this.accountId, application, this);
         fileManager.startUpdateJob();
     }
     

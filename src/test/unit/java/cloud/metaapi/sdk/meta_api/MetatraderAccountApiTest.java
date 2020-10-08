@@ -102,7 +102,6 @@ public class MetatraderAccountApiTest {
         newAccountDto.server = accountDto.server;
         newAccountDto.provisioningProfileId = accountDto.provisioningProfileId;
         newAccountDto.magic = accountDto.magic;
-        newAccountDto.timeConverter = accountDto.timeConverter;
         newAccountDto.application = accountDto.application;
         newAccountDto.type = accountDto.type;
         MetatraderAccountIdDto accountIdDto = new MetatraderAccountIdDto();
@@ -460,7 +459,6 @@ public class MetatraderAccountApiTest {
         account.server = "ICMarketsSC-Demo";
         account.provisioningProfileId = "f9ce1f12-e720-4b9a-9477-c2d4cb25f076";
         account.magic = 123456;
-        account.timeConverter = "icmarkets";
         account.application = "MetaApi";
         account.connectionStatus = ConnectionStatus.DISCONNECTED;
         account.state = DeploymentState.DEPLOYED;

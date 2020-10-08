@@ -66,8 +66,10 @@ public class ProvisioningProfileApi {
             ProvisioningProfileDto createdProfile = new ProvisioningProfileDto();
             createdProfile._id = id.id;
             createdProfile.status = "new";
-            createdProfile.name = createdProfile.name;
-            createdProfile.version = createdProfile.version;
+            createdProfile.name = profile.name;
+            createdProfile.version = profile.version;
+            createdProfile.brokerTimezone = profile.brokerTimezone;
+            createdProfile.brokerDSTTimezone = profile.brokerDSTTimezone;
             return new ProvisioningProfile(createdProfile, provisioningProfileClient);
         });
     }

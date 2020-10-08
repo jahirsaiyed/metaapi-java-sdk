@@ -91,15 +91,6 @@ public class MetatraderAccount {
     }
     
     /**
-     * Returns algorithm used to parse your broker timezone. Supported values are icmarkets for
-     * America/New_York DST switch and roboforex for EET DST switch (the values will be changed soon)
-     * @return algorithm used to parse your broker timezone
-     */
-    public String getTimeConverter() {
-        return data.timeConverter;
-    }
-    
-    /**
      * Returns application name to connect the account to. Currently allowed values are MetaApi and AgiliumTrade
      * @return application name to connect the account to
      */

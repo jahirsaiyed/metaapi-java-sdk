@@ -159,7 +159,6 @@ class MetatraderAccountClientTest {
         newAccount.server = "ICMarketsSC-Demo";
         newAccount.provisioningProfileId = "f9ce1f12-e720-4b9a-9477-c2d4cb25f076";
         newAccount.magic = 123456;
-        newAccount.timeConverter = "icmarkets";
         newAccount.application = "MetaApi";
         newAccount.type = "cloud";
         httpClient.setRequestMock((actualOptions) -> {
@@ -368,7 +367,6 @@ class MetatraderAccountClientTest {
         account.server = "ICMarketsSC-Demo";
         account.provisioningProfileId = "f9ce1f12-e720-4b9a-9477-c2d4cb25f076";
         account.magic = 123456;
-        account.timeConverter = "icmarkets";
         account.application = "MetaApi";
         account.connectionStatus = ConnectionStatus.DISCONNECTED;
         account.state = DeploymentState.DEPLOYED;

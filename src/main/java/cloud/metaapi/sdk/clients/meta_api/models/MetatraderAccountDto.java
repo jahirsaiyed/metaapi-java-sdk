@@ -40,11 +40,6 @@ public class MetatraderAccountDto {
      */
     public String provisioningProfileId;
     /**
-     * Algorithm used to parse your broker timezone. Supported values are icmarkets for
-     * America/New_York DST switch and roboforex for EET DST switch (the values will be changed soon)
-     */
-    public String timeConverter;
-    /**
      * Application name to connect the account to. Currently allowed values are MetaApi and AgiliumTrade
      */
     public String application;

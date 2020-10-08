@@ -86,7 +86,6 @@ class DoubleSynchronizationTest {
                             password = envPassword;
                             server = serverName;
                             provisioningProfileId = profile.getId();
-                            timeConverter = "icmarkets";
                             application = "MetaApi";
                             magic = 1000;
                         }}).join();

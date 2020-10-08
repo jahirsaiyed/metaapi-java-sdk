@@ -23,7 +23,7 @@ import cloud.metaapi.sdk.util.JsonMapper;
  */
 public class MetaApiRpcExample {
 
-    private static String token = getEnvOrDefault("NAME", "<put in your token here>");
+    private static String token = getEnvOrDefault("TOKEN", "<put in your token here>");
     private static String accountId = getEnvOrDefault("ACCOUNT_ID", "<put in your account id here>");
     
     public static void main(String[] args) {
