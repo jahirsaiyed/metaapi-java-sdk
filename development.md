@@ -2,8 +2,9 @@
 1. Verify changelog.md
 2. Make sure pom.xml version is correctly updated
 3. Make sure SDK version is updated in the readme installation section
-4. Publish to Maven Central
-5. Create git tag
+4. Make sure SDK version is updated in examples
+5. Publish to Maven Central
+6. Create git tag
 
 # Publishing to Maven Central
 

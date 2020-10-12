@@ -1,7 +1,3 @@
-package mt4;
-
-import java.time.Instant;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -13,17 +9,17 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.meta_api.models.NewMetatraderAccountDto;
 import cloud.metaapi.sdk.clients.meta_api.models.NewProvisioningProfileDto;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
-import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.meta_api.MetaApi;
 import cloud.metaapi.sdk.meta_api.MetaApiConnection;
 import cloud.metaapi.sdk.meta_api.MetatraderAccount;
 import cloud.metaapi.sdk.meta_api.ProvisioningProfile;
+import cloud.metaapi.sdk.meta_api.TerminalState;
 import cloud.metaapi.sdk.util.JsonMapper;
 
 /**
  * Note: for information on how to use this example code please read https://metaapi.cloud/docs/client/usingCodeExamples
  */
-public class MetaApiRpcExample {
+public class MetaApiSynchronizationExample {
 
     private static String token = getEnvOrDefault("TOKEN", "<put in your token here>");
     private static String login = getEnvOrDefault("LOGIN", "<put in your MT login here>");
@@ -94,24 +90,18 @@ public class MetaApiRpcExample {
             System.out.println("Waiting for SDK to synchronize to terminal state "
                 + "(may take some time depending on your history size)");
             connection.waitSynchronized().get();
-            
-            // invoke RPC API (replace ticket numbers with actual ticket numbers which exist in your MT account)
-            System.out.println("Testing MetaAPI RPC API");
-            System.out.println("account information: " + asJson(connection.getAccountInformation().get()));
-            System.out.println("positions: " + asJson(connection.getPositions().get()));
-            System.out.println("open orders:" + asJson(connection.getOrders().get()));
-            System.out.println("history orders by ticket: " + asJson(connection.getHistoryOrdersByTicket("1234567").get()));
-            System.out.println("history orders by position: " + asJson(connection.getHistoryOrdersByPosition("1234567").get()));
-            System.out.println("history orders (~last 3 months): " + asJson(connection.getHistoryOrdersByTimeRange(
-                new IsoTime(Date.from(Instant.now().plusSeconds(-90 * 24 * 60 * 60))), 
-                new IsoTime(Date.from(Instant.now())), 
-                0, 1000).get()));
-            System.out.println("history deals by ticket: " + asJson(connection.getDealsByTicket("1234567").get()));
-            System.out.println("history deals by position: " + asJson(connection.getDealsByPosition("1234567").get()));
-            System.out.println("history deals (~last 3 months): " + asJson(connection.getDealsByTimeRange(
-                new IsoTime(Date.from(Instant.now().plusSeconds(-90 * 24 * 60 * 60))), 
-                new IsoTime(Date.from(Instant.now())), 
-                0, 1000).get()));
+
+            // access local copy of terminal state
+            System.out.println("Testing terminal state access");
+            TerminalState terminalState = connection.getTerminalState();
+            System.out.println("connected: " + terminalState.isConnected());
+            System.out.println("connected to broker: " + terminalState.isConnectedToBroker());
+            System.out.println("account information: " + asJson(terminalState.getAccountInformation().orElse(null)));
+            System.out.println("positions: " + asJson(terminalState.getPositions()));
+            System.out.println("orders: " + asJson(terminalState.getOrders()));
+            System.out.println("specifications: " + asJson(terminalState.getSpecifications()));
+            System.out.println("EURUSD specification: " + asJson(terminalState.getSpecification("EURUSD").orElse(null)));
+            System.out.println("EURUSD price: " + asJson(terminalState.getPrice("EURUSD").orElse(null)));
             
             // trade
             System.out.println("Submitting pending order");

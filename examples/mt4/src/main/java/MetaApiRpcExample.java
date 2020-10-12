@@ -1,21 +1,21 @@
-package example_generator;
-
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import cloud.metaapi.sdk.clients.meta_api.TradeException;
-import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
+import cloud.metaapi.sdk.clients.meta_api.models.NewMetatraderAccountDto;
+import cloud.metaapi.sdk.clients.meta_api.models.NewProvisioningProfileDto;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.meta_api.MetaApi;
 import cloud.metaapi.sdk.meta_api.MetaApiConnection;
 import cloud.metaapi.sdk.meta_api.MetatraderAccount;
+import cloud.metaapi.sdk.meta_api.ProvisioningProfile;
 import cloud.metaapi.sdk.util.JsonMapper;
 
 /**
@@ -24,29 +24,70 @@ import cloud.metaapi.sdk.util.JsonMapper;
 public class MetaApiRpcExample {
 
     private static String token = getEnvOrDefault("TOKEN", "<put in your token here>");
-    private static String accountId = getEnvOrDefault("ACCOUNT_ID", "<put in your account id here>");
+    private static String login = getEnvOrDefault("LOGIN", "<put in your MT login here>");
+    private static String password = getEnvOrDefault("PASSWORD", "<put in your MT password here>");
+    private static String serverName = getEnvOrDefault("SERVER", "<put in your MT server name here>");
+    private static String brokerSrvFile = getEnvOrDefault("PATH_TO_BROKER_SRV", "/path/to/your/broker.srv");
     
     public static void main(String[] args) {
         try {
             MetaApi api = new MetaApi(token);
+            List<ProvisioningProfile> profiles = api.getProvisioningProfileApi().getProvisioningProfiles().get();
             
-            MetatraderAccount account = api.getMetatraderAccountApi().getAccount(accountId).get();
-            DeploymentState initialState = account.getState();
-            List<DeploymentState> deployedStates = new ArrayList<>();
-            deployedStates.add(DeploymentState.DEPLOYING);
-            deployedStates.add(DeploymentState.DEPLOYED);
-            
-            if (!deployedStates.contains(initialState)) {
-                // wait until account is deployed and connected to broker
-                System.out.println("Deploying account");
-                account.deploy().get();
+            // create test MetaTrader account profile
+            Optional<ProvisioningProfile> profile = profiles.stream()
+                .filter(p -> p.getName().equals(serverName))
+                .findFirst();
+            if (!profile.isPresent()) {
+                System.out.println("Creating account profile");
+                NewProvisioningProfileDto newDto = new NewProvisioningProfileDto() {{
+                    name = serverName;
+                    version = 4;
+                    brokerTimezone = "EET";
+                    brokerDSTTimezone = "EET";
+                }};
+                profile = Optional.of(api.getProvisioningProfileApi().createProvisioningProfile(newDto).get());
+                profile.get().uploadFile("broker.srv", brokerSrvFile).get();
+            }
+            if (profile.isPresent() && profile.get().getStatus().equals("new")) {
+                System.out.println("Uploading broker.srv");
+                profile.get().uploadFile("broker.srv", brokerSrvFile).get();
+            } else {
+                System.out.println("Account profile already created");
             }
             
+            // Add test MetaTrader account
+            List<MetatraderAccount> accounts = api.getMetatraderAccountApi().getAccounts().get();
+            Optional<MetatraderAccount> account = accounts.stream()
+                .filter(a -> a.getLogin().equals(login) && a.getType().startsWith("cloud"))
+                .findFirst();
+            if (!account.isPresent()) {
+                System.out.println("Adding MT4 account to MetaApi");
+                String mtLogin = login;
+                String mtPassword = password;
+                ProvisioningProfile provisioningProfile = profile.get();
+                account = Optional.of(api.getMetatraderAccountApi().createAccount(new NewMetatraderAccountDto() {{
+                    name = "Test account";
+                    type = "cloud";
+                    login = mtLogin;
+                    password = mtPassword;
+                    server = serverName;
+                    provisioningProfileId = provisioningProfile.getId();
+                    application = "MetaApi";
+                    magic = 1000;
+                }}).get());
+            } else {
+                System.out.println("MT4 account already added to MetaApi");
+            }
+            
+            // wait until account is deployed and connected to broker
+            System.out.println("Deploying account");
+            account.get().deploy().get();
             System.out.println("Waiting for API server to connect to broker (may take couple of minutes)");
-            account.waitConnected().get();
+            account.get().waitConnected().get();
             
             // connect to MetaApi API
-            MetaApiConnection connection = account.connect().get();
+            MetaApiConnection connection = account.get().connect().get();
             
             System.out.println("Waiting for SDK to synchronize to terminal state "
                 + "(may take some time depending on your history size)");
@@ -61,7 +102,7 @@ public class MetaApiRpcExample {
             System.out.println("history orders by position: " + asJson(connection.getHistoryOrdersByPosition("1234567").get()));
             System.out.println("history orders (~last 3 months): " + asJson(connection.getHistoryOrdersByTimeRange(
                 new IsoTime(Date.from(Instant.now().plusSeconds(-90 * 24 * 60 * 60))), 
-                new IsoTime(Date.from(Instant.now())),
+                new IsoTime(Date.from(Instant.now())), 
                 0, 1000).get()));
             System.out.println("history deals by ticket: " + asJson(connection.getDealsByTicket("1234567").get()));
             System.out.println("history deals by position: " + asJson(connection.getDealsByPosition("1234567").get()));
@@ -82,12 +123,9 @@ public class MetaApiRpcExample {
                 System.out.println("Trade failed with result code " + ((TradeException) err.getCause()).stringCode);
             }
             
-            if (!deployedStates.contains(initialState)) {
-                // finally, undeploy account
-                System.out.println("Undeploying account so that it does not consume any unwanted resources");
-                account.undeploy().get();
-            }
-            
+            // finally, undeploy account
+            System.out.println("Undeploying MT4 account so that it does not consume any unwanted resources");
+            account.get().undeploy().get();
         } catch (Exception err) {
             System.err.println(err);
         }

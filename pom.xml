@@ -182,7 +182,6 @@
 	  <groupId>com.konghq</groupId>
 	  <artifactId>unirest-java</artifactId>
 	  <version>3.10.00</version>
-	  <scope>provided</scope>
 	</dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
