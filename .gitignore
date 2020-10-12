@@ -1,13 +1,10 @@
-# Build directory
+bin
+.classpath
+.settings
+.project
 target
-
-# Logs directory
 logs
-
-# Files for testing
 broker.srv
 servers.dat
 .env
-
-# Internal MetaApi directory
 .metaapi

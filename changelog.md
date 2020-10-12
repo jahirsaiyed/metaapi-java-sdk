@@ -7,6 +7,7 @@
   - added application setting to MetaApi class to make it possible to launch several MetaApi applications in parallel on the same account
   - breaking change: removed the `timeConverter` field from the account, replaced it with `brokerTimezone` and `brokerDSTTimezone` fields in the provisioning profile instead
   - added originalComment and clientId fields to MetatraderPosition
+  - examples extracted into own maven projects
 
 7.2.0
   - Added time fields in broker timezone to objects

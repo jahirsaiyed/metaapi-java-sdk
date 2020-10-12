@@ -1,5 +1,3 @@
-package mt4;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -27,8 +25,8 @@ public class MetaApiSynchronizationExample {
     private static String login = getEnvOrDefault("LOGIN", "<put in your MT login here>");
     private static String password = getEnvOrDefault("PASSWORD", "<put in your MT password here>");
     private static String serverName = getEnvOrDefault("SERVER", "<put in your MT server name here>");
-    private static String brokerSrvFile = getEnvOrDefault("PATH_TO_BROKER_SRV", "/path/to/your/broker.srv");
-    
+    private static String serverDatFile = getEnvOrDefault("PATH_TO_SERVERS_DAT", "/path/to/your/servers.dat");
+
     public static void main(String[] args) {
         try {
             MetaApi api = new MetaApi(token);
@@ -42,16 +40,16 @@ public class MetaApiSynchronizationExample {
                 System.out.println("Creating account profile");
                 NewProvisioningProfileDto newDto = new NewProvisioningProfileDto() {{
                     name = serverName;
-                    version = 4;
+                    version = 5;
                     brokerTimezone = "EET";
                     brokerDSTTimezone = "EET";
                 }};
                 profile = Optional.of(api.getProvisioningProfileApi().createProvisioningProfile(newDto).get());
-                profile.get().uploadFile("broker.srv", brokerSrvFile).get();
+                profile.get().uploadFile("servers.dat", serverDatFile).get();
             }
             if (profile.isPresent() && profile.get().getStatus().equals("new")) {
-                System.out.println("Uploading broker.srv");
-                profile.get().uploadFile("broker.srv", brokerSrvFile).get();
+                System.out.println("Uploading servers.dat");
+                profile.get().uploadFile("servers.dat", serverDatFile).get();
             } else {
                 System.out.println("Account profile already created");
             }
@@ -62,7 +60,7 @@ public class MetaApiSynchronizationExample {
                 .filter(a -> a.getLogin().equals(login) && a.getType().startsWith("cloud"))
                 .findFirst();
             if (!account.isPresent()) {
-                System.out.println("Adding MT4 account to MetaApi");
+                System.out.println("Adding MT5 account to MetaApi");
                 String mtLogin = login;
                 String mtPassword = password;
                 ProvisioningProfile provisioningProfile = profile.get();
@@ -77,7 +75,7 @@ public class MetaApiSynchronizationExample {
                     magic = 1000;
                 }}).get());
             } else {
-                System.out.println("MT4 account already added to MetaApi");
+                System.out.println("MT5 account already added to MetaApi");
             }
             
             // wait until account is deployed and connected to broker
@@ -91,7 +89,7 @@ public class MetaApiSynchronizationExample {
             
             System.out.println("Waiting for SDK to synchronize to terminal state "
                 + "(may take some time depending on your history size)");
-            connection.waitSynchronized().get();
+            connection.waitSynchronized(null, 600, null).get();
 
             // access local copy of terminal state
             System.out.println("Testing terminal state access");
@@ -118,7 +116,7 @@ public class MetaApiSynchronizationExample {
             }
             
             // finally, undeploy account
-            System.out.println("Undeploying MT4 account so that it does not consume any unwanted resources");
+            System.out.println("Undeploying MT5 account so that it does not consume any unwanted resources");
             account.get().undeploy().get();
         } catch (Exception err) {
             System.err.println(err);

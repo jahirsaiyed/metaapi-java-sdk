@@ -1,5 +1,3 @@
-package mt5;
-
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
