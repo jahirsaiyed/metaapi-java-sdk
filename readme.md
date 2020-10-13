@@ -33,6 +33,15 @@ You can also find code examples at [examples folder of our github repo](https://
 
 We have composed a [short guide explaining how to use the example code](https://metaapi.cloud/docs/client/usingCodeExamples)
 
+### Running Java SDK examples
+In order to run Java SDK examples, follow these steps:
+1. Make sure that you have installed [Maven](http://maven.apache.org) and its command `mvn` is accessible.
+2. Navigate to the root folder of the example project (where its `pom.xml` is located).
+3. Build the project with `mvn package`.
+4. Run `mvn exec:java@`_`ExampleClassName`_ where _`ExampleClassName`_ is the example to execute, e.g. `mvn exec:java@MetaApiRpcExample`.
+
+Example parameters such as token or account id can be passed via environment variables, or set directly in the example source code. In the last case you need to rebuild the example with `mvn package`. 
+
 ## Connecting to MetaApi
 Please use one of these ways: 
 1. [https://app.metaapi.cloud/token](https://app.metaapi.cloud/token) web UI to obtain your API token.
