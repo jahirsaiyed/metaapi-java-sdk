@@ -1,6 +1,7 @@
 package cloud.metaapi.sdk.util;
 
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
+import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.meta_api.ConnectionRegistry;
 import cloud.metaapi.sdk.meta_api.HistoryFileManager;
 import cloud.metaapi.sdk.meta_api.HistoryStorage;
@@ -30,13 +31,15 @@ public class ServiceProvider {
          * @param historyStorage optional local terminal history storage. Use for accounts in user synchronization mode.
          * By default an instance of MemoryHistoryStorage will be used.
          * @param connectionRegistry metatrader account connection registry
+         * @param historyStartTime history start sync time, or {@code null}
          * @return MetaApiConnection mock
          */
         MetaApiConnection create(
             MetaApiWebsocketClient websocketClient,
             MetatraderAccount account,
             HistoryStorage historyStorage,
-            ConnectionRegistry connectionRegistry);
+            ConnectionRegistry connectionRegistry,
+            IsoTime historyStartTime);
     }
     
     /**
@@ -68,18 +71,20 @@ public class ServiceProvider {
      * @param historyStorage optional local terminal history storage. Use for accounts in user synchronization mode.
      * By default an instance of MemoryHistoryStorage will be used.
      * @param connectionRegistry metatrader account connection registry
+     * @param historyStartTime history start sync time, or {@code null}
      * @see #setHistoryFileManagerMock(HistoryFileManager)
      */
     public static MetaApiConnection createMetaApiConnection(
         MetaApiWebsocketClient websocketClient,
         MetatraderAccount account,
         HistoryStorage historyStorage,
-        ConnectionRegistry connectionRegistry
+        ConnectionRegistry connectionRegistry,
+        IsoTime historyStartTime
     ) {
         if (metaApiConnectionMock != null) return metaApiConnectionMock;
         else if (metaApiConnectionMockProvider != null) return metaApiConnectionMockProvider
-            .create(websocketClient, account, historyStorage, connectionRegistry);
-        return new MetaApiConnection(websocketClient, account, historyStorage, connectionRegistry);
+            .create(websocketClient, account, historyStorage, connectionRegistry, historyStartTime);
+        return new MetaApiConnection(websocketClient, account, historyStorage, connectionRegistry, historyStartTime);
     }
     
     /**

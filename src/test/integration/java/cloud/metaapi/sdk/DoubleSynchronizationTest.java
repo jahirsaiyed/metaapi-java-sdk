@@ -20,6 +20,7 @@ import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.models.NewMetatraderAccountDto;
 import cloud.metaapi.sdk.clients.meta_api.models.NewProvisioningProfileDto;
+import cloud.metaapi.sdk.clients.meta_api.models.SynchronizationOptions;
 import cloud.metaapi.sdk.meta_api.MetaApi;
 import cloud.metaapi.sdk.meta_api.MetaApiConnection;
 import cloud.metaapi.sdk.meta_api.MetatraderAccount;
@@ -102,8 +103,14 @@ class DoubleSynchronizationTest {
                 MetaApiConnection connection = account.connect().join();
                 MetaApiConnection connectionCopy = accountCopy.connect().join();
                 CompletableFuture.allOf(
-                    connection.waitSynchronized(null, 600, 1000),
-                    connectionCopy.waitSynchronized(null, 600, 1000)
+                    connection.waitSynchronized(new SynchronizationOptions() {{
+                        this.timeoutInSeconds = 600;
+                        this.intervalInMilliseconds = 1000;
+                    }}),
+                    connectionCopy.waitSynchronized(new SynchronizationOptions() {{
+                        this.timeoutInSeconds = 600;
+                        this.intervalInMilliseconds = 1000;
+                    }})
                 ).join();
                 account.undeploy().join();
                 accountCopy.undeploy().join();

@@ -11,6 +11,7 @@ import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountUpdateDto;
+import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.ConnectionStatus;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.util.ServiceProvider;
@@ -351,17 +352,28 @@ public class MetatraderAccount {
      * @return MetaApi connection
      */
     public CompletableFuture<MetaApiConnection> connect() {
-        return connect(null);
+        return connect(null, null);
     }
     
     /**
      * Connects to MetaApi. There is only one connection per account. 
      * Subsequent calls to this method will return the same connection.
-     * @param historyStorage optional history storage
+     * @param historyStorage optional history storage, or {@code null}
      * @return MetaApi connection
      */
     public CompletableFuture<MetaApiConnection> connect(HistoryStorage historyStorage) {
-        return connectionRegistry.connect(this, historyStorage);
+        return connect(historyStorage, null);
+    }
+    
+    /**
+     * Connects to MetaApi. There is only one connection per account. 
+     * Subsequent calls to this method will return the same connection.
+     * @param historyStorage optional history storage, or {@code null}
+     * @param historyStartTime history start time, or {@code null}. Used for tests
+     * @return MetaApi connection
+     */
+    public CompletableFuture<MetaApiConnection> connect(HistoryStorage historyStorage, IsoTime historyStartTime) {
+        return connectionRegistry.connect(this, historyStorage, historyStartTime);
     }
     
     /**

@@ -420,7 +420,7 @@ public class MetatraderAccountApiTest {
         Mockito.when(storage.loadData()).thenReturn(CompletableFuture.completedFuture(null));
         
         account.connect(storage).join();
-        Mockito.verify(connectionRegistry).connect(account, storage);
+        Mockito.verify(connectionRegistry).connect(account, storage, null);
     }
     
     /**

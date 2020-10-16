@@ -33,7 +33,6 @@ public class TerminalState extends SynchronizationListener {
     private Map<String, MetatraderSymbolSpecification> specificationsBySymbol = new HashMap<>();
     private Map<String, MetatraderSymbolPrice> pricesBySymbol = new HashMap<>();
     private Optional<MetatraderAccountInformation> accountInformation = Optional.empty();
-    private int accountInformationUpdateCount = 0;
     private Timer statusTimer = null;
     
     /**
@@ -212,15 +211,10 @@ public class TerminalState extends SynchronizationListener {
                 double unrealizedProfit = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
                     (newPositionPrice - position.openPrice) * currentTickValue *
                     position.volume / specification.get().tickSize;
-                double increment = unrealizedProfit - position.unrealizedProfit;
                 position.unrealizedProfit = unrealizedProfit;
                 position.profit = position.unrealizedProfit + position.realizedProfit;
                 position.currentPrice = newPositionPrice;
                 position.currentTickValue = currentTickValue;
-                if (accountInformation.isPresent()) {
-                    accountInformation.get().equity += increment;
-                    accountInformationUpdateCount++;
-                }
             }
             for (MetatraderOrder order : orders) {
                 if (!order.symbol.equals(price.symbol)) continue;
@@ -228,12 +222,11 @@ public class TerminalState extends SynchronizationListener {
                     || order.type == OrderType.ORDER_TYPE_BUY_STOP
                     || order.type == OrderType.ORDER_TYPE_BUY_STOP_LIMIT
                 ? price.ask : price.bid);
-                if (accountInformationUpdateCount > 100) {
-                    double profitSum = 0;
-                    for (MetatraderPosition position : positions) profitSum += position.profit;
-                    accountInformation.get().equity = accountInformation.get().balance + profitSum;
-                    accountInformationUpdateCount = 0;
-                }
+            }
+            if (accountInformation.isPresent()) {
+                double profitSum = 0;
+                for (MetatraderPosition position : positions) profitSum += position.profit;
+                accountInformation.get().equity = accountInformation.get().balance + profitSum;
             }
         }
         return CompletableFuture.completedFuture(null);

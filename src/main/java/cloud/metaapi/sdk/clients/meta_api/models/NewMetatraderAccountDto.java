@@ -1,5 +1,7 @@
 package cloud.metaapi.sdk.clients.meta_api.models;
 
+import java.util.List;
+
 /**
  * New MetaTrader account model
  */
@@ -48,4 +50,8 @@ public class NewMetatraderAccountDto {
      * Default value is 2.5 seconds. Intervals less than 2.5 seconds are supported only for G2
      */
     public Double quoteStreamingIntervalInSeconds;
+    /**
+     * MetaTrader account tags, or {@code null}.
+     */
+    public List<String> tags;
 }

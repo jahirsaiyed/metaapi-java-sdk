@@ -167,7 +167,7 @@ class TerminalStateTest {
      */
     @Test
     void testUpdatesAccountEquityAndPositionProfitOnPriceUpdate() {
-        state.onAccountInformationUpdated(new MetatraderAccountInformation() {{ equity = 1000; }});
+        state.onAccountInformationUpdated(new MetatraderAccountInformation() {{ equity = 1000; balance = 800; }});
         state.onPositionUpdated(new MetatraderPosition() {{
             id = "1";
             symbol = "EURUSD";

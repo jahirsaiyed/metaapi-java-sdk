@@ -1155,6 +1155,35 @@ class MetaApiWebsocketClientTest {
         assertThat(listener.onSymbolPriceUpdatedResult.get()).usingRecursiveComparison().isEqualTo(expected);
     }
     
+    /**
+     * Tests {@link MetaApiWebsocketClient#waitSynchronized(String, String, Long)}
+     */
+    @Test
+    void testWaitsForServerSideTerminalStateSynchronization() {
+        requestReceived = false;
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
+            @Override
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
+                if (    request.get("type").asText().equals("waitSynchronized")
+                     && request.get("accountId").asText().equals("accountId")
+                     && request.get("applicationPattern").asText().equals("app.*")
+                     && request.get("timeoutInSeconds").asLong() == 10
+                     && request.get("application").asText().equals("application")
+                ) {
+                    requestReceived = true;
+                    ObjectNode response = jsonMapper.createObjectNode();
+                    response.put("type", "response");
+                    response.set("accountId", request.get("accountId"));
+                    response.set("requestId", request.get("requestId"));
+                    client.sendEvent("response", response.toString());
+                }
+            }
+        });
+        client.waitSynchronized("accountId", "app.*", 10L).join();
+        assertTrue(requestReceived);
+    }
+    
     private static Stream<Arguments> provideAccountInformation() throws Exception {
         MetatraderAccountInformation accountInformation = new MetatraderAccountInformation();
         accountInformation.broker = "True ECN Trading Ltd";

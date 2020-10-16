@@ -44,7 +44,7 @@ public class MetaApiRpcExample {
                     name = serverName;
                     version = 4;
                     brokerTimezone = "EET";
-                    brokerDSTTimezone = "EET";
+                    brokerDSTSwitchTimezone = "EET";
                 }};
                 profile = Optional.of(api.getProvisioningProfileApi().createProvisioningProfile(newDto).get());
                 profile.get().uploadFile("broker.srv", brokerSrvFile).get();

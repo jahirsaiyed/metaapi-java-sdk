@@ -33,6 +33,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolSpecification;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
+import cloud.metaapi.sdk.clients.meta_api.models.SynchronizationOptions;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal.DealEntryType;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal.DealType;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder.OrderState;
@@ -566,7 +567,7 @@ class MetaApiConnectionTest {
      * Tests {@link MetaApiConnection#synchronize()}
      */
     @Test
-    void testSynchronizesStateWithTerminal() throws Exception {
+    void testSynchronizesStateWithTerminal() {
         IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
         IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
         Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.anyString(), Mockito.any(), Mockito.any()))
@@ -580,7 +581,7 @@ class MetaApiConnectionTest {
         api.getHistoryStorage().onDealAdded(new MetatraderDeal() {{
             time = startingDealTime;
         }});
-        api.synchronize().get();
+        api.synchronize().join();
         Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.anyString(), Mockito.argThat((arg) -> {
             assertThat(arg).usingRecursiveComparison().isEqualTo(startingHistoryOrderTime);
             return true;
@@ -588,6 +589,28 @@ class MetaApiConnectionTest {
             assertThat(arg).usingRecursiveComparison().isEqualTo(startingDealTime);
             return true;
         }));
+    }
+    
+    /**
+     * Tests {@link MetaApiConnection#synchronize()}
+     */
+    @Test
+    void testSynchronizesStateWithTerminalFromSpecifiedTime() {
+        IsoTime historyStartTime = new IsoTime("2020-10-07T00:00:00.000Z");
+        Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.anyString(), Mockito.any(), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
+        MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry, historyStartTime);
+        api.getHistoryStorage().onHistoryOrderAdded(new MetatraderOrder() {{
+            doneTime = new IsoTime("2020-01-01T00:00:00.000Z");
+        }});
+        api.getHistoryStorage().onDealAdded(new MetatraderDeal() {{
+            time = new IsoTime("2020-01-02T00:00:00.000Z");
+        }});
+        api.synchronize().join();
+        Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.anyString(),
+            Mockito.eq(historyStartTime), Mockito.eq(historyStartTime));
     }
     
     /**
@@ -720,18 +743,20 @@ class MetaApiConnectionTest {
     }
     
     /**
-     * Tests {@link MetaApiConnection#waitSynchronized(String, Integer, Integer)}
+     * Tests {@link MetaApiConnection#waitSynchronized(SynchronizationOptions)}
      */
     @Test
     void testWaitsUntilSynchronizationComplete() throws Exception {
-        Mockito.when(client.getDealsByTimeRange(
-            Mockito.anyString(), Mockito.any(IsoTime.class), Mockito.any(IsoTime.class),
-            Mockito.anyInt(), Mockito.anyInt())
-        ).thenReturn(CompletableFuture.completedFuture(new MetatraderDeals() {{ synchronizing = true; }}))
-        .thenReturn(CompletableFuture.completedFuture(new MetatraderDeals() {{ synchronizing = false; }}));
+        Mockito.when(client.waitSynchronized(Mockito.anyString(), Mockito.anyString(), Mockito.anyLong()))
+            .thenReturn(CompletableFuture.completedFuture(null));
         Mockito.when(storageMock.updateStorage()).thenReturn(CompletableFuture.completedFuture(null));
         assertFalse(api.isSynchronized("synchronizationId").join());
-        CompletableFuture<Void> future = api.waitSynchronized("synchronizationId", Integer.MAX_VALUE, 10);
+        CompletableFuture<Void> future = api.waitSynchronized(new SynchronizationOptions() {{
+            applicationPattern = "app.*";
+            synchronizationId = "synchronizationId";
+            timeoutInSeconds = 1;
+            intervalInMilliseconds = 10;
+        }});
         Thread.sleep(15);
         api.onOrderSynchronizationFinished("synchronizationId");
         api.onDealSynchronizationFinished("synchronizationId");
@@ -744,16 +769,21 @@ class MetaApiConnectionTest {
      * Tests {@link MetaApiConnection#waitSynchronized(String, Integer, Integer)}
      */
     @Test
-    void testTimesOutWatingForSynchronizationComplete() throws Exception {
+    void testTimesOutWatingForSynchronizationComplete() {
         assertThrows(TimeoutException.class, () -> {
             try {
-                api.waitSynchronized("synchronizationId", 1, 10).get();
+                api.waitSynchronized(new SynchronizationOptions() {{
+                    applicationPattern = "app.*";
+                    synchronizationId = "synchronizationId";
+                    timeoutInSeconds = 1;
+                    intervalInMilliseconds = 10;
+                }}).get();
                 throw new Exception("TimeoutException is expected");
             } catch (ExecutionException e) {
                 throw e.getCause();
             }
         });
-        assertFalse(api.isSynchronized("synchronizationId").get());
+        assertFalse(api.isSynchronized("synchronizationId").join());
     }
     
     /**
