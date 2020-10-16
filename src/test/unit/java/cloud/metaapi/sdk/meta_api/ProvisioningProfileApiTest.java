@@ -62,7 +62,7 @@ class ProvisioningProfileApiTest {
         assertEquals(expectedDto.status, actualProfile.getStatus());
         assertEquals(expectedDto.version, actualProfile.getVersion());
         assertEquals(expectedDto.brokerTimezone, actualProfile.getBrokerTimezone());
-        assertEquals(expectedDto.brokerDSTTimezone, actualProfile.getBrokerDSTTimezone());
+        assertEquals(expectedDto.brokerDSTSwitchTimezone, actualProfile.getBrokerDSTSwitchTimezone());
     }
     
     /**
@@ -77,7 +77,7 @@ class ProvisioningProfileApiTest {
             name = "name";
             version = 4;
             brokerTimezone = "EET";
-            brokerDSTTimezone = "EET";
+            brokerDSTSwitchTimezone = "EET";
         }};
         ProvisioningProfile profile = api.createProvisioningProfile(newDto).join();
         assertEquals("id", profile.getId());
@@ -85,7 +85,7 @@ class ProvisioningProfileApiTest {
         assertEquals(4, profile.getVersion());
         assertEquals("new", profile.getStatus());
         assertEquals("EET", profile.getBrokerTimezone());
-        assertEquals("EET", profile.getBrokerDSTTimezone());
+        assertEquals("EET", profile.getBrokerDSTSwitchTimezone());
         Mockito.verify(client).createProvisioningProfile(newDto);
     }
     
@@ -98,12 +98,12 @@ class ProvisioningProfileApiTest {
         firstCallProfile._id = "id";
         firstCallProfile.status = "new";
         firstCallProfile.brokerTimezone = "EET";
-        firstCallProfile.brokerDSTTimezone = "EET";
+        firstCallProfile.brokerDSTSwitchTimezone = "EET";
         ProvisioningProfileDto secondCallProfile = new ProvisioningProfileDto();
         secondCallProfile._id = "id";
         secondCallProfile.status = "active";
         secondCallProfile.brokerTimezone = "EET";
-        secondCallProfile.brokerDSTTimezone = "EET";
+        secondCallProfile.brokerDSTSwitchTimezone = "EET";
         Mockito.when(client.getProvisioningProfile("id"))
             .thenReturn(CompletableFuture.completedFuture(firstCallProfile))
             .thenReturn(CompletableFuture.completedFuture(secondCallProfile));
@@ -164,7 +164,7 @@ class ProvisioningProfileApiTest {
         profile.version = 4;
         profile.status = "new";
         profile.brokerTimezone = "EET";
-        profile.brokerDSTTimezone = "EET";
+        profile.brokerDSTSwitchTimezone = "EET";
         return Stream.of(Arguments.of(profile));
     }
 }

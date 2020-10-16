@@ -70,8 +70,8 @@ public class ProvisioningProfile {
      * Returns broker DST timezone name from Time Zone Database
      * @return broker DST timezone name
      */
-    public String getBrokerDSTTimezone() {
-        return data.brokerDSTTimezone;
+    public String getBrokerDSTSwitchTimezone() {
+        return data.brokerDSTSwitchTimezone;
     }
     
     /**

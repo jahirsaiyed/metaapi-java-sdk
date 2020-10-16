@@ -69,7 +69,7 @@ public class ProvisioningProfileApi {
             createdProfile.name = profile.name;
             createdProfile.version = profile.version;
             createdProfile.brokerTimezone = profile.brokerTimezone;
-            createdProfile.brokerDSTTimezone = profile.brokerDSTTimezone;
+            createdProfile.brokerDSTSwitchTimezone = profile.brokerDSTSwitchTimezone;
             return new ProvisioningProfile(createdProfile, provisioningProfileClient);
         });
     }

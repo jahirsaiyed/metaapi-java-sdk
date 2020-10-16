@@ -46,7 +46,7 @@ import io.socket.engineio.client.transports.WebSocket;
 /**
  * MetaApi websocket API client (see https://metaapi.cloud/docs/client/websocket/overview/)
  */
-public class MetaApiWebsocketClient {
+public class MetaApiWebsocketClient implements OutOfOrderListener {
 
     private static Logger logger = Logger.getLogger(MetaApiWebsocketClient.class);
     
@@ -61,6 +61,7 @@ public class MetaApiWebsocketClient {
     private Map<String, List<SynchronizationListener>> synchronizationListeners;
     private List<ReconnectListener> reconnectListeners;
     private CompletableFuture<Void> connectFuture = null;
+    private PacketOrderer packetOrderer;
     private boolean isSocketConnecting = false;
     private boolean connected = false;
     
@@ -98,6 +99,23 @@ public class MetaApiWebsocketClient {
         this.reconnectListeners = new LinkedList<>();
         this.requestTimeout = (requestTimeout != null ? requestTimeout : 60000);
         this.connectTimeout = (connectTimeout != null ? connectTimeout : 60000);
+        this.packetOrderer = new PacketOrderer(this, null);
+    }
+    
+    /**
+     * Restarts the account synchronization process on an out of order packet
+     * @param accountId account id
+     * @param expectedSequenceNumber expected s/n
+     * @param actualSequenceNumber actual s/n
+     * @param packet packet data
+     * @param receivedAt time the packet was received at
+     */
+    public void onOutOfOrderPacket(String accountId, int expectedSequenceNumber, 
+        int actualSequenceNumber, JsonNode packet, IsoTime receivedAt) {
+        logger.error("MetaApi websocket client received an out of order packet type "
+            + packet.get("type").asText() + " for account id " + accountId + ". Expected s/n is "
+            + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber);
+        subscribe(accountId);
     }
     
     /**
@@ -119,6 +137,7 @@ public class MetaApiWebsocketClient {
             requestResolves.clear();
             CompletableFuture<Void> result = new CompletableFuture<>();
             connectFuture = result;
+            packetOrderer.start();
             
             String url = this.url + "?auth-token=" + token;
             IO.Options socketOptions = new IO.Options();
@@ -235,6 +254,7 @@ public class MetaApiWebsocketClient {
         });
         requestResolves.clear();
         synchronizationListeners.clear();
+        packetOrderer.stop();
     }
     
     /**
@@ -638,6 +658,22 @@ public class MetaApiWebsocketClient {
     }
     
     /**
+     * Waits for server-side terminal state synchronization to complete.
+     * (see https://metaapi.cloud/docs/client/websocket/synchronizing/waitSynchronized/).
+     * @param accountId id of the MetaTrader account to synchronize
+     * @param applicationPattern MetaApi application regular expression pattern, or {@code null}, default is .*
+     * @param timeoutInSeconds timeout in seconds, or {@code null}, default is 300 seconds
+     * @returns completable future which resolves when synchronization started
+     */
+    public CompletableFuture<Void> waitSynchronized(String accountId, String applicationPattern, Long timeoutInSeconds) {
+        ObjectNode request = jsonMapper.createObjectNode();
+        request.put("type", "waitSynchronized");
+        if (applicationPattern != null) request.put("applicationPattern", applicationPattern);
+        request.put("timeoutInSeconds", timeoutInSeconds);
+        return rpcRequest(accountId, request, timeoutInSeconds).thenApply((response) -> null);
+    }
+    
+    /**
      * Subscribes on market data of specified symbol (see
      * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/subscribeToMarketData/).
      * @param accountId id of the MetaTrader account
@@ -773,6 +809,10 @@ public class MetaApiWebsocketClient {
     }
     
     private CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request) {
+        return rpcRequest(accountId, request, null);
+    }
+    
+    private CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request, Long timeoutInSeconds) {
         String requestId = request.has("requestId") ? request.get("requestId").asText() : UUID.randomUUID().toString();
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -784,10 +824,12 @@ public class MetaApiWebsocketClient {
                 request.put("application", this.application);
                 if (!request.has("requestId")) request.put("requestId", requestId);
                 socket.emit("request", new JSONObject(jsonMapper.writeValueAsString(request)));
-                return result.get(requestTimeout, TimeUnit.MILLISECONDS);
+                if (timeoutInSeconds != null) return result.get(timeoutInSeconds, TimeUnit.SECONDS);
+                else return result.get(requestTimeout, TimeUnit.MILLISECONDS);
             } catch (java.util.concurrent.TimeoutException e) {
-            	throw new CompletionException(new TimeoutException("MetaApi websocket client request " 
-                    + requestId + " of type " + request.get("type").asText() + " timed out"));
+            	throw new CompletionException(new TimeoutException("MetaApi websocket client request " + requestId 
+        	        + " of type " + request.get("type").asText() + " timed out. Please make sure your account is "
+        	        + "connected to broker before retrying your request."));
             } catch (InterruptedException | JsonProcessingException | JSONException e) {
                 throw new CompletionException(e);
             } catch (ExecutionException e) {
@@ -801,6 +843,7 @@ public class MetaApiWebsocketClient {
             case "ValidationError": return new ValidationException(error.message, error.details);
             case "NotFoundError": return new NotFoundException(error.message);
             case "NotSynchronizedError": return new NotSynchronizedException(error.message);
+            case "TimeoutError": return new TimeoutException(error.message);
             case "NotAuthenticatedError": return new NotConnectedException(error.message);
             case "TradeError": return new TradeException(error.message, error.numericCode, error.stringCode);
             case "UnauthorizedError": close(); return new UnauthorizedException(error.message);
@@ -808,237 +851,39 @@ public class MetaApiWebsocketClient {
         }
     }
     
-    private CompletableFuture<Void> processSynchronizationPacket(String packet) {
+    private CompletableFuture<Void> processSynchronizationPacket(String jsonPacket) {
         return CompletableFuture.runAsync(() -> {
             try {
-                JsonNode data = jsonMapper.readTree(packet);
-                List<SynchronizationListener> listeners = synchronizationListeners.get(data.get("accountId").asText());
-                if (listeners == null || listeners.isEmpty()) return;
-                String type = data.get("type").asText();
-                if (type.equals("authenticated")) {
-                    List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                    for (SynchronizationListener listener : listeners) {
-                        completableFutures.add(listener.onConnected().exceptionally(e -> {
-                            logger.error("Failed to notify listener about connected event", e);
-                            return null;
-                        }));
-                    }
-                    CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                } else if (type.equals("disconnected")) {
-                    List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                    for (SynchronizationListener listener : listeners) {
-                        completableFutures.add(listener.onDisconnected().exceptionally(e -> {
-                            logger.error("Failed to notify listener about " + type + " event", e);
-                            return null;
-                        }));
-                    }
-                    CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                } else if (type.equals("accountInformation")) {
-                    if (data.hasNonNull(type)) {
-                        MetatraderAccountInformation accountInformation = jsonMapper
-                            .treeToValue(data.get(type), MetatraderAccountInformation.class);
+                List<JsonNode> packets = packetOrderer.restoreOrder(jsonMapper.readTree(jsonPacket));
+                for (JsonNode data : packets) {
+                    List<SynchronizationListener> listeners = synchronizationListeners.get(data.get("accountId").asText());
+                    if (listeners == null || listeners.isEmpty()) return;
+                    String type = data.get("type").asText();
+                    if (type.equals("authenticated")) {
                         List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                         for (SynchronizationListener listener : listeners) {
-                            completableFutures.add(listener.onAccountInformationUpdated(accountInformation)
-                                .exceptionally(e -> {
-                                    logger.error("Failed to notify listener about " + type + " event", e);
-                                    return null;
-                                }));
+                            completableFutures.add(listener.onConnected().exceptionally(e -> {
+                                logger.error("Failed to notify listener about connected event", e);
+                                return null;
+                            }));
                         }
                         CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                    }
-                } else if (type.equals("deals")) {
-                    if (data.hasNonNull(type)) {
-                        MetatraderDeal[] deals = jsonMapper.treeToValue(data.get(type), MetatraderDeal[].class);
-                        for (MetatraderDeal deal : deals) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onDealAdded(deal).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about " + type + " event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                } else if (type.equals("orders")) {
-                    if (data.hasNonNull(type)) {
-                        MetatraderOrder[] orders = jsonMapper.treeToValue(data.get(type), MetatraderOrder[].class);
-                        for (MetatraderOrder order : orders) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onOrderUpdated(order).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about " + type + " event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                } else if (type.equals("historyOrders")) {
-                    if (data.hasNonNull(type)) {
-                        MetatraderOrder[] historyOrders = jsonMapper.treeToValue(data.get(type), MetatraderOrder[].class);
-                        for (MetatraderOrder historyOrder : historyOrders) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onHistoryOrderAdded(historyOrder).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about " + type + " event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                } else if (type.equals("positions")) {
-                    if (data.hasNonNull(type)) {
-                        MetatraderPosition[] positions = jsonMapper.treeToValue(data.get(type), MetatraderPosition[].class);
-                        for (MetatraderPosition position : positions) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onPositionUpdated(position).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about " + type + " event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                } else if (type.equals("update")) {
-                    if (data.hasNonNull("accountInformation")) {
-                        MetatraderAccountInformation accountInformation = jsonMapper
-                            .treeToValue(data.get("accountInformation"), MetatraderAccountInformation.class);
+                    } else if (type.equals("disconnected")) {
                         List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                         for (SynchronizationListener listener : listeners) {
-                            completableFutures.add(listener.onAccountInformationUpdated(accountInformation)
-                                .exceptionally(e -> {
-                                    logger.error("Failed to notify listener about update event", e);
-                                    return null;
-                                }));
-                        }
-                        CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                    }
-                    if (data.hasNonNull("updatedPositions")) {
-                        MetatraderPosition[] positions = jsonMapper
-                            .treeToValue(data.get("updatedPositions"), MetatraderPosition[].class);
-                        for (MetatraderPosition position : positions) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onPositionUpdated(position).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about update event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                    if (data.hasNonNull("removedPositionIds")) {
-                        String[] removedPositionIds = jsonMapper
-                            .treeToValue(data.get("removedPositionIds"), String[].class);
-                        for (String positionId : removedPositionIds) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onPositionRemoved(positionId).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about update event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                    if (data.hasNonNull("updatedOrders")) {
-                        MetatraderOrder[] updatedOrders = jsonMapper
-                            .treeToValue(data.get("updatedOrders"), MetatraderOrder[].class);
-                        for (MetatraderOrder order : updatedOrders) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onOrderUpdated(order).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about update event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                    if (data.hasNonNull("completedOrderIds")) {
-                        String[] completedOrderIds = jsonMapper
-                            .treeToValue(data.get("completedOrderIds"), String[].class);
-                        for (String orderId : completedOrderIds) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onOrderCompleted(orderId).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about update event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                    if (data.hasNonNull("historyOrders")) {
-                        MetatraderOrder[] historyOrders = jsonMapper
-                            .treeToValue(data.get("historyOrders"), MetatraderOrder[].class);
-                        for (MetatraderOrder historyOrder : historyOrders) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onHistoryOrderAdded(historyOrder).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about update event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                    if (data.hasNonNull("deals")) {
-                        MetatraderDeal[] deals = jsonMapper
-                            .treeToValue(data.get("deals"), MetatraderDeal[].class);
-                        for (MetatraderDeal deal : deals) {
-                            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                            for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onDealAdded(deal).exceptionally(e -> {
-                                    logger.error("Failed to notify listener about update event", e);
-                                    return null;
-                                }));
-                            }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                        }
-                    }
-                } else if (type.equals("dealSynchronizationFinished")) {
-                    List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                    for (SynchronizationListener listener : listeners) {
-                        completableFutures.add(listener.onDealSynchronizationFinished(data.get("synchronizationId").asText())
-                            .exceptionally(e -> {
+                            completableFutures.add(listener.onDisconnected().exceptionally(e -> {
                                 logger.error("Failed to notify listener about " + type + " event", e);
                                 return null;
                             }));
-                    }
-                    CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                } else if (type.equals("orderSynchronizationFinished")) {
-                    List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                    for (SynchronizationListener listener : listeners) {
-                        completableFutures.add(listener.onOrderSynchronizationFinished(data.get("synchronizationId").asText())
-                            .exceptionally(e -> {
-                                logger.error("Failed to notify listener about " + type + " event", e);
-                                return null;
-                            }));
-                    }
-                    CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                } else if (type.equals("status")) {
-                    List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                    for (SynchronizationListener listener : listeners) {
-                        completableFutures.add(listener.onBrokerConnectionStatusChanged(data.get("connected").asBoolean())
-                            .exceptionally(e -> {
-                                logger.error("Failed to notify listener about brokerConnectionStatusChanged event", e);
-                                return null;
-                            }));
-                    }
-                    CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                } else if (type.equals("specifications")) {
-                    if (data.hasNonNull(type)) {
-                        MetatraderSymbolSpecification[] specifications = jsonMapper
-                            .treeToValue(data.get(type), MetatraderSymbolSpecification[].class);
-                        for (MetatraderSymbolSpecification specification : specifications) {
+                        }
+                        CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                    } else if (type.equals("accountInformation")) {
+                        if (data.hasNonNull(type)) {
+                            MetatraderAccountInformation accountInformation = jsonMapper
+                                .treeToValue(data.get(type), MetatraderAccountInformation.class);
                             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                             for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onSymbolSpecificationUpdated(specification)
+                                completableFutures.add(listener.onAccountInformationUpdated(accountInformation)
                                     .exceptionally(e -> {
                                         logger.error("Failed to notify listener about " + type + " event", e);
                                         return null;
@@ -1046,20 +891,220 @@ public class MetaApiWebsocketClient {
                             }
                             CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
                         }
-                    }
-                } else if (type.equals("prices")) {
-                    if (data.hasNonNull(type)) {
-                        MetatraderSymbolPrice[] prices = jsonMapper
-                            .treeToValue(data.get(type), MetatraderSymbolPrice[].class);
-                        for (MetatraderSymbolPrice price : prices) {
+                    } else if (type.equals("deals")) {
+                        if (data.hasNonNull(type)) {
+                            MetatraderDeal[] deals = jsonMapper.treeToValue(data.get(type), MetatraderDeal[].class);
+                            for (MetatraderDeal deal : deals) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onDealAdded(deal).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about " + type + " event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                    } else if (type.equals("orders")) {
+                        if (data.hasNonNull(type)) {
+                            MetatraderOrder[] orders = jsonMapper.treeToValue(data.get(type), MetatraderOrder[].class);
+                            for (MetatraderOrder order : orders) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onOrderUpdated(order).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about " + type + " event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                    } else if (type.equals("historyOrders")) {
+                        if (data.hasNonNull(type)) {
+                            MetatraderOrder[] historyOrders = jsonMapper.treeToValue(data.get(type), MetatraderOrder[].class);
+                            for (MetatraderOrder historyOrder : historyOrders) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onHistoryOrderAdded(historyOrder).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about " + type + " event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                    } else if (type.equals("positions")) {
+                        if (data.hasNonNull(type)) {
+                            MetatraderPosition[] positions = jsonMapper.treeToValue(data.get(type), MetatraderPosition[].class);
+                            for (MetatraderPosition position : positions) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onPositionUpdated(position).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about " + type + " event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                    } else if (type.equals("update")) {
+                        if (data.hasNonNull("accountInformation")) {
+                            MetatraderAccountInformation accountInformation = jsonMapper
+                                .treeToValue(data.get("accountInformation"), MetatraderAccountInformation.class);
                             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                             for (SynchronizationListener listener : listeners) {
-                                completableFutures.add(listener.onSymbolPriceUpdated(price).exceptionally(e -> {
+                                completableFutures.add(listener.onAccountInformationUpdated(accountInformation)
+                                    .exceptionally(e -> {
+                                        logger.error("Failed to notify listener about update event", e);
+                                        return null;
+                                    }));
+                            }
+                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                        }
+                        if (data.hasNonNull("updatedPositions")) {
+                            MetatraderPosition[] positions = jsonMapper
+                                .treeToValue(data.get("updatedPositions"), MetatraderPosition[].class);
+                            for (MetatraderPosition position : positions) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onPositionUpdated(position).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about update event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                        if (data.hasNonNull("removedPositionIds")) {
+                            String[] removedPositionIds = jsonMapper
+                                .treeToValue(data.get("removedPositionIds"), String[].class);
+                            for (String positionId : removedPositionIds) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onPositionRemoved(positionId).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about update event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                        if (data.hasNonNull("updatedOrders")) {
+                            MetatraderOrder[] updatedOrders = jsonMapper
+                                .treeToValue(data.get("updatedOrders"), MetatraderOrder[].class);
+                            for (MetatraderOrder order : updatedOrders) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onOrderUpdated(order).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about update event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                        if (data.hasNonNull("completedOrderIds")) {
+                            String[] completedOrderIds = jsonMapper
+                                .treeToValue(data.get("completedOrderIds"), String[].class);
+                            for (String orderId : completedOrderIds) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onOrderCompleted(orderId).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about update event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                        if (data.hasNonNull("historyOrders")) {
+                            MetatraderOrder[] historyOrders = jsonMapper
+                                .treeToValue(data.get("historyOrders"), MetatraderOrder[].class);
+                            for (MetatraderOrder historyOrder : historyOrders) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onHistoryOrderAdded(historyOrder).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about update event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                        if (data.hasNonNull("deals")) {
+                            MetatraderDeal[] deals = jsonMapper
+                                .treeToValue(data.get("deals"), MetatraderDeal[].class);
+                            for (MetatraderDeal deal : deals) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onDealAdded(deal).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about update event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
+                        }
+                    } else if (type.equals("dealSynchronizationFinished")) {
+                        List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                        for (SynchronizationListener listener : listeners) {
+                            completableFutures.add(listener.onDealSynchronizationFinished(data.get("synchronizationId").asText())
+                                .exceptionally(e -> {
                                     logger.error("Failed to notify listener about " + type + " event", e);
                                     return null;
                                 }));
+                        }
+                        CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                    } else if (type.equals("orderSynchronizationFinished")) {
+                        List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                        for (SynchronizationListener listener : listeners) {
+                            completableFutures.add(listener.onOrderSynchronizationFinished(data.get("synchronizationId").asText())
+                                .exceptionally(e -> {
+                                    logger.error("Failed to notify listener about " + type + " event", e);
+                                    return null;
+                                }));
+                        }
+                        CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                    } else if (type.equals("status")) {
+                        List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                        for (SynchronizationListener listener : listeners) {
+                            completableFutures.add(listener.onBrokerConnectionStatusChanged(data.get("connected").asBoolean())
+                                .exceptionally(e -> {
+                                    logger.error("Failed to notify listener about brokerConnectionStatusChanged event", e);
+                                    return null;
+                                }));
+                        }
+                        CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                    } else if (type.equals("specifications")) {
+                        if (data.hasNonNull(type)) {
+                            MetatraderSymbolSpecification[] specifications = jsonMapper
+                                .treeToValue(data.get(type), MetatraderSymbolSpecification[].class);
+                            for (MetatraderSymbolSpecification specification : specifications) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onSymbolSpecificationUpdated(specification)
+                                        .exceptionally(e -> {
+                                            logger.error("Failed to notify listener about " + type + " event", e);
+                                            return null;
+                                        }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
                             }
-                            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                        }
+                    } else if (type.equals("prices")) {
+                        if (data.hasNonNull(type)) {
+                            MetatraderSymbolPrice[] prices = jsonMapper
+                                .treeToValue(data.get(type), MetatraderSymbolPrice[].class);
+                            for (MetatraderSymbolPrice price : prices) {
+                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                                for (SynchronizationListener listener : listeners) {
+                                    completableFutures.add(listener.onSymbolPriceUpdated(price).exceptionally(e -> {
+                                        logger.error("Failed to notify listener about " + type + " event", e);
+                                        return null;
+                                    }));
+                                }
+                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                            }
                         }
                     }
                 }

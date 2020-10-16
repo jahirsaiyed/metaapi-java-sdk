@@ -31,10 +31,11 @@ class ConnectionRegistryTest {
                 MetaApiWebsocketClient websocketClient,
                 MetatraderAccount account,
                 HistoryStorage historyStorage,
-                ConnectionRegistry connectionRegistry
+                ConnectionRegistry connectionRegistry,
+                IsoTime historyStartTime
             ) {
                 MetaApiConnection metaApiConnection = new MetaApiConnection(websocketClient, account, historyStorage,
-                    connectionRegistry);
+                    connectionRegistry, historyStartTime);
                 MetaApiConnection metaApiConnectionSpy = Mockito.spy(metaApiConnection);
                 Mockito.when(metaApiConnectionSpy.initialize()).thenReturn(CompletableFuture.completedFuture(null));
                 return metaApiConnectionSpy;

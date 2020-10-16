@@ -161,6 +161,7 @@ class MetatraderAccountClientTest {
         newAccount.magic = 123456;
         newAccount.application = "MetaApi";
         newAccount.type = "cloud";
+        newAccount.tags = Lists.list("tag1");
         httpClient.setRequestMock((actualOptions) -> {
             try {
                 HttpRequestOptions expectedOptions = new HttpRequestOptions(
@@ -331,6 +332,7 @@ class MetatraderAccountClientTest {
         MetatraderAccountUpdateDto updateAccount = new MetatraderAccountUpdateDto();
         updateAccount.name = "new account name";
         updateAccount.password = "new_password007";
+        updateAccount.tags = Lists.list("tag1");
         httpClient.setRequestMock((actualOptions) -> {
             HttpRequestOptions expectedOptions = new HttpRequestOptions(
                 provisioningApiUrl + "/users/current/accounts/id", Method.PUT);
@@ -371,6 +373,7 @@ class MetatraderAccountClientTest {
         account.connectionStatus = ConnectionStatus.DISCONNECTED;
         account.state = DeploymentState.DEPLOYED;
         account.type = "cloud";
+        account.tags = Lists.list("tag1", "tag2");
         return Stream.of(Arguments.of(account));
     }
 }

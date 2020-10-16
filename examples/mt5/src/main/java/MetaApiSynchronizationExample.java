@@ -42,7 +42,7 @@ public class MetaApiSynchronizationExample {
                     name = serverName;
                     version = 5;
                     brokerTimezone = "EET";
-                    brokerDSTTimezone = "EET";
+                    brokerDSTSwitchTimezone = "EET";
                 }};
                 profile = Optional.of(api.getProvisioningProfileApi().createProvisioningProfile(newDto).get());
                 profile.get().uploadFile("servers.dat", serverDatFile).get();

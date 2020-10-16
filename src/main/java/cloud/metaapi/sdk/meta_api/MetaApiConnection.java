@@ -2,13 +2,11 @@ package cloud.metaapi.sdk.meta_api;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
 
 import org.apache.log4j.Logger;
 
@@ -28,6 +26,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolSpecification;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
+import cloud.metaapi.sdk.clients.meta_api.models.SynchronizationOptions;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade.ActionType;
 import cloud.metaapi.sdk.clients.models.*;
 
@@ -42,6 +41,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     private HashSet<String> ordersSynchronized = new HashSet<>();
     private HashSet<String> dealsSynchronized = new HashSet<>();
     private ConnectionRegistry connectionRegistry;
+    private IsoTime historyStartTime = null;
     private String lastSynchronizationId = null;
     private String lastDisconnectedSynchronizationId = null;
     private TerminalState terminalState;
@@ -52,8 +52,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * Constructs MetaApi MetaTrader Api connection
      * @param websocketClient MetaApi websocket client
      * @param account MetaTrader account to connect to
-     * @param historyStorage terminal history storage or {@code null}. By default an instance of MemoryHistoryStorage
-     * will be used.
+     * @param historyStorage terminal history storage or {@code null}. 
+     * By default an instance of MemoryHistoryStorage will be used.
      * @param connectionRegistry metatrader account connection registry
      */
     public MetaApiConnection(
@@ -62,9 +62,29 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
         HistoryStorage historyStorage,
         ConnectionRegistry connectionRegistry
     ) {
+        this(websocketClient, account, historyStorage, connectionRegistry, null);
+    }
+    
+    /**
+     * Constructs MetaApi MetaTrader Api connection
+     * @param websocketClient MetaApi websocket client
+     * @param account MetaTrader account to connect to
+     * @param historyStorage terminal history storage or {@code null}. 
+     * By default an instance of MemoryHistoryStorage will be used.
+     * @param connectionRegistry metatrader account connection registry
+     * @param historyStartTime history start sync time, or {@code null}
+     */
+    public MetaApiConnection(
+        MetaApiWebsocketClient websocketClient,
+        MetatraderAccount account,
+        HistoryStorage historyStorage,
+        ConnectionRegistry connectionRegistry,
+        IsoTime historyStartTime
+    ) {
         this.websocketClient = websocketClient;
         this.account = account;
         this.connectionRegistry = connectionRegistry;
+        this.historyStartTime = historyStartTime;
         this.terminalState = new TerminalState();
         this.historyStorage = historyStorage != null 
             ? historyStorage : new MemoryHistoryStorage(account.getId(), connectionRegistry.getApplication());
@@ -482,8 +502,16 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      */
     public CompletableFuture<Void> synchronize() {
         return CompletableFuture.runAsync(() -> {
-            IsoTime startingHistoryOrderTime = historyStorage.getLastHistoryOrderTime().join();
-            IsoTime startingDealTime = historyStorage.getLastDealTime().join();
+            IsoTime lastHistoryOrderTime = historyStorage.getLastHistoryOrderTime().join();
+            IsoTime startingHistoryOrderTime;
+            if (historyStartTime == null || lastHistoryOrderTime.getDate().compareTo(historyStartTime.getDate()) > 0) {
+                startingHistoryOrderTime = lastHistoryOrderTime;
+            } else startingHistoryOrderTime = historyStartTime;
+            IsoTime lastDealTime = historyStorage.getLastDealTime().join();
+            IsoTime startingDealTime;
+            if (historyStartTime == null || lastDealTime.getDate().compareTo(historyStartTime.getDate()) > 0) {
+                startingDealTime = lastDealTime;
+            } else startingDealTime = historyStartTime;
             lastSynchronizationId = UUID.randomUUID().toString();
             websocketClient.synchronize(
                 account.getId(), lastSynchronizationId,
@@ -576,11 +604,13 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     
     @Override
     public CompletableFuture<Void> onConnected() {
-        try {
-            return synchronize();
-        } catch (Exception e) {
-            throw new CompletionException(e);
-        }
+        return CompletableFuture.runAsync(() -> {
+            try {
+                synchronize().join();
+            } catch (CompletionException e) {
+                logger.error("MetaApi websocket client failed to synchronize", e.getCause());
+            }
+        });
     }
 
     @Override
@@ -623,68 +653,39 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     public CompletableFuture<Boolean> isSynchronized(String synchronizationId) {
         if (synchronizationId == null) synchronizationId = lastSynchronizationId;
         String finalSynchronizationId = synchronizationId;
-        return CompletableFuture.supplyAsync(() -> {
-            if (   ordersSynchronized.contains(finalSynchronizationId) 
-                && dealsSynchronized.contains(finalSynchronizationId))
-            {
-                try {
-                    return !getDealsByTimeRange(
-                        new IsoTime(Date.from(Instant.now())),
-                        new IsoTime(Date.from(Instant.now())), 0, 1000
-                    ).get().synchronizing;
-                } catch (ExecutionException e) {
-                    if (e.getCause() instanceof TimeoutException) return false;
-                    throw new CompletionException(e.getCause());
-                } catch (InterruptedException e) {
-                    throw new CompletionException(e);
-                }
-
-            }
-            return false;
-        });
-    }
-    
-    /**
-     * Waits until synchronization to MetaTrader terminal is completed. Completes exceptionally with TimeoutError 
-     * if application failed to synchronize with the teminal withing timeout allowed. Last synchronization request
-     * id will be used as synchronization id. Wait timeout in seconds is 5m and interval between account reloads
-     * while waiting for a change is 1s.
-     * @return completable future which resolves when synchronization to MetaTrader terminal is completed
-     */
-    public CompletableFuture<Void> waitSynchronized() {
-        return waitSynchronized(null, null, null);
-    }
-    
-    /**
-     * Waits until synchronization to MetaTrader terminal is completed. Completes exceptionally with TimeoutError 
-     * if application failed to synchronize with the teminal withing timeout allowed. Wait timeout in seconds is 5m
-     * and interval between account reloads while waiting for a change is 1s.
-     * @param synchronizationId optional synchronization id, last synchronization request id will be used by default
-     * @return completable future which resolves when synchronization to MetaTrader terminal is completed
-     */
-    public CompletableFuture<Void> waitSynchronized(String synchronizationId) {
-        return waitSynchronized(synchronizationId, null, null);
+        return CompletableFuture.completedFuture(ordersSynchronized.contains(finalSynchronizationId) 
+            && dealsSynchronized.contains(finalSynchronizationId));
     }
     
     /**
      * Waits until synchronization to MetaTrader terminal is completed. Completes exceptionally with TimeoutError 
      * if application failed to synchronize with the teminal withing timeout allowed.
-     * @param synchronizationId optional synchronization id, last synchronization request id will be used by default
-     * @param timeoutInSeconds optional wait timeout in seconds, default is 5m
-     * @param intervalInMilliseconds optional interval between account reloads while waiting for a change, default is 1s
      * @return completable future which resolves when synchronization to MetaTrader terminal is completed
      */
-    public CompletableFuture<Void> waitSynchronized(
-        String synchronizationId, Integer timeoutInSeconds, Integer intervalInMilliseconds
-    ) {
+    public CompletableFuture<Void> waitSynchronized() {
+        return waitSynchronized(null);
+    }
+    
+    /**
+     * Waits until synchronization to MetaTrader terminal is completed. Completes exceptionally with TimeoutError 
+     * if application failed to synchronize with the teminal withing timeout allowed.
+     * @param synchronization options, or {@code null}
+     * @return completable future which resolves when synchronization to MetaTrader terminal is completed
+     */
+    public CompletableFuture<Void> waitSynchronized(SynchronizationOptions opts) {
+        String synchronizationId = opts.synchronizationId;
+        int timeoutInSeconds = (opts.timeoutInSeconds != null ? opts.timeoutInSeconds : 300);
+        int intervalInMilliseconds = (opts.intervalInMilliseconds != null ? opts.intervalInMilliseconds : 1000);
         long startTime = Instant.now().getEpochSecond();
-        long timeoutTime = startTime + (timeoutInSeconds != null ? timeoutInSeconds : 300);
+        long timeoutTime = startTime + timeoutInSeconds;
         return CompletableFuture.runAsync(() -> {
             try {
-                while (!isSynchronized(synchronizationId).get() && timeoutTime > Instant.now().getEpochSecond()) {
-                    Thread.sleep(intervalInMilliseconds != null ? intervalInMilliseconds : 1000);
+                boolean isSynchronized;
+                while (!(isSynchronized = isSynchronized(synchronizationId).get())
+                    && timeoutTime > Instant.now().getEpochSecond()) {
+                    Thread.sleep(intervalInMilliseconds);
                 };
-                if (!isSynchronized(synchronizationId).get()) throw new TimeoutException(
+                if (!isSynchronized) throw new TimeoutException(
                     "Timed out waiting for account MetApi to synchronize to MetaTrader account " 
                     + account.getId() + ", synchronization id " + (
                         synchronizationId != null ? synchronizationId
@@ -692,6 +693,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
                             : lastDisconnectedSynchronizationId)
                     )
                 );
+                websocketClient.waitSynchronized(account.getId(), ".*", (long) timeoutInSeconds).get();
             } catch (Exception e) {
                 throw new CompletionException(e);
             }

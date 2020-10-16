@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
+import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
 /**
@@ -41,12 +42,24 @@ public class ConnectionRegistry {
      * @param historyStorage terminal history storage
      */
     public CompletableFuture<MetaApiConnection> connect(MetatraderAccount account, HistoryStorage historyStorage) {
+        return connect(account, historyStorage, null);
+    }
+    
+    /**
+     * Creates and returns a new account connection if doesnt exist, otherwise returns old
+     * @param account MetaTrader account id to connect to
+     * @param historyStorage terminal history storage
+     * @param historyStartTime history start time, or {@code null}
+     */
+    public CompletableFuture<MetaApiConnection> connect(
+        MetatraderAccount account, HistoryStorage historyStorage, IsoTime historyStartTime
+    ) {
         return CompletableFuture.supplyAsync(() -> {
             if (connections.containsKey(account.getId())) {
                 return connections.get(account.getId());
             } else {
                 MetaApiConnection connection = ServiceProvider.createMetaApiConnection(
-                    metaApiWebsocketClient, account, historyStorage, this);
+                    metaApiWebsocketClient, account, historyStorage, this, historyStartTime);
                 connection.initialize().join();
                 connection.subscribe().join();
                 connections.put(account.getId(), connection);

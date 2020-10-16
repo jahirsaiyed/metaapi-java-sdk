@@ -17,7 +17,7 @@ public class NewProvisioningProfileDto {
      */
     public String brokerTimezone;
     /**
-     * Broker DST timezone name from Time Zone Database
+     * Broker DST switch timezone name from Time Zone Database
      */
-    public String brokerDSTTimezone;
+    public String brokerDSTSwitchTimezone;
 }
