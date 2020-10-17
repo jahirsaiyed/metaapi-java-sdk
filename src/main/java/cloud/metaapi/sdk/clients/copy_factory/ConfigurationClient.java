@@ -1,8 +1,10 @@
 package cloud.metaapi.sdk.clients.copy_factory;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import org.apache.commons.lang3.RandomStringUtils;
 
@@ -11,6 +13,7 @@ import cloud.metaapi.sdk.clients.HttpRequestOptions;
 import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
 import cloud.metaapi.sdk.clients.copy_factory.models.*;
 import cloud.metaapi.sdk.clients.MetaApiClient;
+import cloud.metaapi.sdk.clients.TimeoutException;
 
 /**
  * metaapi.cloud CopyFactory configuration API (trade copying configuration API) client (see
@@ -156,5 +159,45 @@ public class ConfigurationClient extends MetaApiClient {
             + connectionId + "/active-resynchronization-tasks", Method.GET);
         opts.getHeaders().put("auth-token", token);
         return httpClient.requestJson(opts, ResynchronizationTask[].class).thenApply(array -> Arrays.asList(array));
+    }
+    
+    /**
+     * Waits until active resynchronization tasks are completed with default timeout and reloading interval.
+     * Completes exceptionally with {@link TimeoutException} if tasks have not completed  to the broker withing
+     * timeout allowed.
+     * @param connectionId MetaApi account id to wait tasks completed for
+     * @return completable future which resolves when tasks are completed
+     */
+    public CompletableFuture<Void> waitResynchronizationTasksCompleted(String connectionId) {
+        return waitResynchronizationTasksCompleted(connectionId, null, null);
+    }
+    
+    /**
+     * Waits until active resynchronization tasks are completed. Completes exceptionally with
+     * {@link TimeoutException} if tasks have not completed  to the broker withing timeout allowed.
+     * @param connectionId MetaApi account id to wait tasks completed for
+     * @param timeoutInSeconds wait timeout in seconds, default is 5m
+     * @param intervalInMilliseconds interval between tasks reload while waiting for a change, default is 1s
+     * @return completable future which resolves when tasks are completed
+     */
+    public CompletableFuture<Void> waitResynchronizationTasksCompleted(
+        String connectionId, Integer timeoutInSeconds, Integer intervalInMilliseconds) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                long startTime = Instant.now().getEpochSecond();
+                long timeoutTime = startTime + (timeoutInSeconds != null ? timeoutInSeconds : 300);
+                List<ResynchronizationTask> tasks = getActiveResynchronizationTasks(connectionId).get();
+                while (!tasks.isEmpty() && timeoutTime > Instant.now().getEpochSecond()) {
+                    Thread.sleep(intervalInMilliseconds != null ? intervalInMilliseconds : 1000);
+                    tasks = getActiveResynchronizationTasks(connectionId).get();
+                };
+                if (!tasks.isEmpty()) {
+                    throw new TimeoutException("Timed out waiting for resynchronization tasks for account "
+                        + connectionId + " to be completed");
+                }
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        });
     }
 }

@@ -5,17 +5,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import cloud.metaapi.sdk.clients.HttpRequestOptions;
 import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
+import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.mocks.HttpClientMock;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.util.JsonMapper;
@@ -29,10 +32,11 @@ class ConfigurationClientTest {
     private final static String copyFactoryApiUrl = "https://trading-api-v1.agiliumtrade.agiliumtrade.ai";
     private static ObjectMapper jsonMapper = JsonMapper.getInstance();
     private ConfigurationClient copyFactoryClient;
-    private HttpClientMock httpClient = new HttpClientMock((opts) -> CompletableFuture.completedFuture("empty"));
+    private HttpClientMock httpClient;
     
     @BeforeEach
     void setUp() throws Exception {
+        httpClient = new HttpClientMock((opts) -> CompletableFuture.completedFuture("empty"));
         copyFactoryClient = new ConfigurationClient(httpClient, "header.payload.sign");
     }
 
@@ -404,5 +408,64 @@ class ConfigurationClientTest {
                 e.getCause().getMessage()
             );
         };
+    }
+    
+    /**
+     * Tests {@link ConfigurationClient#waitResynchronizationTasksCompleted(String, Integer, Integer)}
+     */
+    @Test
+    void waitsUntilActiveResynchronizationTasksAreCompleted() throws Exception {
+        List<ResynchronizationTask> activeTasks = Lists.list(new ResynchronizationTask() {{
+            _id = "ABCD";
+            type = TaskType.CREATE_STRATEGY;
+            createdAt = new IsoTime("2020-08-25T00:00:00.000Z");
+            status = TaskStatus.EXECUTING;
+        }});
+        httpClient = Mockito.mock(HttpClientMock.class);
+        Mockito.when(httpClient.requestJson(Mockito.any(HttpRequestOptions.class), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(activeTasks.toArray(new ResynchronizationTask[0])))
+            .thenReturn(CompletableFuture.completedFuture(activeTasks.toArray(new ResynchronizationTask[0])))
+            .thenReturn(CompletableFuture.completedFuture(Lists.emptyList().toArray(new ResynchronizationTask[0])));
+        copyFactoryClient = new ConfigurationClient(httpClient, "header.payload.sign");
+        copyFactoryClient.waitResynchronizationTasksCompleted("accountId", 1, 50).join();
+        Mockito.verify(httpClient, Mockito.times(3)).requestJson(Mockito.argThat(arg -> {
+            HttpRequestOptions expected = new HttpRequestOptions(copyFactoryApiUrl
+                + "/users/current/configuration/connections/accountId/active-resynchronization-tasks", Method.GET);
+            expected.getHeaders().put("auth-token", "header.payload.sign");
+            assertThat(arg).usingRecursiveComparison().isEqualTo(expected);
+            return true;
+        }), Mockito.any());
+    }
+    
+    /**
+     * Tests {@link ConfigurationClient#waitResynchronizationTasksCompleted(String, Integer, Integer)}
+     */
+    @Test
+    void waitsTimesOutWaitingForActiveResynchronizationTasksAreCompleted() throws Exception {
+        List<ResynchronizationTask> activeTasks = Lists.list(new ResynchronizationTask() {{
+            _id = "ABCD";
+            type = TaskType.CREATE_STRATEGY;
+            createdAt = new IsoTime("2020-08-25T00:00:00.000Z");
+            status = TaskStatus.EXECUTING;
+        }});
+        httpClient = Mockito.mock(HttpClientMock.class);
+        Mockito.when(httpClient.requestJson(Mockito.any(HttpRequestOptions.class), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(activeTasks.toArray(new ResynchronizationTask[0])));
+        copyFactoryClient = new ConfigurationClient(httpClient, "header.payload.sign");
+        assertThrows(TimeoutException.class, () -> {
+            try {
+                copyFactoryClient.waitResynchronizationTasksCompleted("accountId", 1, 50).join();
+                throw new Exception("TimeoutException is expected");
+            } catch (CompletionException e) {
+                throw e.getCause();
+            }
+        });
+        Mockito.verify(httpClient, Mockito.atLeastOnce()).requestJson(Mockito.argThat(arg -> {
+            HttpRequestOptions expected = new HttpRequestOptions(copyFactoryApiUrl
+                + "/users/current/configuration/connections/accountId/active-resynchronization-tasks", Method.GET);
+            expected.getHeaders().put("auth-token", "header.payload.sign");
+            assertThat(arg).usingRecursiveComparison().isEqualTo(expected);
+            return true;
+        }), Mockito.any());
     }
 }
