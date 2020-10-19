@@ -89,8 +89,8 @@ public class PacketOrderer {
      */
     public List<JsonNode> restoreOrder(JsonNode packet) {
         List<JsonNode> result = new ArrayList<>();
-        int sequenceNumber = (packet.has("sequenceNumber") ? packet.get("sequenceNumber").asInt() : 0);
-        if (sequenceNumber == 0) {
+        int sequenceNumber = (packet.has("sequenceNumber") ? packet.get("sequenceNumber").asInt() : -1);
+        if (sequenceNumber == -1 || sequenceNumber == 0) {
             result.add(packet);
             return result;
         }
@@ -102,26 +102,28 @@ public class PacketOrderer {
             packetsByAccountId.remove(accountId);
             result.add(packet);
             return result;
-        } else if (sequenceNumber < sequenceNumberByAccount.get(accountId).get()) {
+        } else if (sequenceNumberByAccount.containsKey(accountId)
+            && sequenceNumber < sequenceNumberByAccount.get(accountId).get()) {
             // filter out previous packets
             return result;
-        } else if (sequenceNumber == sequenceNumberByAccount.get(accountId).get()) {
+        } else if (sequenceNumberByAccount.containsKey(accountId)
+            && sequenceNumber == sequenceNumberByAccount.get(accountId).get()) {
             // let the duplicate s/n packet to pass through
             result.add(packet);
             return result;
-        } else if (sequenceNumber == sequenceNumberByAccount.get(accountId).get() + 1) {
+        } else if (sequenceNumberByAccount.containsKey(accountId)
+            && sequenceNumber == sequenceNumberByAccount.get(accountId).get() + 1) {
             // in-order packet was received
             sequenceNumberByAccount.get(accountId).incrementAndGet();
             result.add(packet);
             List<Packet> waitList = packetsByAccountId.getOrDefault(accountId, new ArrayList<>());
             while (!waitList.isEmpty() 
-                && (waitList.get(0).sequenceNumber == getSequenceNumberByPacket(packet).get()
-                    || waitList.get(0).sequenceNumber == getSequenceNumberByPacket(packet).get() + 1
-                )
+                && (waitList.get(0).sequenceNumber == sequenceNumberByAccount.get(accountId).get()
+                    || waitList.get(0).sequenceNumber == sequenceNumberByAccount.get(accountId).get() + 1)
             ) {
                 result.add(waitList.get(0).packet);
-                if (waitList.get(0).sequenceNumber == getSequenceNumberByPacket(packet).get() + 1) {
-                    getSequenceNumberByPacket(packet).getAndIncrement();
+                if (waitList.get(0).sequenceNumber == sequenceNumberByAccount.get(accountId).get() + 1) {
+                    sequenceNumberByAccount.get(accountId).getAndIncrement();
                 }
                 waitList.remove(0);
             }
@@ -150,6 +152,7 @@ public class PacketOrderer {
         packetsByAccountId.values().forEach(waitList -> { 
             if (!waitList.isEmpty()) {
                 Packet packet = waitList.get(0);
+                if (packet == null) return;
                 Instant receivedAtPlusTimeout = packet.receivedAt.getDate().toInstant().plusSeconds(orderingTimeoutInSeconds);
                 if (receivedAtPlusTimeout.compareTo(Instant.now()) < 0) {
                     String accountId = packet.accountId;
@@ -162,9 +165,5 @@ public class PacketOrderer {
                 }
             }
         });
-    }
-    
-    private AtomicInteger getSequenceNumberByPacket(JsonNode packet) {
-        return sequenceNumberByAccount.get(packet.get("accountId").asText());
     }
 }

@@ -652,9 +652,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      */
     public CompletableFuture<Boolean> isSynchronized(String synchronizationId) {
         if (synchronizationId == null) synchronizationId = lastSynchronizationId;
-        String finalSynchronizationId = synchronizationId;
-        return CompletableFuture.completedFuture(ordersSynchronized.contains(finalSynchronizationId) 
-            && dealsSynchronized.contains(finalSynchronizationId));
+        return CompletableFuture.completedFuture(ordersSynchronized.contains(synchronizationId) 
+            && dealsSynchronized.contains(synchronizationId));
     }
     
     /**
@@ -669,10 +668,11 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     /**
      * Waits until synchronization to MetaTrader terminal is completed. Completes exceptionally with TimeoutError 
      * if application failed to synchronize with the teminal withing timeout allowed.
-     * @param synchronization options, or {@code null}
+     * @param opts synchronization options, or {@code null}
      * @return completable future which resolves when synchronization to MetaTrader terminal is completed
      */
     public CompletableFuture<Void> waitSynchronized(SynchronizationOptions opts) {
+        if (opts == null) opts = new SynchronizationOptions();
         String synchronizationId = opts.synchronizationId;
         int timeoutInSeconds = (opts.timeoutInSeconds != null ? opts.timeoutInSeconds : 300);
         int intervalInMilliseconds = (opts.intervalInMilliseconds != null ? opts.intervalInMilliseconds : 1000);

@@ -51,7 +51,7 @@ public class StreamQuotesExample {
             
             System.out.println("Waiting for SDK to synchronize to terminal state "
                 + "(may take some time depending on your history size)");
-            connection.waitSynchronized(null, 1200, null).get();
+            connection.waitSynchronized().get();
             
             // Add symbol to MarketWatch if not yet added
             connection.subscribeToMarketData("EURUSD").get();
