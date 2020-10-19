@@ -89,7 +89,7 @@ public class MetaApiSynchronizationExample {
             
             System.out.println("Waiting for SDK to synchronize to terminal state "
                 + "(may take some time depending on your history size)");
-            connection.waitSynchronized(null, 600, null).get();
+            connection.waitSynchronized().get();
 
             // access local copy of terminal state
             System.out.println("Testing terminal state access");

@@ -663,7 +663,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
      * @param accountId id of the MetaTrader account to synchronize
      * @param applicationPattern MetaApi application regular expression pattern, or {@code null}, default is .*
      * @param timeoutInSeconds timeout in seconds, or {@code null}, default is 300 seconds
-     * @returns completable future which resolves when synchronization started
+     * @return completable future which resolves when synchronization started
      */
     public CompletableFuture<Void> waitSynchronized(String accountId, String applicationPattern, Long timeoutInSeconds) {
         ObjectNode request = jsonMapper.createObjectNode();
