@@ -1,3 +1,6 @@
+8.0.1
+  - bugfix packet ordering algorithm
+
 8.0.0
   - added latency and slippage metrics to CopyFactory trade copying API
   - added CopyFactory configuration client method retrieving active resynchronization tasks

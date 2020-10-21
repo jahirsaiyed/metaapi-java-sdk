@@ -31,7 +31,7 @@ public class CopyFactoryStrategyUpdate {
     /**
      * Commission scheme allowed by this strategy, or {@code null}
      */
-    public CopyFactoryStrategyComissionScheme commissionScheme;
+    public CopyFactoryStrategyCommissionScheme commissionScheme;
     /**
      * Commission rate the platform charges for strategy copying, applied to commissions charged by provider.
      * This commission applies only to accounts not managed directly by provider. Should be fraction of 1

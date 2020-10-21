@@ -5,6 +5,7 @@
 4. Make sure SDK version is updated in examples
 5. Publish to Maven Central
 6. Create git tag
+7. Verify examples are in working condition
 
 # Publishing to Maven Central
 

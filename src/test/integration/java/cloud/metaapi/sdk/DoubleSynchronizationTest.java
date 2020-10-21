@@ -105,11 +105,9 @@ class DoubleSynchronizationTest {
                 CompletableFuture.allOf(
                     connection.waitSynchronized(new SynchronizationOptions() {{
                         this.timeoutInSeconds = 600;
-                        this.intervalInMilliseconds = 1000;
                     }}),
                     connectionCopy.waitSynchronized(new SynchronizationOptions() {{
                         this.timeoutInSeconds = 600;
-                        this.intervalInMilliseconds = 1000;
                     }})
                 ).join();
                 account.undeploy().join();

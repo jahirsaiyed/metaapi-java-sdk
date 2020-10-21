@@ -19,7 +19,10 @@ import cloud.metaapi.sdk.clients.models.IsoTime;
  */
 public class PacketOrderer {
    
-    private class Packet {
+    /**
+     * Class for storing packet in wait list
+     */
+    protected class Packet {
         /**
          * Account id from packet
          */
@@ -42,7 +45,9 @@ public class PacketOrderer {
     private int orderingTimeoutInSeconds;
     private Map<String, Boolean> isOutOfOrderEmitted;
     private Map<String, AtomicInteger> sequenceNumberByAccount;
+    private Map<String, Integer> lastSessionStartTimestamp;
     private Map<String, List<Packet>> packetsByAccountId;
+    private int waitListSizeLimit = 100;
     private Timer outOfOrderJob;
     
     /**
@@ -62,6 +67,7 @@ public class PacketOrderer {
     public void start() {
         final PacketOrderer self = this;
         sequenceNumberByAccount = new HashMap<>();
+        lastSessionStartTimestamp = new HashMap<>();
         packetsByAccountId = new HashMap<>();
         outOfOrderJob = new Timer();
         outOfOrderJob.schedule(new TimerTask() {
@@ -99,11 +105,16 @@ public class PacketOrderer {
             // synchronization packet sequence just started
             isOutOfOrderEmitted.put(accountId, false);
             sequenceNumberByAccount.put(accountId, new AtomicInteger(sequenceNumber));
-            packetsByAccountId.remove(accountId);
+            lastSessionStartTimestamp.put(accountId, packet.get("sequenceTimestamp").asInt());
+            if (packetsByAccountId.containsKey(accountId)) {
+                packetsByAccountId.get(accountId).removeIf(waitPacket -> 
+                    waitPacket.packet.get("sequenceTimestamp").asInt() < packet.get("sequenceTimestamp").asInt());
+            }
             result.add(packet);
+            result.addAll(findNextPacketsFromWaitList(accountId));
             return result;
-        } else if (sequenceNumberByAccount.containsKey(accountId)
-            && sequenceNumber < sequenceNumberByAccount.get(accountId).get()) {
+        } else if (lastSessionStartTimestamp.containsKey(accountId)
+            && packet.get("sequenceTimestamp").asInt() < lastSessionStartTimestamp.get(accountId)) {
             // filter out previous packets
             return result;
         } else if (sequenceNumberByAccount.containsKey(accountId)
@@ -116,22 +127,9 @@ public class PacketOrderer {
             // in-order packet was received
             sequenceNumberByAccount.get(accountId).incrementAndGet();
             result.add(packet);
-            List<Packet> waitList = packetsByAccountId.getOrDefault(accountId, new ArrayList<>());
-            while (!waitList.isEmpty() 
-                && (waitList.get(0).sequenceNumber == sequenceNumberByAccount.get(accountId).get()
-                    || waitList.get(0).sequenceNumber == sequenceNumberByAccount.get(accountId).get() + 1)
-            ) {
-                result.add(waitList.get(0).packet);
-                if (waitList.get(0).sequenceNumber == sequenceNumberByAccount.get(accountId).get() + 1) {
-                    sequenceNumberByAccount.get(accountId).getAndIncrement();
-                }
-                waitList.remove(0);
-            }
-            if (waitList.isEmpty()) {
-                packetsByAccountId.remove(accountId);
-            }
+            result.addAll(findNextPacketsFromWaitList(accountId));
             return result;
-        } else if (sequenceNumberByAccount.containsKey(accountId)) {
+        } else {
             // out-of-order packet was received, add it to the wait list
             if (packetsByAccountId.get(accountId) == null) packetsByAccountId.put(accountId, new ArrayList<>());
             List<Packet> waitList = packetsByAccountId.get(accountId);
@@ -141,11 +139,29 @@ public class PacketOrderer {
             p.packet = packet;
             p.receivedAt = new IsoTime(Date.from(Instant.now()));
             waitList.add(p);
-            return result;
-        } else {
-            result.add(packet);
+            waitList.sort((e1, e2) -> e1.sequenceNumber - e2.sequenceNumber);
+            while (waitList.size() > waitListSizeLimit) waitList.remove(0);
             return result;
         }
+    }
+    
+    private List<JsonNode> findNextPacketsFromWaitList(String accountId) {
+        List<JsonNode> result = new ArrayList<>();
+        List<Packet> waitList = packetsByAccountId.getOrDefault(accountId, new ArrayList<>());
+        while (!waitList.isEmpty() 
+            && (waitList.get(0).sequenceNumber == sequenceNumberByAccount.get(accountId).get()
+                || waitList.get(0).sequenceNumber == sequenceNumberByAccount.get(accountId).get() + 1)
+        ) {
+            result.add(waitList.get(0).packet);
+            if (waitList.get(0).sequenceNumber == sequenceNumberByAccount.get(accountId).get() + 1) {
+                sequenceNumberByAccount.get(accountId).getAndIncrement();
+            }
+            waitList.remove(0);
+        }
+        if (waitList.isEmpty()) {
+            packetsByAccountId.remove(accountId);
+        }
+        return result;
     }
     
     private void emitOutOfOrderEvents() {
@@ -153,13 +169,15 @@ public class PacketOrderer {
             if (!waitList.isEmpty()) {
                 Packet packet = waitList.get(0);
                 if (packet == null) return;
-                Instant receivedAtPlusTimeout = packet.receivedAt.getDate().toInstant().plusSeconds(orderingTimeoutInSeconds);
+                Instant receivedAtPlusTimeout = packet.receivedAt.getDate()
+                    .toInstant().plusSeconds(orderingTimeoutInSeconds);
                 if (receivedAtPlusTimeout.compareTo(Instant.now()) < 0) {
                     String accountId = packet.accountId;
                     if (!isOutOfOrderEmitted.getOrDefault(accountId, false)) {
                         isOutOfOrderEmitted.put(accountId, true);
                         outOfOrderListener.onOutOfOrderPacket(
-                            packet.accountId, sequenceNumberByAccount.get(accountId).get() + 1,
+                            packet.accountId, sequenceNumberByAccount
+                                .getOrDefault(accountId,new AtomicInteger(0)).get() + 1,
                             packet.sequenceNumber, packet.packet, packet.receivedAt);
                     }
                 }

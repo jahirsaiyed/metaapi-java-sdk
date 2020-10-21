@@ -3,13 +3,13 @@ package cloud.metaapi.sdk.clients.copy_factory.models;
 /**
  * CopyFactory strategy commission scheme
  */
-public class CopyFactoryStrategyComissionScheme {
+public class CopyFactoryStrategyCommissionScheme {
     /**
      * Commission type. One of flat-fee, lots-traded, lots-won, amount-traded, amount-won, high-water-mark
      */
     public String type;
     /**
-     * Billing period. One of week, month, quater
+     * Billing period. One of week, month, quarter
      */
     public String billingPeriod;
     /**
