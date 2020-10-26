@@ -17,6 +17,6 @@ public interface OutOfOrderListener {
      * @param packet packet data
      * @param receivedAt time the packet was received at
      */
-    void onOutOfOrderPacket(String accountId, int expectedSequenceNumber, 
-        int actualSequenceNumber, JsonNode packet, IsoTime receivedAt);
+    void onOutOfOrderPacket(String accountId, long expectedSequenceNumber, 
+        long actualSequenceNumber, JsonNode packet, IsoTime receivedAt);
 }

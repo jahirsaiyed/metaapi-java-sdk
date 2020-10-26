@@ -228,7 +228,7 @@ class PacketOrdererTest {
             .usingRecursiveComparison().isEqualTo(Lists.emptyList());
         Thread.sleep(3000);
         Mockito.verify(outOfOrderListener, Mockito.times(1)).onOutOfOrderPacket(Mockito.eq("accountId"), 
-            Mockito.eq(14), Mockito.eq(15), Mockito.eq(thirdPacket), Mockito.any());
+            Mockito.eq(14L), Mockito.eq(15L), Mockito.eq(thirdPacket), Mockito.any());
     }
     
     /**
