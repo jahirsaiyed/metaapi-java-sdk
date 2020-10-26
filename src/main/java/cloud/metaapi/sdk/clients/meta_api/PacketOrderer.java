@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -30,7 +30,7 @@ public class PacketOrderer {
         /**
          * Sequence number
          */
-        public int sequenceNumber;
+        public long sequenceNumber;
         /**
          * Packet data
          */
@@ -44,7 +44,7 @@ public class PacketOrderer {
     private OutOfOrderListener outOfOrderListener;
     private int orderingTimeoutInSeconds;
     private Map<String, Boolean> isOutOfOrderEmitted;
-    private Map<String, AtomicInteger> sequenceNumberByAccount;
+    private Map<String, AtomicLong> sequenceNumberByAccount;
     private Map<String, Integer> lastSessionStartTimestamp;
     private Map<String, List<Packet>> packetsByAccountId;
     private int waitListSizeLimit = 100;
@@ -95,8 +95,8 @@ public class PacketOrderer {
      */
     public List<JsonNode> restoreOrder(JsonNode packet) {
         List<JsonNode> result = new ArrayList<>();
-        int sequenceNumber = (packet.has("sequenceNumber") ? packet.get("sequenceNumber").asInt() : -1);
-        if (sequenceNumber == -1 || sequenceNumber == 0) {
+        long sequenceNumber = (packet.has("sequenceNumber") ? packet.get("sequenceNumber").asLong() : -1);
+        if (sequenceNumber == -1) {
             result.add(packet);
             return result;
         }
@@ -104,7 +104,7 @@ public class PacketOrderer {
         if (packet.get("type").asText().equals("specifications") && packet.has("synchronizationId")) {
             // synchronization packet sequence just started
             isOutOfOrderEmitted.put(accountId, false);
-            sequenceNumberByAccount.put(accountId, new AtomicInteger(sequenceNumber));
+            sequenceNumberByAccount.put(accountId, new AtomicLong(sequenceNumber));
             lastSessionStartTimestamp.put(accountId, packet.get("sequenceTimestamp").asInt());
             if (packetsByAccountId.containsKey(accountId)) {
                 packetsByAccountId.get(accountId).removeIf(waitPacket -> 
@@ -139,7 +139,7 @@ public class PacketOrderer {
             p.packet = packet;
             p.receivedAt = new IsoTime(Date.from(Instant.now()));
             waitList.add(p);
-            waitList.sort((e1, e2) -> e1.sequenceNumber - e2.sequenceNumber);
+            waitList.sort((e1, e2) -> (e1.sequenceNumber - e2.sequenceNumber) > 0 ? 1 : -1);
             while (waitList.size() > waitListSizeLimit) waitList.remove(0);
             return result;
         }
@@ -177,7 +177,7 @@ public class PacketOrderer {
                         isOutOfOrderEmitted.put(accountId, true);
                         outOfOrderListener.onOutOfOrderPacket(
                             packet.accountId, sequenceNumberByAccount
-                                .getOrDefault(accountId,new AtomicInteger(0)).get() + 1,
+                                .getOrDefault(accountId,new AtomicLong(0)).get() + 1,
                             packet.sequenceNumber, packet.packet, packet.receivedAt);
                     }
                 }
