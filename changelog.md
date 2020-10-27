@@ -1,3 +1,6 @@
+8.0.3
+  - fixed failing reconnection attempts after disconnection from MetaApi
+
 8.0.2
   - bugfix packet ordering algorithm
 

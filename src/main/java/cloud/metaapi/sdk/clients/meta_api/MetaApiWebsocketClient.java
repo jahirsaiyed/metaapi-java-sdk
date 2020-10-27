@@ -168,13 +168,15 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 
                 socket.on(Socket.EVENT_CONNECT, (Object[] args) -> {
                     isSocketConnecting = false;
-                    logger.info("MetaApi websocket client connected to the MetaApi server");
-                    if (!result.isDone()) result.complete(null);
-                    else fireReconnected().exceptionally((e) -> {
-                        logger.error("Failed to notify reconnect listeners", e);
-                        return null;
-                    }).join();
-                    if (!connected) socket.close();
+                    CompletableFuture.runAsync(() -> {
+                        logger.info("MetaApi websocket client connected to the MetaApi server");
+                        if (!result.isDone()) result.complete(null);
+                        else fireReconnected().exceptionally((e) -> {
+                            logger.error("Failed to notify reconnect listeners", e);
+                            return null;
+                        }).join();
+                        if (!connected) socket.close();
+                    });
                 });
                 socket.on(Socket.EVENT_RECONNECT, (Object[] args) -> {
                     try {
@@ -785,27 +787,24 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         reconnectListeners.clear();
     }
     
-    private void reconnect() throws InterruptedException, ExecutionException  {
-        while (!socket.connected() && !isSocketConnecting && connected) {
-            tryReconnect().get();
-        }
-    }
-    
-    private CompletableFuture<Void> tryReconnect() {
-        CompletableFuture<Void> result = new CompletableFuture<>();
-        CompletableFuture.runAsync(() -> {
-            try {
-                Thread.sleep(1000);
-                if (!socket.connected() && !isSocketConnecting && connected) {
-                    isSocketConnecting = true;
-                    socket.connect();
-                }
-                result.complete(null);
-            } catch (InterruptedException e) {
-                result.completeExceptionally(e);
+    private CompletableFuture<Void> reconnect() throws InterruptedException, ExecutionException  {
+        return CompletableFuture.runAsync(() -> {
+            while (!socket.connected() && !isSocketConnecting && connected) {
+                tryReconnect();
             }
         });
-        return result;
+    }
+    
+    private void tryReconnect() {
+        try {
+            Thread.sleep(1000);
+            if (!socket.connected() && !isSocketConnecting && connected) {
+                isSocketConnecting = true;
+                socket.connect();
+            }
+        } catch (InterruptedException e) {
+            throw new CompletionException(e);
+        }
     }
     
     private CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request) {
