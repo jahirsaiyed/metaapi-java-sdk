@@ -905,19 +905,17 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                             }
                         }
                     } else if (type.equals("orders")) {
-                        if (data.hasNonNull(type)) {
-                            MetatraderOrder[] orders = jsonMapper.treeToValue(data.get(type), MetatraderOrder[].class);
-                            for (MetatraderOrder order : orders) {
-                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                                for (SynchronizationListener listener : listeners) {
-                                    completableFutures.add(listener.onOrderUpdated(order).exceptionally(e -> {
-                                        logger.error("Failed to notify listener about " + type + " event", e);
-                                        return null;
-                                    }));
-                                }
-                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                            }
+                        List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                        MetatraderOrder[] orders = data.hasNonNull("orders")
+                            ? jsonMapper.treeToValue(data.get(type), MetatraderOrder[].class)
+                            : new MetatraderOrder[0];
+                        for (SynchronizationListener listener : listeners) {
+                            completableFutures.add(listener.onOrdersReplaced(Arrays.asList(orders)).exceptionally(e -> {
+                                logger.error("Failed to notify listener about orders event", e);
+                                return null;
+                            }));
                         }
+                        CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
                     } else if (type.equals("historyOrders")) {
                         if (data.hasNonNull(type)) {
                             MetatraderOrder[] historyOrders = jsonMapper.treeToValue(data.get(type), MetatraderOrder[].class);
@@ -933,19 +931,17 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                             }
                         }
                     } else if (type.equals("positions")) {
-                        if (data.hasNonNull(type)) {
-                            MetatraderPosition[] positions = jsonMapper.treeToValue(data.get(type), MetatraderPosition[].class);
-                            for (MetatraderPosition position : positions) {
-                                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-                                for (SynchronizationListener listener : listeners) {
-                                    completableFutures.add(listener.onPositionUpdated(position).exceptionally(e -> {
-                                        logger.error("Failed to notify listener about " + type + " event", e);
-                                        return null;
-                                    }));
-                                }
-                                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-                            }
+                        List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                        MetatraderPosition[] positions = data.hasNonNull("positions")
+                            ? jsonMapper.treeToValue(data.get(type), MetatraderPosition[].class)
+                            : new MetatraderPosition[0];
+                        for (SynchronizationListener listener : listeners) {
+                            completableFutures.add(listener.onPositionsReplaced(Arrays.asList(positions)).exceptionally(e -> {
+                                logger.error("Failed to notify listener about positions event", e);
+                                return null;
+                            }));
                         }
+                        CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
                     } else if (type.equals("update")) {
                         if (data.hasNonNull("accountInformation")) {
                             MetatraderAccountInformation accountInformation = jsonMapper

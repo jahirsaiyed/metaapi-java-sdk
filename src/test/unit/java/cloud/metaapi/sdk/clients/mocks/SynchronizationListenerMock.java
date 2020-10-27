@@ -1,5 +1,6 @@
 package cloud.metaapi.sdk.clients.mocks;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
@@ -29,7 +30,12 @@ public class SynchronizationListenerMock extends SynchronizationListener {
      */
     public CompletableFuture<MetatraderAccountInformation> onAccountInformationUpdatedResult = new CompletableFuture<>();
     /**
-     * Completable future which is completed when onPositionUpdated event is handled
+     * Completable future which is completed when onPositionReplaced event is handled
+     * resulting with event received data
+     */
+    public CompletableFuture<List<MetatraderPosition>> onPositionsReplacedResult = new CompletableFuture<>();
+    /**
+     * Completable future which is completed when onPositionsUpdated event is handled
      * resulting with event received data
      */
     public CompletableFuture<MetatraderPosition> onPositionUpdatedResult = new CompletableFuture<>();
@@ -38,6 +44,11 @@ public class SynchronizationListenerMock extends SynchronizationListener {
      * resulting with event received data
      */
     public CompletableFuture<String> onPositionRemovedResult = new CompletableFuture<>();
+    /**
+     * Completable future which is completed when onOrdersReplaced event is handled
+     * resulting with event received data
+     */
+    public CompletableFuture<List<MetatraderOrder>> onOrdersReplacedResult = new CompletableFuture<>();
     /**
      * Completable future which is completed when onOrderUpdated event is handled
      * resulting with event received data
@@ -100,6 +111,12 @@ public class SynchronizationListenerMock extends SynchronizationListener {
         this.onAccountInformationUpdatedResult.complete(accountInformation);
         return CompletableFuture.completedFuture(null);
     }
+    
+    @Override
+    public CompletableFuture<Void> onPositionsReplaced(List<MetatraderPosition> positions) {
+        this.onPositionsReplacedResult.complete(positions);
+        return CompletableFuture.completedFuture(null);
+    }
 
     @Override
     public CompletableFuture<Void> onPositionUpdated(MetatraderPosition position) {
@@ -113,7 +130,12 @@ public class SynchronizationListenerMock extends SynchronizationListener {
         return CompletableFuture.completedFuture(null);
     }
 
-
+    @Override
+    public CompletableFuture<Void> onOrdersReplaced(List<MetatraderOrder> orders) {
+        this.onOrdersReplacedResult.complete(orders);
+        return CompletableFuture.completedFuture(null);
+    }
+    
     @Override
     public CompletableFuture<Void> onOrderUpdated(MetatraderOrder order) {
         this.onOrderUpdatedResult.complete(order);

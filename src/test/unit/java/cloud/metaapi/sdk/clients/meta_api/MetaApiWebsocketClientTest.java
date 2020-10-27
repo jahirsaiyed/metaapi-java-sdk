@@ -988,7 +988,7 @@ class MetaApiWebsocketClientTest {
         packet.put("accountId", "accountId");
         packet.set("positions", jsonMapper.valueToTree(Lists.list(expected)));
         socket.sendEvent("synchronization", packet.toString());
-        assertThat(listener.onPositionUpdatedResult.get()).usingRecursiveComparison().isEqualTo(expected);
+        assertThat(listener.onPositionsReplacedResult.join().get(0)).usingRecursiveComparison().isEqualTo(expected);
     }
     
     /**
@@ -1004,7 +1004,7 @@ class MetaApiWebsocketClientTest {
         packet.put("accountId", "accountId");
         packet.set("orders", jsonMapper.valueToTree(Lists.list(expected)));
         socket.sendEvent("synchronization", packet.toString());
-        assertThat(listener.onOrderUpdatedResult.get()).usingRecursiveComparison().isEqualTo(expected);
+        assertThat(listener.onOrdersReplacedResult.join().get(0)).usingRecursiveComparison().isEqualTo(expected);
     }
     
     /**

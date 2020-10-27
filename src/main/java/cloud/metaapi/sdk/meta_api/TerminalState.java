@@ -138,6 +138,12 @@ public class TerminalState extends SynchronizationListener {
         this.accountInformation = Optional.of(accountInformation);
         return CompletableFuture.completedFuture(null);
     }
+    
+    @Override
+    public CompletableFuture<Void> onPositionsReplaced(List<MetatraderPosition> positions) {
+        this.positions = positions;
+        return CompletableFuture.completedFuture(null);
+    }
 
     @Override
     public CompletableFuture<Void> onPositionUpdated(MetatraderPosition position) {
@@ -154,6 +160,12 @@ public class TerminalState extends SynchronizationListener {
     @Override
     public CompletableFuture<Void> onPositionRemoved(String positionId) {
         positions.removeIf(position -> position.id.equals(positionId));
+        return CompletableFuture.completedFuture(null);
+    }
+    
+    @Override
+    public CompletableFuture<Void> onOrdersReplaced(List<MetatraderOrder> orders) {
+        this.orders = orders;
         return CompletableFuture.completedFuture(null);
     }
 

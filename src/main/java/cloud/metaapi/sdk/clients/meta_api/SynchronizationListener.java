@@ -1,5 +1,6 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import cloud.metaapi.sdk.clients.meta_api.models.*;
@@ -44,6 +45,15 @@ public abstract class SynchronizationListener {
     }
     
     /**
+     * Invoked when the positions are replaced as a result of initial terminal state synchronization
+     * @param positions updated array of positions
+     * @return completable future which resolves when the asynchronous event is processed
+     */
+    public CompletableFuture<Void> onPositionsReplaced(List<MetatraderPosition> positions) {
+        return CompletableFuture.completedFuture(null);
+    }
+    
+    /**
      * Invoked when MetaTrader position is updated
      * @param position updated MetaTrader position
      * @return completable future which resolves when the asynchronous event is processed
@@ -58,6 +68,15 @@ public abstract class SynchronizationListener {
      * @return completable future which resolves when the asynchronous event is processed
      */
     public CompletableFuture<Void> onPositionRemoved(String positionId) {
+        return CompletableFuture.completedFuture(null);
+    }
+    
+    /**
+     * Invoked when the orders are replaced as a result of initial terminal state synchronization
+     * @param orders updated array of orders
+     * @return completable future which resolves when the asynchronous event is processed
+     */
+    public CompletableFuture<Void> onOrdersReplaced(List<MetatraderOrder> orders) {
         return CompletableFuture.completedFuture(null);
     }
     
