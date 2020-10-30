@@ -253,7 +253,7 @@ class PacketOrdererTest {
             .readField(packetOrderer, "packetsByAccountId", true);
         waitLists.put("accountId", Lists.list(timedOutPacket, notTimedOutPacket));
         Thread.sleep(3000);
-        Mockito.verify(outOfOrderListener, Mockito.times(1)).onOutOfOrderPacket("accountId", 1, 11,
+        Mockito.verify(outOfOrderListener, Mockito.times(1)).onOutOfOrderPacket("accountId", -1, 11,
             timedOutPacket.packet, timedOutPacket.receivedAt);
     }
     

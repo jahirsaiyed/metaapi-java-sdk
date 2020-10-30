@@ -175,9 +175,9 @@ public class PacketOrderer {
                     String accountId = packet.accountId;
                     if (!isOutOfOrderEmitted.getOrDefault(accountId, false)) {
                         isOutOfOrderEmitted.put(accountId, true);
-                        outOfOrderListener.onOutOfOrderPacket(
-                            packet.accountId, sequenceNumberByAccount
-                                .getOrDefault(accountId,new AtomicLong(0)).get() + 1,
+                        long expectedSequenceNumber = sequenceNumberByAccount.containsKey(accountId) ?
+                            (sequenceNumberByAccount.get(accountId).get() + 1) : -1;
+                        outOfOrderListener.onOutOfOrderPacket(packet.accountId, expectedSequenceNumber,
                             packet.sequenceNumber, packet.packet, packet.receivedAt);
                     }
                 }

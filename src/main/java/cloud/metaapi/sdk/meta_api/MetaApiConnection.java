@@ -608,7 +608,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
             try {
                 synchronize().join();
             } catch (CompletionException e) {
-                logger.error("MetaApi websocket client failed to synchronize", e.getCause());
+                logger.error("MetaApi websocket client for account " + account.getId()
+                    + " failed to synchronize", e.getCause());
             }
         });
     }
