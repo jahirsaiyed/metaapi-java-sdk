@@ -45,6 +45,10 @@ public class CopyFactoryTransaction {
      */
     public CopyFactoryStrategyIdAndName strategy;
     /**
+     * Source position id, or {@code null}
+     */
+    public String positionId;
+    /**
      * High-water mark strategy balance improvement
      */
     public double improvement;

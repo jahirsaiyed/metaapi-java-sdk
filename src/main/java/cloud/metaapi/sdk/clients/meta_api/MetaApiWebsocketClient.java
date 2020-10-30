@@ -113,8 +113,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     public void onOutOfOrderPacket(String accountId, long expectedSequenceNumber, 
         long actualSequenceNumber, JsonNode packet, IsoTime receivedAt) {
         logger.error("MetaApi websocket client received an out of order packet type "
-            + packet.get("type").asText() + " for account id " + accountId + ". Expected s/n "
-            + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber);
+            + packet.get("type").asText() + " for account id " + accountId + ". " + (expectedSequenceNumber != -1
+            ? "Expected s/n " + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber
+            : "Packet with s/n " + actualSequenceNumber + " has come before initial synchronization packet"));
         subscribe(accountId);
     }
     
@@ -618,8 +619,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         request.put("type", "subscribe");
         return rpcRequest(accountId, request)
             .exceptionally(exception -> {
-                logger.error("MetaApi websocket client failed to receive subscribe response "
-                    + "(this usually does not mean an error)", exception);
+                logger.error("MetaApi websocket client failed to receive subscribe response", exception);
                 throw new CompletionException(exception);
             }).thenApply(response -> null);
     }
