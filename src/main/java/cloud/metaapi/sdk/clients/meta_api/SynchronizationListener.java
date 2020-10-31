@@ -36,6 +36,14 @@ public abstract class SynchronizationListener {
     }
     
     /**
+     * Invoked when MetaTrader terminal state synchronization is started
+     * @return completable future which resolves when the asynchronous event is processed
+     */
+    public CompletableFuture<Void> onSynchronizationStarted() {
+        return CompletableFuture.completedFuture(null);
+    }
+    
+    /**
      * Invoked when MetaTrader account information is updated
      * @param accountInformation updated MetaTrader account information
      * @return completable future which resolves when the asynchronous event is processed

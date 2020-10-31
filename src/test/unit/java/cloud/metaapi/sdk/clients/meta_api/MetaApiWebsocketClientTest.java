@@ -962,6 +962,20 @@ class MetaApiWebsocketClientTest {
     /**
      * Tests {@link MetaApiWebsocketClient#addSynchronizationListener(String, SynchronizationListener)}
      */
+    @Test
+    void testProcessesSynchronizationStartedEvent() {
+        SynchronizationListenerMock listener = new SynchronizationListenerMock();
+        client.addSynchronizationListener("accountId", listener);
+        ObjectNode packet = jsonMapper.createObjectNode();
+        packet.put("type", "synchronizationStarted");
+        packet.put("accountId", "accountId");
+        socket.sendEvent("synchronization", packet.toString());
+        assertNull(listener.onSynchronizationStartedResult.join());
+    }
+    
+    /**
+     * Tests {@link MetaApiWebsocketClient#addSynchronizationListener(String, SynchronizationListener)}
+     */
     @ParameterizedTest
     @MethodSource("provideAccountInformation")
     void testSynchronizesAccountInformation(MetatraderAccountInformation expected) throws Exception {
