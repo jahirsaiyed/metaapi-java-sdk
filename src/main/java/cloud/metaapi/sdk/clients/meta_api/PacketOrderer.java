@@ -101,7 +101,7 @@ public class PacketOrderer {
             return result;
         }
         String accountId = packet.get("accountId").asText();
-        if (packet.get("type").asText().equals("specifications") && packet.has("synchronizationId")) {
+        if (packet.get("type").asText().equals("synchronizationStarted") && packet.has("synchronizationId")) {
             // synchronization packet sequence just started
             isOutOfOrderEmitted.put(accountId, false);
             sequenceNumberByAccount.put(accountId, new AtomicLong(sequenceNumber));

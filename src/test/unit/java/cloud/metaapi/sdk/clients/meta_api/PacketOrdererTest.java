@@ -55,9 +55,9 @@ class PacketOrdererTest {
      * Tests {@link PacketOrderer#restoreOrder(JsonNode)}
      */
     @Test
-    void testRestoresPacketOrderStartingFromPacketOfSpecificationsType() {
+    void testRestoresPacketOrder() {
         ObjectNode firstPacket = JsonMapper.getInstance().createObjectNode();
-        firstPacket.put("type", "specifications");
+        firstPacket.put("type", "synchronizationStarted");
         firstPacket.put("accountId", "accountId");
         firstPacket.put("sequenceTimestamp", 1603124267178L);
         firstPacket.put("sequenceNumber", 13);
@@ -91,55 +91,55 @@ class PacketOrdererTest {
      * Tests {@link PacketOrderer#restoreOrder(JsonNode)}
      */
     @Test
-    void testFiltersOutPacketsFromPreviousSynchronizationAttemptThatIncludesSpecifications() {
-        ObjectNode previousSpecifications = JsonMapper.getInstance().createObjectNode();
-        previousSpecifications.put("type", "specifications");
-        previousSpecifications.put("accountId", "accountId");
-        previousSpecifications.put("sequenceTimestamp", 1603124267178L);
-        previousSpecifications.put("sequenceNumber", 13);
-        previousSpecifications.put("synchronizationId", "synchronizationId");
+    void testFiltersOutPacketsFromPreviousSynchronizationAttemptThatIncludesSynchronizationStartedPacket() {
+        ObjectNode previousStart = JsonMapper.getInstance().createObjectNode();
+        previousStart.put("type", "synchronizationStarted");
+        previousStart.put("accountId", "accountId");
+        previousStart.put("sequenceTimestamp", 1603124267178L);
+        previousStart.put("sequenceNumber", 13);
+        previousStart.put("synchronizationId", "synchronizationId");
         ObjectNode oneOfPreviousPackets = JsonMapper.getInstance().createObjectNode();
         oneOfPreviousPackets.put("type", "positions");
         oneOfPreviousPackets.put("accountId", "accountId");
         oneOfPreviousPackets.put("sequenceTimestamp", 1603124267188L);
         oneOfPreviousPackets.put("sequenceNumber", 15);
-        ObjectNode thisSpecifications = JsonMapper.getInstance().createObjectNode();
-        thisSpecifications.put("type", "specifications");
-        thisSpecifications.put("accountId", "accountId");
-        thisSpecifications.put("sequenceTimestamp", 1603124267198L);
-        thisSpecifications.put("sequenceNumber", 1);
-        thisSpecifications.put("synchronizationId", "synchronizationId");
+        ObjectNode thisStart = JsonMapper.getInstance().createObjectNode();
+        thisStart.put("type", "synchronizationStarted");
+        thisStart.put("accountId", "accountId");
+        thisStart.put("sequenceTimestamp", 1603124267198L);
+        thisStart.put("sequenceNumber", 1);
+        thisStart.put("synchronizationId", "synchronizationId");
         ObjectNode thisSecondPacket = JsonMapper.getInstance().createObjectNode();
         thisSecondPacket.put("type", "prices");
         thisSecondPacket.put("accountId", "accountId");
         thisSecondPacket.put("sequenceTimestamp", 1603124268198L);
         thisSecondPacket.put("sequenceNumber", 2);
-        assertThat(packetOrderer.restoreOrder(previousSpecifications))
-            .usingRecursiveComparison().isEqualTo(Lists.list(previousSpecifications));
+        assertThat(packetOrderer.restoreOrder(previousStart))
+            .usingRecursiveComparison().isEqualTo(Lists.list(previousStart));
         assertThat(packetOrderer.restoreOrder(oneOfPreviousPackets))
             .usingRecursiveComparison().isEqualTo(Lists.emptyList());
         assertThat(packetOrderer.restoreOrder(thisSecondPacket))
             .usingRecursiveComparison().isEqualTo(Lists.emptyList());
-        assertThat(packetOrderer.restoreOrder(thisSpecifications))
-            .usingRecursiveComparison().isEqualTo(Lists.list(thisSpecifications, thisSecondPacket));
+        assertThat(packetOrderer.restoreOrder(thisStart))
+            .usingRecursiveComparison().isEqualTo(Lists.list(thisStart, thisSecondPacket));
     }
     
     /**
      * Tests {@link PacketOrderer#restoreOrder(JsonNode)}
      */
     @Test
-    void testFiltersOutPacketsFromPreviousSynchronizationAttemptThatDoesNotIncludeSpecifications() {
+    void testFiltersOutPacketsFromPreviousSynchronizationAttemptThatDoesNotIncludeSynchronizationStartedPacket() {
         ObjectNode oneOfPreviousPackets = JsonMapper.getInstance().createObjectNode();
         oneOfPreviousPackets.put("type", "positions");
         oneOfPreviousPackets.put("accountId", "accountId");
         oneOfPreviousPackets.put("sequenceTimestamp", 1603124267188L);
         oneOfPreviousPackets.put("sequenceNumber", 15);
-        ObjectNode thisSpecifications = JsonMapper.getInstance().createObjectNode();
-        thisSpecifications.put("type", "specifications");
-        thisSpecifications.put("accountId", "accountId");
-        thisSpecifications.put("sequenceTimestamp", 1603124267198L);
-        thisSpecifications.put("sequenceNumber", 16);
-        thisSpecifications.put("synchronizationId", "synchronizationId");
+        ObjectNode thisStart = JsonMapper.getInstance().createObjectNode();
+        thisStart.put("type", "synchronizationStarted");
+        thisStart.put("accountId", "accountId");
+        thisStart.put("sequenceTimestamp", 1603124267198L);
+        thisStart.put("sequenceNumber", 16);
+        thisStart.put("synchronizationId", "synchronizationId");
         ObjectNode thisSecondPacket = JsonMapper.getInstance().createObjectNode();
         thisSecondPacket.put("type", "prices");
         thisSecondPacket.put("accountId", "accountId");
@@ -149,8 +149,8 @@ class PacketOrdererTest {
             .usingRecursiveComparison().isEqualTo(Lists.emptyList());
         assertThat(packetOrderer.restoreOrder(thisSecondPacket))
             .usingRecursiveComparison().isEqualTo(Lists.emptyList());
-        assertThat(packetOrderer.restoreOrder(thisSpecifications))
-            .usingRecursiveComparison().isEqualTo(Lists.list(thisSpecifications, thisSecondPacket));
+        assertThat(packetOrderer.restoreOrder(thisStart))
+            .usingRecursiveComparison().isEqualTo(Lists.list(thisStart, thisSecondPacket));
     }
     
     /**
@@ -158,19 +158,19 @@ class PacketOrdererTest {
      */
     @Test
     void testPassesThroughDuplicatePackets() {
-        ObjectNode previousSpecifications = JsonMapper.getInstance().createObjectNode();
-        previousSpecifications.put("type", "specifications");
-        previousSpecifications.put("accountId", "accountId");
-        previousSpecifications.put("sequenceTimestamp", 1603124267178L);
-        previousSpecifications.put("sequenceNumber", 16);
-        previousSpecifications.put("synchronizationId", "synchronizationId");
+        ObjectNode previousStart = JsonMapper.getInstance().createObjectNode();
+        previousStart.put("type", "synchronizationStarted");
+        previousStart.put("accountId", "accountId");
+        previousStart.put("sequenceTimestamp", 1603124267178L);
+        previousStart.put("sequenceNumber", 16);
+        previousStart.put("synchronizationId", "synchronizationId");
         ObjectNode secondPacket = JsonMapper.getInstance().createObjectNode();
         secondPacket.put("type", "prices");
         secondPacket.put("accountId", "accountId");
         secondPacket.put("sequenceTimestamp", 1603124268198L);
         secondPacket.put("sequenceNumber", 17);
-        assertThat(packetOrderer.restoreOrder(previousSpecifications))
-            .usingRecursiveComparison().isEqualTo(Lists.list(previousSpecifications));
+        assertThat(packetOrderer.restoreOrder(previousStart))
+            .usingRecursiveComparison().isEqualTo(Lists.list(previousStart));
         assertThat(packetOrderer.restoreOrder(secondPacket))
             .usingRecursiveComparison().isEqualTo(Lists.list(secondPacket));
         assertThat(packetOrderer.restoreOrder(secondPacket))
@@ -183,7 +183,7 @@ class PacketOrdererTest {
     @Test
     void testReturnsInOrderPacketsImmediately() {
         ObjectNode firstPacket = JsonMapper.getInstance().createObjectNode();
-        firstPacket.put("type", "specifications");
+        firstPacket.put("type", "synchronizationStarted");
         firstPacket.put("accountId", "accountId");
         firstPacket.put("sequenceTimestamp", 1603124267178L);
         firstPacket.put("sequenceNumber", 13);
@@ -212,7 +212,7 @@ class PacketOrdererTest {
     @Test
     void testCallsOnOutOfOutOrderListenerOnlyOncePerSynchronizationAttempt() throws InterruptedException {
         ObjectNode firstPacket = JsonMapper.getInstance().createObjectNode();
-        firstPacket.put("type", "specifications");
+        firstPacket.put("type", "synchronizationStarted");
         firstPacket.put("accountId", "accountId");
         firstPacket.put("sequenceTimestamp", 1603124267178L);
         firstPacket.put("sequenceNumber", 13);

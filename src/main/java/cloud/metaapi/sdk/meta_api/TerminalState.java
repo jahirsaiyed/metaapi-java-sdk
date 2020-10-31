@@ -32,7 +32,7 @@ public class TerminalState extends SynchronizationListener {
     private List<MetatraderSymbolSpecification> specifications = new ArrayList<>();
     private Map<String, MetatraderSymbolSpecification> specificationsBySymbol = new HashMap<>();
     private Map<String, MetatraderSymbolPrice> pricesBySymbol = new HashMap<>();
-    private Optional<MetatraderAccountInformation> accountInformation = Optional.empty();
+    private MetatraderAccountInformation accountInformation = null;
     private Timer statusTimer = null;
     
     /**
@@ -56,7 +56,7 @@ public class TerminalState extends SynchronizationListener {
      * @return local copy of account information
      */
     public Optional<MetatraderAccountInformation> getAccountInformation() {
-        return accountInformation;
+        return Optional.ofNullable(accountInformation);
     }
     
     /**
@@ -133,9 +133,23 @@ public class TerminalState extends SynchronizationListener {
         return CompletableFuture.completedFuture(null);
     }
 
+    /**
+     * Invoked when MetaTrader terminal state synchronization is started
+     * @return completable future which resolves when the asynchronous event is processed
+     */
+    public CompletableFuture<Void> onSynchronizationStarted() {
+        accountInformation = null;
+        positions.clear();
+        orders.clear();
+        specifications.clear();
+        specificationsBySymbol.clear();
+        pricesBySymbol.clear();
+        return CompletableFuture.completedFuture(null);
+    }
+    
     @Override
     public CompletableFuture<Void> onAccountInformationUpdated(MetatraderAccountInformation accountInformation) {
-        this.accountInformation = Optional.of(accountInformation);
+        this.accountInformation = accountInformation;
         return CompletableFuture.completedFuture(null);
     }
     
@@ -235,10 +249,10 @@ public class TerminalState extends SynchronizationListener {
                     || order.type == OrderType.ORDER_TYPE_BUY_STOP_LIMIT
                 ? price.ask : price.bid);
             }
-            if (accountInformation.isPresent()) {
+            if (accountInformation != null) {
                 double profitSum = 0;
                 for (MetatraderPosition position : positions) profitSum += position.profit;
-                accountInformation.get().equity = accountInformation.get().balance + profitSum;
+                accountInformation.equity = accountInformation.balance + profitSum;
             }
         }
         return CompletableFuture.completedFuture(null);

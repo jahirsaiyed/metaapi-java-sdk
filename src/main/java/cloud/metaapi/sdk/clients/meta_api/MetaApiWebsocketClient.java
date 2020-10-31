@@ -855,7 +855,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             try {
                 List<JsonNode> packets = packetOrderer.restoreOrder(jsonMapper.readTree(jsonPacket));
                 for (JsonNode data : packets) {
-                    List<SynchronizationListener> listeners = synchronizationListeners.get(data.get("accountId").asText());
+                    String accountId = data.get("accountId").asText();
+                    List<SynchronizationListener> listeners = synchronizationListeners.get(accountId);
                     if (listeners == null || listeners.isEmpty()) return;
                     String type = data.get("type").asText();
                     if (type.equals("authenticated")) {
@@ -872,6 +873,16 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                         for (SynchronizationListener listener : listeners) {
                             completableFutures.add(listener.onDisconnected().exceptionally(e -> {
                                 logger.error("Failed to notify listener about " + type + " event", e);
+                                return null;
+                            }));
+                        }
+                        CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                    } else if (type.equals("synchronizationStarted")) {
+                        List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                        for (SynchronizationListener listener : listeners) {
+                            completableFutures.add(listener.onSynchronizationStarted().exceptionally(e -> {
+                                logger.error(accountId + ": Failed to notify listener about synchronization "
+                                    + "started event", e);
                                 return null;
                             }));
                         }

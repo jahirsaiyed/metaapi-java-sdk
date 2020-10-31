@@ -25,6 +25,11 @@ public class SynchronizationListenerMock extends SynchronizationListener {
      */
     public CompletableFuture<Boolean> onBrokerConnectionStatusChangedResult = new CompletableFuture<>();
     /**
+     * Completable future which is completed when onSynchronizationStarted event is handled 
+     * resulting with event received data
+     */
+    public CompletableFuture<Void> onSynchronizationStartedResult = new CompletableFuture<>();
+    /**
      * Completable future which is completed when onAccountInformationUpdated event is handled 
      * resulting with event received data
      */
@@ -106,6 +111,12 @@ public class SynchronizationListenerMock extends SynchronizationListener {
         return CompletableFuture.completedFuture(null);
     }
 
+    @Override
+    public CompletableFuture<Void> onSynchronizationStarted() {
+        this.onSynchronizationStartedResult.complete(null);
+        return CompletableFuture.completedFuture(null);
+    }
+    
     @Override
     public CompletableFuture<Void> onAccountInformationUpdated(MetatraderAccountInformation accountInformation) {
         this.onAccountInformationUpdatedResult.complete(accountInformation);
