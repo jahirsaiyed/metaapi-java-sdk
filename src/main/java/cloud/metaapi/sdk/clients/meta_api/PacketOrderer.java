@@ -175,10 +175,12 @@ public class PacketOrderer {
                     String accountId = packet.accountId;
                     if (!isOutOfOrderEmitted.getOrDefault(accountId, false)) {
                         isOutOfOrderEmitted.put(accountId, true);
-                        long expectedSequenceNumber = sequenceNumberByAccount.containsKey(accountId) ?
-                            (sequenceNumberByAccount.get(accountId).get() + 1) : -1;
-                        outOfOrderListener.onOutOfOrderPacket(packet.accountId, expectedSequenceNumber,
-                            packet.sequenceNumber, packet.packet, packet.receivedAt);
+                        // Do not emit onOutOfOrderPacket for packets that come before synchronizationStarted
+                        if (sequenceNumberByAccount.containsKey(accountId)) {
+                            outOfOrderListener.onOutOfOrderPacket(packet.accountId,
+                                sequenceNumberByAccount.get(accountId).get() + 1,
+                                packet.sequenceNumber, packet.packet, packet.receivedAt);
+                        }
                     }
                 }
             }

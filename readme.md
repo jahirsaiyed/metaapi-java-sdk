@@ -20,11 +20,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>9.0.0</version>
+  <version>9.1.0</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/9.0.0/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/9.1.0/jar).
 
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.
@@ -334,6 +334,30 @@ System.out.println(connection.cancelOrder("46870472").get());
 // if you need to, check the extra result information in stringCode and numericCode properties of the response
 MetatraderTradeResponse result = connection.createMarketBuyOrder("GBPUSD", 0.07, 0.9, 2.0, options).get();
 System.out.println("Trade successful, result code is " + result.stringCode);
+```
+
+## Managing MetaTrader demo accounts via API
+Please note that not all MT4/MT5 servers allows you to create demo accounts using the method below.
+### Create a MetaTrader 4 demo account
+```java
+MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
+  .createMT4DemoAccount(new NewMT4DemoAccount() {{
+  balance = 100000;
+  email = "example@example.com";
+  leverage = 100;
+  serverName = "Exness-Trial4";
+}}, provisioningProfile.getId()).get();
+```
+
+### Create a MetaTrader 5 demo account
+```java
+MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
+  .createMT5DemoAccount(new NewMT5DemoAccount() {{
+  balance = 100000;
+  email = "example@example.com";
+  leverage = 100;
+  serverName = "ICMarketsSC-Demo";
+}}, provisioningProfile.getId()).get();
 ```
 
 ## CopyFactory copy trading API (experimental)

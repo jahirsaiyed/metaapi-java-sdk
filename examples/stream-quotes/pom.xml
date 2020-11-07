@@ -37,7 +37,7 @@
     <dependency>
       <groupId>cloud.metaapi.sdk</groupId>
       <artifactId>metaapi-java-sdk</artifactId>
-      <version>9.0.0</version>
+      <version>9.1.0</version>
     </dependency>
   </dependencies>
 </project>

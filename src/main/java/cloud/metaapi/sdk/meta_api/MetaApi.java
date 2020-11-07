@@ -7,6 +7,7 @@ import cloud.metaapi.sdk.clients.HttpClient;
 import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
+import cloud.metaapi.sdk.clients.meta_api.MetatraderDemoAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
 import cloud.metaapi.sdk.clients.models.ValidationDetails;
 
@@ -19,6 +20,7 @@ public class MetaApi {
     private ProvisioningProfileApi provisioningProfileApi;
     private MetatraderAccountApi metatraderAccountApi;
     private ConnectionRegistry connectionRegistry;
+    private MetatraderDemoAccountApi metatraderDemoAccountApi;
     
     /**
      * Constructs MetaApi class instance. Domain is {@code agiliumtrade.agiliumtrade.ai}, application is {@code MetaApi},
@@ -77,6 +79,8 @@ public class MetaApi {
         metatraderAccountApi = new MetatraderAccountApi(
             new MetatraderAccountClient(httpClient, token, domain),
             metaApiWebsocketClient, connectionRegistry);
+        metatraderDemoAccountApi = new MetatraderDemoAccountApi(
+            new MetatraderDemoAccountClient(httpClient, token, domain));
     }
     
     /**
@@ -93,6 +97,14 @@ public class MetaApi {
      */
     public MetatraderAccountApi getMetatraderAccountApi() {
         return metatraderAccountApi;
+    }
+    
+    /**
+     * Returns MetaTrader demo account API
+     * @return MetaTrader demo account API
+     */
+    public MetatraderDemoAccountApi getMetatraderDemoAccountApi() {
+        return metatraderDemoAccountApi;
     }
     
     /**

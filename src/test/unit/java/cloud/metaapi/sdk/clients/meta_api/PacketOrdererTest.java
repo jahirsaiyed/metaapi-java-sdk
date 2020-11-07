@@ -1,9 +1,11 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.assertj.core.util.Lists;
@@ -235,6 +237,7 @@ class PacketOrdererTest {
      * Tests {@link PacketOrderer#restoreOrder(JsonNode)}
      */
     @Test
+    @SuppressWarnings("unchecked")
     void testCallsOnOutOfOutOrderListenerIfTheFirstPacketInWaitListIsTimedOut() throws Exception {
         Packet timedOutPacket = packetOrderer.new Packet() {{
             accountId = "accountId";
@@ -248,12 +251,14 @@ class PacketOrdererTest {
             packet = JsonMapper.getInstance().createObjectNode();
             receivedAt = new IsoTime("3015-10-19T09:58:56.000Z");
         }};
-        @SuppressWarnings("unchecked")
+        Map<String, AtomicLong> sequenceNumberByAccount = (Map<String, AtomicLong>) FieldUtils
+            .readField(packetOrderer, "sequenceNumberByAccount", true);
+        sequenceNumberByAccount.put("accountId", new AtomicLong(1));
         Map<String, List<Packet>> waitLists = (Map<String, List<Packet>>) FieldUtils
             .readField(packetOrderer, "packetsByAccountId", true);
         waitLists.put("accountId", Lists.list(timedOutPacket, notTimedOutPacket));
         Thread.sleep(3000);
-        Mockito.verify(outOfOrderListener, Mockito.times(1)).onOutOfOrderPacket("accountId", -1, 11,
+        Mockito.verify(outOfOrderListener, Mockito.times(1)).onOutOfOrderPacket("accountId", 2, 11,
             timedOutPacket.packet, timedOutPacket.receivedAt);
     }
     
@@ -261,6 +266,7 @@ class PacketOrdererTest {
      * Tests {@link PacketOrderer#restoreOrder(JsonNode)}
      */
     @Test
+    @SuppressWarnings("unchecked")
     void testDoesNotCallOnOutOfOutOrderListenerIfTheFirstPacketInWaitListIsNotTimedOut() throws Exception {
         Packet timedOutPacket = packetOrderer.new Packet() {{
             accountId = "accountId";
@@ -274,12 +280,85 @@ class PacketOrdererTest {
             packet = JsonMapper.getInstance().createObjectNode();
             receivedAt = new IsoTime("3015-10-19T09:58:56.000Z");
         }};
-        @SuppressWarnings("unchecked")
+        Map<String, AtomicLong> sequenceNumberByAccount = (Map<String, AtomicLong>) FieldUtils
+            .readField(packetOrderer, "sequenceNumberByAccount", true);
+            sequenceNumberByAccount.put("accountId", new AtomicLong(1));
         Map<String, List<Packet>> waitLists = (Map<String, List<Packet>>) FieldUtils
             .readField(packetOrderer, "packetsByAccountId", true);
         waitLists.put("accountId", Lists.list(notTimedOutPacket, timedOutPacket));
         Thread.sleep(3000);
         Mockito.verify(outOfOrderListener, Mockito.times(0)).onOutOfOrderPacket(Mockito.anyString(), 
             Mockito.anyInt(), Mockito.anyInt(), Mockito.any(JsonNode.class), Mockito.any(IsoTime.class));
+    }
+    
+    /**
+     * Tests {@link PacketOrderer#restoreOrder(JsonNode)}
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void testDoesNotCallOnOutOfOutOrderListenerForPacketsThatComeBeforeSynchronizationStart() throws Exception {
+        Packet outOfOrderPacket = packetOrderer.new Packet() {{
+            accountId = "accountId";
+            sequenceNumber = 11;
+            packet = JsonMapper.getInstance().createObjectNode();
+            receivedAt = new IsoTime("2010-10-19T09:58:56.000Z");
+        }};
+        
+        // There were no synchronization start packets        
+        Map<String, AtomicLong> sequenceNumberByAccount = (Map<String, AtomicLong>) FieldUtils
+            .readField(packetOrderer, "sequenceNumberByAccount", true);
+            sequenceNumberByAccount.remove("accountId");
+        
+        Map<String, List<Packet>> waitLists = (Map<String, List<Packet>>) FieldUtils
+            .readField(packetOrderer, "packetsByAccountId", true);
+        waitLists.put("accountId", Lists.list(outOfOrderPacket));
+        Thread.sleep(1000);
+        Mockito.verify(outOfOrderListener, Mockito.times(0)).onOutOfOrderPacket(Mockito.anyString(), 
+            Mockito.anyInt(), Mockito.anyInt(), Mockito.any(JsonNode.class), Mockito.any(IsoTime.class));
+    }
+    
+    /**
+     * Tests {@link PacketOrderer#restoreOrder(JsonNode)}
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void testMaintainsAFixedQueueOfWaitList() throws Exception {
+        FieldUtils.writeField(packetOrderer, "waitListSizeLimit", 1, true);
+        ObjectNode secondPacket = JsonMapper.getInstance().createObjectNode();
+        secondPacket.put("type", "prices");
+        secondPacket.put("sequenceTimestamp", 1603124267180L);
+        secondPacket.put("sequenceNumber", 14);
+        secondPacket.put("accountId", "accountId");
+        ObjectNode thirdPacket = JsonMapper.getInstance().createObjectNode();
+        thirdPacket.put("type", "accountInformation");
+        thirdPacket.put("sequenceTimestamp", 1603124267187L);
+        thirdPacket.put("sequenceNumber", 15);
+        thirdPacket.put("accountId", "accountId");
+        Map<String, List<Packet>> packetsByAccountId = (Map<String, List<Packet>>) FieldUtils
+            .readField(packetOrderer, "packetsByAccountId", true); 
+        packetOrderer.restoreOrder(secondPacket);
+        assertEquals(1, packetsByAccountId.get("accountId").size());
+        assertEquals(secondPacket, packetsByAccountId.get("accountId").get(0).packet);
+        packetOrderer.restoreOrder(thirdPacket);
+        assertEquals(1, packetsByAccountId.get("accountId").size());
+        assertEquals(thirdPacket, packetsByAccountId.get("accountId").get(0).packet);
+    }
+    
+    /**
+     * Tests {@link PacketOrderer#restoreOrder(JsonNode)}
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void testCountsStartPacketsWithUndefinedSynchronizationIdAsOutOfOrder() throws Exception {
+        ObjectNode startPacket = JsonMapper.getInstance().createObjectNode();
+        startPacket.put("type", "synchronizationStarted");
+        startPacket.put("sequenceTimestamp", 1603124267180L);
+        startPacket.put("sequenceNumber", 16);
+        startPacket.put("accountId", "accountId");
+        Map<String, List<Packet>> packetsByAccountId = (Map<String, List<Packet>>) FieldUtils
+            .readField(packetOrderer, "packetsByAccountId", true); 
+        assertEquals(0, packetOrderer.restoreOrder(startPacket).size());
+        assertEquals(1, packetsByAccountId.get("accountId").size());
+        assertEquals(startPacket, packetsByAccountId.get("accountId").get(0).packet);
     }
 }
