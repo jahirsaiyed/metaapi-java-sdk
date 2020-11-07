@@ -113,9 +113,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     public void onOutOfOrderPacket(String accountId, long expectedSequenceNumber, 
         long actualSequenceNumber, JsonNode packet, IsoTime receivedAt) {
         logger.error("MetaApi websocket client received an out of order packet type "
-            + packet.get("type").asText() + " for account id " + accountId + ". " + (expectedSequenceNumber != -1
-            ? "Expected s/n " + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber
-            : "Packet with s/n " + actualSequenceNumber + " has come before initial synchronization packet"));
+            + packet.get("type").asText() + " for account id " + accountId + ". Expected s/n " 
+            + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber);
         subscribe(accountId);
     }
     
