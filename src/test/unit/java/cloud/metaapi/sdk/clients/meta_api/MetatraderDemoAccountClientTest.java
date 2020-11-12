@@ -1,8 +1,10 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,11 +43,13 @@ class MetatraderDemoAccountClientTest {
             login = "12345";
             password = "qwerty";
             serverName = "HugosWay-Demo3";
+            investorPassword = "qwerty";
         }};
         NewMT4DemoAccount newAccount = new NewMT4DemoAccount() {{
             balance = 10;
             email = "test@test.com";
             leverage = 15;
+            serverName = "server";
         }};
         httpClient.setRequestMock((actualOptions) -> {
             try {
@@ -65,6 +69,23 @@ class MetatraderDemoAccountClientTest {
     }
     
     /**
+     * Tests {@link MetatraderDemoAccountClient#createMT4DemoAccount(String, NewMT4DemoAccount)}
+     */
+    @Test
+    void testDoesNotCreateMetatrader4AccountViaApiWithAccountToken() throws Exception {
+        demoAccountClient = new MetatraderDemoAccountClient(httpClient, "token");
+        try {
+            demoAccountClient.createMT4DemoAccount("profileId1", null).get();
+        } catch (ExecutionException e) {
+            assertEquals(
+                "You can not invoke createMT4DemoAccount method, because you have connected with account access token. "
+                + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
+                e.getCause().getMessage()
+            );
+        };
+    }
+    
+    /**
      * Tests {@link MetatraderDemoAccountClient#createMT5DemoAccount(String, NewMT5DemoAccount)}
      */
     @Test
@@ -73,6 +94,7 @@ class MetatraderDemoAccountClientTest {
             login = "12345";
             password = "qwerty";
             serverName = "HugosWay-Demo3";
+            investorPassword = "qwerty";
         }};
         NewMT5DemoAccount newAccount = new NewMT5DemoAccount() {{
             balance = 10;
@@ -95,5 +117,22 @@ class MetatraderDemoAccountClientTest {
         });
         MetatraderDemoAccountDto account = demoAccountClient.createMT5DemoAccount("profileId2", newAccount).join();
         assertThat(account).usingRecursiveComparison().isEqualTo(expected);
+    }
+    
+    /**
+     * Tests {@link MetatraderDemoAccountClient#createMT5DemoAccount(String, NewMT4DemoAccount)}
+     */
+    @Test
+    void testDoesNotCreateMetatrader5AccountViaApiWithAccountToken() throws Exception {
+        demoAccountClient = new MetatraderDemoAccountClient(httpClient, "token");
+        try {
+            demoAccountClient.createMT5DemoAccount("profileId1", null).get();
+        } catch (ExecutionException e) {
+            assertEquals(
+                "You can not invoke createMT5DemoAccount method, because you have connected with account access token. "
+                + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
+                e.getCause().getMessage()
+            );
+        };
     }
 }

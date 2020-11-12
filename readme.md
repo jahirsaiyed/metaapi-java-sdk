@@ -336,28 +336,38 @@ MetatraderTradeResponse result = connection.createMarketBuyOrder("GBPUSD", 0.07,
 System.out.println("Trade successful, result code is " + result.stringCode);
 ```
 
+## Monitoring account connection health and uptime
+You can monitor account connection health using MetaApiConnection.healthMonitor API.
+```java
+ConnectionHealthMonitor monitor = connection.getHealthMonitor();
+// retrieve detailed connection health status
+System.out.println(monitor.getHealthStatus());
+// retrieve account connection update measured over last 7 days
+System.out.println(monitor.getUptime());
+```
+
 ## Managing MetaTrader demo accounts via API
 Please note that not all MT4/MT5 servers allows you to create demo accounts using the method below.
 ### Create a MetaTrader 4 demo account
 ```java
 MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
-  .createMT4DemoAccount(new NewMT4DemoAccount() {{
+  .createMT4DemoAccount(provisioningProfile.getId(), new NewMT4DemoAccount() {{
   balance = 100000;
   email = "example@example.com";
   leverage = 100;
   serverName = "Exness-Trial4";
-}}, provisioningProfile.getId()).get();
+}}).get();
 ```
 
 ### Create a MetaTrader 5 demo account
 ```java
 MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
-  .createMT5DemoAccount(new NewMT5DemoAccount() {{
+  .createMT5DemoAccount(provisioningProfile.getId(), new NewMT5DemoAccount() {{
   balance = 100000;
   email = "example@example.com";
   leverage = 100;
   serverName = "ICMarketsSC-Demo";
-}}, provisioningProfile.getId()).get();
+}}).get();
 ```
 
 ## CopyFactory copy trading API (experimental)
@@ -392,6 +402,8 @@ Features supported:
 - synchronize subscriber account with strategy providers
 - monitor trading history
 - calculate trade copying commissions for account managers
+
+Please note that trade copying to MT5 netting accounts is not supported in the current API version
 
 ### Configuring trade copying
 

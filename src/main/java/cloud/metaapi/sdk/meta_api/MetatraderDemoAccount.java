@@ -40,4 +40,12 @@ public class MetatraderDemoAccount {
    public String getServerName() {
        return data.serverName;
    }
+   
+   /**
+    * Returns account investor password
+    * @return account investor password
+    */
+   public String getInvestorPassword() {
+       return data.investorPassword;
+   }
 }

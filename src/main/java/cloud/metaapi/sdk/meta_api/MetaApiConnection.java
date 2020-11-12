@@ -2,12 +2,16 @@ package cloud.metaapi.sdk.meta_api;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
@@ -46,6 +50,11 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     private String lastDisconnectedSynchronizationId = null;
     private TerminalState terminalState;
     private HistoryStorage historyStorage;
+    private ConnectionHealthMonitor healthMonitor;
+    private HashSet<String> subscriptions = new HashSet<>();
+    private String shouldResynchronize;
+    private int synchronizationRetryIntervalInSeconds;
+    private boolean isSynchronized = false;
     private boolean closed = false;
     
     /**
@@ -88,9 +97,11 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
         this.terminalState = new TerminalState();
         this.historyStorage = historyStorage != null 
             ? historyStorage : new MemoryHistoryStorage(account.getId(), connectionRegistry.getApplication());
+        this.healthMonitor = new ConnectionHealthMonitor(this);
         websocketClient.addSynchronizationListener(account.getId(), this);
         websocketClient.addSynchronizationListener(account.getId(), this.terminalState);
         websocketClient.addSynchronizationListener(account.getId(), this.historyStorage);
+        websocketClient.addSynchronizationListener(account.getId(), this.healthMonitor);
         websocketClient.addReconnectListener(this);
     }
     
@@ -546,8 +557,17 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      */
     public CompletableFuture<Void> subscribeToMarketData(String symbol) {
         return CompletableFuture.runAsync(() -> {
+            subscriptions.add(symbol);
             websocketClient.subscribeToMarketData(account.getId(), symbol).join();
         });
+    }
+    
+    /**
+     * Returns list of the symbols connection is subscribed to
+     * @return list of the symbols connection is subscribed to
+     */
+    public List<String> getSubscribedSymbols() {
+        return new ArrayList<>(subscriptions);
     }
     
     /**
@@ -605,12 +625,11 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     @Override
     public CompletableFuture<Void> onConnected() {
         return CompletableFuture.runAsync(() -> {
-            try {
-                synchronize().join();
-            } catch (CompletionException e) {
-                logger.error("MetaApi websocket client for account " + account.getId()
-                    + " failed to synchronize", e.getCause());
-            }
+            String key = RandomStringUtils.randomAlphanumeric(32);
+            shouldResynchronize = key;
+            synchronizationRetryIntervalInSeconds = 1;
+            isSynchronized = false;
+            ensureSynchronized(key);
         });
     }
 
@@ -618,6 +637,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     public CompletableFuture<Void> onDisconnected() {
         lastDisconnectedSynchronizationId = lastSynchronizationId;
         lastSynchronizationId = null;
+        shouldResynchronize = null;
+        isSynchronized = false;
         return CompletableFuture.completedFuture(null);
     }
     
@@ -711,6 +732,54 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
             websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
             connectionRegistry.remove(account.getId());
             closed = true;
+        }
+    }
+    
+    /**
+     * Returns synchronization status
+     * @return synchronization status
+     */
+    public boolean isSynchronized() {
+        return isSynchronized;
+    }
+    
+    /**
+     * Returns MetaApi account
+     * @return MetaApi account
+     */
+    public MetatraderAccount getAccount() {
+        return account;
+    }
+    
+    /**
+     * Returns connection health monitor instance
+     * @return connection health monitor instance
+     */
+    public ConnectionHealthMonitor getHealthMonitor() {
+        return healthMonitor;
+    }
+    
+    private void ensureSynchronized(String key) {
+        try {
+            synchronize().join();
+            for (String symbol : subscriptions) {
+                subscribeToMarketData(symbol);
+            }
+            isSynchronized = true;
+        } catch (CompletionException e) {
+            logger.error("MetaApi websocket client for account " + account.getId()
+                + " failed to synchronize", e.getCause());
+            if (shouldResynchronize.equals(key)) {
+                Timer retryTimer = new Timer();
+                MetaApiConnection self = this;
+                retryTimer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        self.ensureSynchronized(key);
+                    }
+                }, 1000 * synchronizationRetryIntervalInSeconds);
+                synchronizationRetryIntervalInSeconds = Math.min(synchronizationRetryIntervalInSeconds * 2, 300);
+            }
         }
     }
     

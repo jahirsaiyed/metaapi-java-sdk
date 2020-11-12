@@ -1,5 +1,7 @@
 package cloud.metaapi.sdk.util;
 
+import java.time.Instant;
+
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.meta_api.ConnectionRegistry;
@@ -18,6 +20,7 @@ public class ServiceProvider {
     private static HistoryFileManager historyFileManagerMock = null;
     private static MetaApiConnection metaApiConnectionMock = null;
     private static MetaApiConnectionProvider metaApiConnectionMockProvider = null;
+    private static Instant nowInstantMock = null;
     
     /**
      * Interface for creating {@link MetaApiConnection}. Using this interface it is possible to set MetaApiConnection
@@ -105,5 +108,24 @@ public class ServiceProvider {
     public static void setMetApiConnectionMock(MetaApiConnectionProvider mockProvider) {
         metaApiConnectionMockProvider = mockProvider;
         metaApiConnectionMock = null;
+    }
+    
+    /**
+     * Returns instant with current time or a mock if it is set
+     * @return instant with current time or a mock if it is set
+     * @see #setNowInstantMock(Instant)
+     */
+    public static Instant getNow() {
+        if (nowInstantMock != null) return nowInstantMock;
+        return Instant.now();
+    }
+    
+    /**
+     * Sets instant with current time that will be used for provided by this class instead of real instant.
+     * If {@code null} is set, the mock provider is removed and the object will be created as normal.
+     * @param instant mocked instant or {@code null}
+     */
+    public static void setNowInstantMock(Instant instant) {
+        nowInstantMock = instant;
     }
 }

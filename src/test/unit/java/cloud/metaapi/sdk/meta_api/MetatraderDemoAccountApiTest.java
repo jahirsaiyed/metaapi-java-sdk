@@ -36,11 +36,13 @@ class MetatraderDemoAccountApiTest {
             balance = 10;
             email = "test@test.com";
             leverage = 15;
+            serverName = "server";
         }};
         MetatraderDemoAccountDto accountDto = new MetatraderDemoAccountDto() {{
             login = "12345";
             password = "qwerty";
             serverName = "HugosWay-Demo3";
+            investorPassword = "qwerty";
         }};
         Mockito.when(client.createMT4DemoAccount("profileId1", newAccountData))
             .thenReturn(CompletableFuture.completedFuture(accountDto));
@@ -64,6 +66,7 @@ class MetatraderDemoAccountApiTest {
             login = "12345";
             password = "qwerty";
             serverName = "HugosWay-Demo3";
+            investorPassword = "qwerty";
         }};
         Mockito.when(client.createMT5DemoAccount("profileId2", newAccountData))
             .thenReturn(CompletableFuture.completedFuture(accountDto));
