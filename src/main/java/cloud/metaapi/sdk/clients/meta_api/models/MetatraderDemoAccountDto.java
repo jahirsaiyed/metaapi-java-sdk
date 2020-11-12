@@ -16,4 +16,8 @@ public class MetatraderDemoAccountDto {
      * MetaTrader server name
      */
     public String serverName;
+    /**
+     * Account investor (read-only) password
+     */
+    public String investorPassword;
 }

@@ -121,35 +121,35 @@ class TradingClientTest {
     }
     
     /**
-     * Tests {@link TradingClient#resetStopout(String, String)}
+     * Tests {@link TradingClient#resetStopouts(String, String, String)}
      */
     @Test
-    void testResetsStopout() throws Exception {
+    void testResetsStopouts() {
         httpClient.setRequestMock((actualOptions) -> {
             HttpRequestOptions expectedOptions = new HttpRequestOptions(
                 copyFactoryApiUrl + "/users/current/accounts/"
                     + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/"
-                    + "stopouts/daily-equity/reset", Method.POST);
+                    + "strategies-subscribed/ABCD/stopouts/daily-equity/reset", Method.POST);
             expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
             assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
             return CompletableFuture.completedFuture(null);
         });
-        tradingClient
-            .resetStopout("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "daily-equity").get();
+        tradingClient.resetStopouts("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "ABCD", "daily-equity").join();
     }
     
     /**
-     * Tests {@link TradingClient#resetStopout(String, String)}
+     * Tests {@link TradingClient#resetStopouts(String, String, String)}
      */
     @Test
-    void testDoesResetStopoutWithAccountToken() throws Exception {
+    void testDoesNotResetStopoutsWithAccountToken() throws Exception {
         tradingClient = new TradingClient(httpClient, "token");
         try {
-            tradingClient
-                .resetStopout("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "daily-equity").get();
+            tradingClient.resetStopouts("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "ABCD", "daily-equity").get();
         } catch (ExecutionException e) {
             assertEquals(
-                "You can not invoke resetStopout method, because you have connected with account access token. "
+                "You can not invoke resetStopouts method, because you have connected with account access token. "
                 + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
                 e.getCause().getMessage()
             );

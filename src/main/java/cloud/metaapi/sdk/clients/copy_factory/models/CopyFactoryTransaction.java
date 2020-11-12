@@ -65,6 +65,14 @@ public class CopyFactoryTransaction {
      */
     public Double quantity;
     /**
+     * Commission paid by provider to underlying providers, or {@code null}
+     */
+    public Double incomingProviderCommission;
+    /**
+     * Platform commission paid by provider to underlying providers, or {@code null}
+     */
+    public Double incomingPlatformCommission;
+    /**
      * Trade lot price, or {@code null}
      */
     public Double lotPrice;

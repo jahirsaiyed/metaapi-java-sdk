@@ -35,7 +35,7 @@ import io.github.cdimascio.dotenv.Dotenv;
  */
 class DoubleSynchronizationTest {
 
-    private Dotenv dotenv = Dotenv.load();
+    private Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
     private String token = dotenv.get("TOKEN");
     private String login = dotenv.get("LOGIN");
     private String password = dotenv.get("PASSWORD");
@@ -54,7 +54,7 @@ class DoubleSynchronizationTest {
 
     @Test
     void testDoesNotCorruptFilesAfterSimultaneousSynchronization() throws ValidationException {
-        MetaApi api = new MetaApi(token);
+        MetaApi api = new MetaApi(token, "MetaApi", "project-stock.agiliumlabs.cloud");
         final ProvisioningProfileApi profileApi = api.getProvisioningProfileApi();
         final MetatraderAccountApi accountApi = api.getMetatraderAccountApi();
         if (token != null) {

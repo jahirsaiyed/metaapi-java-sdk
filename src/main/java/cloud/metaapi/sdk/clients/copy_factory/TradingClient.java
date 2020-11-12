@@ -69,17 +69,19 @@ public class TradingClient extends MetaApiClient {
     }
     
     /**
-     * Resets account stopout. See
-     * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/post_users_current_accounts_accountId_stopouts_reason_reset
+     * Resets strategy stopouts. See
+     * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/post_users_current_accounts_accountId_
+     * strategies_subscribed_strategyId_stopouts_reason_reset
      * @param accountId account id
+     * @param strategyId strategy id
      * @param reason stopout reason to reset. One of yearly-balance, monthly-balance, daily-balance,
      * yearly-equity, monthly-equity, daily-equity, max-drawdown
-     * @return completable future which resolves when the stopout is reset
+     * @return completable future which resolves when the stopouts are reset
      */
-    public CompletableFuture<Void> resetStopout(String accountId, String reason) {
-        if (isNotJwtToken()) return handleNoAccessError("resetStopout");
-        HttpRequestOptions opts = new HttpRequestOptions(
-            host + "/users/current/accounts/" + accountId + "/stopouts/" + reason + "/reset", Method.POST);
+    public CompletableFuture<Void> resetStopouts(String accountId, String strategyId, String reason) {
+        if (isNotJwtToken()) return handleNoAccessError("resetStopouts");
+        HttpRequestOptions opts = new HttpRequestOptions(host + "/users/current/accounts/" + accountId
+            + "/strategies-subscribed/" + strategyId + "/stopouts/" + reason + "/reset", Method.POST);
         opts.getHeaders().put("auth-token", token);
         return httpClient.request(opts).thenApply(response -> null);
     }

@@ -41,7 +41,7 @@ public class NewMT5DemoAccount {
      */
     public String phone;
     /**
-     * Server name, or {@code null}
+     * Server name
      */
     public String serverName;
     /**
