@@ -62,6 +62,8 @@ public class MetaApiClient {
     /**
      * Handles no accessing to the method
      * @param methodName Name of method
+     * @param <T> any type returned by the calling method
+     * @return completable future with completed with method access exception
      */
     protected <T> CompletableFuture<T> handleNoAccessError(String methodName) {
     	return CompletableFuture.supplyAsync(() -> {

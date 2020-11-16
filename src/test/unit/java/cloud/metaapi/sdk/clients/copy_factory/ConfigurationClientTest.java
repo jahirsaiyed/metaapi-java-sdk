@@ -366,6 +366,127 @@ class ConfigurationClientTest {
     }
     
     /**
+     * Tests {@link ConfigurationClient#getPortfolioStrategies()}
+     */
+    @Test
+    void testRetrievePortfolioStrategiesFromApi() throws Exception {
+        List<CopyFactoryPortfolioStrategy> expectedStrategies = Lists.list(new CopyFactoryPortfolioStrategy() {{
+            _id = "ABCD";
+            platformCommissionRate = 0.01;
+            name = "Test strategy";
+            members = Lists.list(new CopyFactoryPortfolioMember() {{
+                strategyId = "BCDE";
+            }});
+        }});
+        httpClient.setRequestMock((actualOptions) -> {
+            try {
+                HttpRequestOptions expectedOptions = new HttpRequestOptions(
+                    copyFactoryApiUrl + "/users/current/configuration/portfolio-strategies", Method.GET);
+                expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
+                assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
+                return CompletableFuture.completedFuture(jsonMapper.writeValueAsString(expectedStrategies));
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+                return null;
+            }
+        });
+        List<CopyFactoryPortfolioStrategy> actualStrategies = copyFactoryClient.getPortfolioStrategies().get();
+        assertThat(actualStrategies).usingRecursiveComparison().isEqualTo(expectedStrategies);
+    }
+    
+    /**
+     * Tests {@link ConfigurationClient#getPortfolioStrategies()}
+     */
+    @Test
+    void testDoesNotRetrievePortfolioStrategiesFromApiWithAccountToken() throws Exception {
+        copyFactoryClient = new ConfigurationClient(httpClient, "token");
+        try {
+            copyFactoryClient.getPortfolioStrategies().get();
+        } catch (ExecutionException e) {
+            assertEquals(
+                "You can not invoke getPortfolioStrategies method, because you have connected with account access token. "
+                + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
+                e.getCause().getMessage()
+            );
+        };
+    }
+    
+    /**
+     * Tests {@link ConfigurationClient#updatePortfolioStrategy(String, CopyFactoryPortfolioStrategyUpdate)}
+     */
+    @Test
+    void testUpdatesPortfolioStrategyViaApi() throws Exception {
+        httpClient.setRequestMock((actualOptions) -> {
+            HttpRequestOptions expectedOptions = new HttpRequestOptions(
+                copyFactoryApiUrl + "/users/current/configuration/portfolio-strategies/ABCD", Method.PUT);
+            expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
+            expectedOptions.setBody(new CopyFactoryPortfolioStrategyUpdate() {{
+                name = "Test strategy";
+                members = Lists.list(new CopyFactoryPortfolioMember() {{
+                    strategyId = "BCDE";
+                }});
+            }});
+            assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
+            return CompletableFuture.completedFuture(null);
+        });
+        copyFactoryClient.updatePortfolioStrategy("ABCD", new CopyFactoryPortfolioStrategyUpdate() {{
+            name = "Test strategy";
+            members = Lists.list(new CopyFactoryPortfolioMember() {{
+                strategyId = "BCDE";
+            }});
+        }}).get();
+    }
+    
+    /**
+     * Tests {@link ConfigurationClient#updatePortfolioStrategy(String, CopyFactoryPortfolioStrategyUpdate)}
+     */
+    @Test
+    void testDoesNotUpdatesPortfolioStrategyViaApiWithAccountToken() throws Exception {
+        copyFactoryClient = new ConfigurationClient(httpClient, "token");
+        try {
+            copyFactoryClient.updatePortfolioStrategy("ABCD", new CopyFactoryPortfolioStrategyUpdate() {{}}).get();
+        } catch (ExecutionException e) {
+            assertEquals(
+                "You can not invoke updatePortfolioStrategy method, because you have connected with account access token. "
+                + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
+                e.getCause().getMessage()
+            );
+        };
+    }
+    
+    /**
+     * Tests {@link ConfigurationClient#removePortfolioStrategy(String)}
+     */
+    @Test
+    void testRemovesPortfolioStrategyViaApi() throws Exception {
+        httpClient.setRequestMock((actualOptions) -> {
+            HttpRequestOptions expectedOptions = new HttpRequestOptions(
+                copyFactoryApiUrl + "/users/current/configuration/portfolio-strategies/ABCD", Method.DELETE);
+            expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
+            assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
+            return CompletableFuture.completedFuture(null);
+        });
+        copyFactoryClient.removePortfolioStrategy("ABCD").get();
+    }
+    
+    /**
+     * Tests {@link ConfigurationClient#removePortfolioStrategy(String)}
+     */
+    @Test
+    void testDoesNotRemovePortfolioStrategyViaApiWithAccountToken() throws Exception {
+        copyFactoryClient = new ConfigurationClient(httpClient, "token");
+        try {
+            copyFactoryClient.removePortfolioStrategy("id").get();
+        } catch (ExecutionException e) {
+            assertEquals(
+                "You can not invoke removePortfolioStrategy method, because you have connected with account access token. "
+                + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
+                e.getCause().getMessage()
+            );
+        };
+    }
+    
+    /**
      * Tests {@link ConfigurationClient#getActiveResynchronizationTasks(String)}
      */
     @Test

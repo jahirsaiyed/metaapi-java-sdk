@@ -53,11 +53,11 @@ public class PacketOrderer {
     /**
      * Constructs the class
      * @param outOfOrderListener listener which will receive out of order packet events
-     * @param orderingTimeoutInSeconds packet ordering timeout, or {@code null}. Default is 10 seconds
+     * @param orderingTimeoutInSeconds packet ordering timeout
      */
-    public PacketOrderer(OutOfOrderListener outOfOrderListener, Integer orderingTimeoutInSeconds) {
+    public PacketOrderer(OutOfOrderListener outOfOrderListener, int orderingTimeoutInSeconds) {
         this.outOfOrderListener = outOfOrderListener;
-        this.orderingTimeoutInSeconds = (orderingTimeoutInSeconds != null ? orderingTimeoutInSeconds : 10);
+        this.orderingTimeoutInSeconds = orderingTimeoutInSeconds;
         this.isOutOfOrderEmitted = new HashMap<>();
     }
     

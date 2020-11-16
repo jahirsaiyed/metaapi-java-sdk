@@ -1,9 +1,13 @@
+10.1.0
+  - added support for portfolio strategies (i.e. the strategies which include several other member strategies) to CopyFactory API
+
 10.0.0
   - added incoming commissions to CopyFactory history API
   - breaking change: refactored resetStopout method in CopyFactory trading API. Changed method name, added strategyId parameter.
   - retry synchronization if synchronization attempt have failed
   - restore market data subscriptions on successful synchronization
   - added capability to monitor terminal connection health and measure terminal connection uptime
+  - change packet orderer timeout from 10 seconds to 1 minute to accomodate for slower connections
 
 9.1.0
   - added API to register MetaTrader demo accounts
