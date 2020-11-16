@@ -28,7 +28,7 @@ public class MetaApi {
      * @param token authorization token
      */
     public MetaApi(String token) throws ValidationException {
-        this(token, null, null, null, null);
+        this(token, null, null, null, null, null);
     }
     
     /**
@@ -39,7 +39,7 @@ public class MetaApi {
      * 
      */
     public MetaApi(String token, String application) throws ValidationException {
-        this(token, application, null, null, null);
+        this(token, application, null, null, null, null);
     }
     
     /**
@@ -50,7 +50,7 @@ public class MetaApi {
      * @param domain domain to connect to, or {@code null}. By default is {@code agiliumtrade.agiliumtrade.ai} used
      */
     public MetaApi(String token, String application, String domain) throws ValidationException {
-        this(token, application, domain, null, null);
+        this(token, application, domain, null, null, null);
     }
     
     /**
@@ -61,9 +61,22 @@ public class MetaApi {
      * @param requestTimeout timeout for http requests in seconds, or {@code null}. By default is 60 seconds
      * @param connectTimeout timeout for connecting to server in seconds, or {@code null}. By default is 60 seconds
      */
-    public MetaApi(String token, String application, String domain, Integer requestTimeout, Integer connectTimeout)
-        throws ValidationException
-    {
+    public MetaApi(String token, String application, String domain, Integer requestTimeout,
+        Integer connectTimeout) throws ValidationException {
+        this(token, application, domain, requestTimeout, connectTimeout, null);
+    }
+    
+    /**
+     * Constructs MetaApi class instance
+     * @param token authorization token
+     * @param application id, or {@code null}. By default is {@code MetaApi}
+     * @param domain domain to connect to, or {@code null}. By default is {@code agiliumtrade.agiliumtrade.ai} used
+     * @param requestTimeout timeout for http requests in seconds, or {@code null}. By default is 60 seconds
+     * @param connectTimeout timeout for connecting to server in seconds, or {@code null}. By default is 60 seconds
+     * @param packetOrderingTimeout packet ordering timeout in seconds, or {@code null}. By default is 60 seconds
+     */
+    public MetaApi(String token, String application, String domain, Integer requestTimeout, Integer connectTimeout,
+        Integer packetOrderingTimeout) throws ValidationException {
         if (application == null) application = "MetaApi";
         else if (!application.matches("[a-zA-Z0-9_]+")) {
             List<ValidationDetails> details = new ArrayList<>();
@@ -73,7 +86,8 @@ public class MetaApi {
         if (requestTimeout == null) requestTimeout = 60;
         if (connectTimeout == null) connectTimeout = 60;
         HttpClient httpClient = new HttpClient(requestTimeout * 1000, connectTimeout * 1000);
-        metaApiWebsocketClient = new MetaApiWebsocketClient(token, application, domain, requestTimeout * 1000L, connectTimeout * 1000L);
+        metaApiWebsocketClient = new MetaApiWebsocketClient(token, application, domain, requestTimeout * 1000L, 
+            connectTimeout * 1000L, packetOrderingTimeout);
         provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, domain));
         connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, application);
         metatraderAccountApi = new MetatraderAccountApi(

@@ -122,6 +122,7 @@ public class ConfigurationClient extends MetaApiClient {
      * Updates a CopyFactory strategy. See
      * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/put_users_current_configuration_strategies_strategyId
      * @param id copy trading strategy id
+     * @param strategy trading strategy update
      * @return completable future resolving when strategy is updated
      */
     public CompletableFuture<Void> updateStrategy(String id, CopyFactoryStrategyUpdate strategy) {
@@ -143,6 +144,51 @@ public class ConfigurationClient extends MetaApiClient {
         if (isNotJwtToken()) return handleNoAccessError("removeStrategy");
         HttpRequestOptions opts = new HttpRequestOptions(
             host + "/users/current/configuration/strategies/" + id, Method.DELETE);
+        opts.getHeaders().put("auth-token", token);
+        return httpClient.request(opts).thenApply((response) -> null);
+    }
+    
+    /**
+     * Retrieves CopyFactory copy portfolio strategies. See
+     * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/get_users_current_configuration_portfolio_strategies
+     * @return completable future resolving with CopyFactory portfolio strategies found
+     */
+    public CompletableFuture<List<CopyFactoryPortfolioStrategy>> getPortfolioStrategies() {
+        if (isNotJwtToken()) return handleNoAccessError("getPortfolioStrategies");
+        HttpRequestOptions opts = new HttpRequestOptions(
+            host + "/users/current/configuration/portfolio-strategies", Method.GET);
+        opts.getHeaders().put("auth-token", token);
+        return httpClient.requestJson(opts, CopyFactoryPortfolioStrategy[].class)
+            .thenApply(array -> Arrays.asList(array));
+    }
+    
+    /**
+     * Updates a CopyFactory portfolio strategy. See
+     * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/put_users_current_configuration_portfolio_strategies_portfolioId
+     * @param id copy trading portfolio strategy id
+     * @param strategy portfolio strategy update
+     * @return completable future resolving when portfolio strategy is updated
+     */
+    public CompletableFuture<Void> updatePortfolioStrategy(String id, CopyFactoryPortfolioStrategyUpdate strategy) {
+        if (isNotJwtToken()) return handleNoAccessError("updatePortfolioStrategy");
+        HttpRequestOptions opts = new HttpRequestOptions(
+            host + "/users/current/configuration/portfolio-strategies/" + id, Method.PUT);
+        opts.getHeaders().put("auth-token", token);
+        opts.setBody(strategy);
+        return httpClient.request(opts).thenApply((response) -> null);
+    }
+    
+    /**
+     * Deletes a CopyFactory portfolio strategy. See
+     * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/
+     * #!/default/delete_users_current_configuration_portfolio_strategies_portfolioId
+     * @param id portfolio strategy id
+     * @return completable future resolving when portfolio strategy is removed
+     */
+    public CompletableFuture<Void> removePortfolioStrategy(String id) {
+        if (isNotJwtToken()) return handleNoAccessError("removePortfolioStrategy");
+        HttpRequestOptions opts = new HttpRequestOptions(
+            host + "/users/current/configuration/portfolio-strategies/" + id, Method.DELETE);
         opts.getHeaders().put("auth-token", token);
         return httpClient.request(opts).thenApply((response) -> null);
     }

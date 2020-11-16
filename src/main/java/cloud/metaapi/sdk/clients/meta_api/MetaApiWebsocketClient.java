@@ -70,7 +70,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
      * @param token authorization token
      */
     public MetaApiWebsocketClient(String token) {
-        this(token, null, null, null, null);
+        this(token, null, null, null, null, null);
     }
     
     /**
@@ -79,7 +79,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
      * @param application application id or {@code null}. By default is {@code MetaApi}
      */
     public MetaApiWebsocketClient(String token, String application) {
-        this(token, application, null, null, null);
+        this(token, application, null, null, null, null);
     }
     
     /**
@@ -87,10 +87,30 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
      * @param token authorization token
      * @param application application id or {@code null}. By default is {@code MetaApi}
      * @param domain domain to connect to {@code null}. By default is {@code agiliumtrade.agiliumtrade.ai}
-     * @param requestTimeout timeout for socket requests in milliseconds or {@code null}. By default is {@code 1 minute}
-     * @param connectTimeout timeout for connecting to server in milliseconds or {@code null}. By default is {@code 1 minute}
+     * @param requestTimeout timeout for socket requests in milliseconds or {@code null}. 
+     * By default is {@code 1 minute}
+     * @param connectTimeout timeout for connecting to server in milliseconds or {@code null}. 
+     * By default is {@code 1 minute}
      */
-    public MetaApiWebsocketClient(String token, String application, String domain, Long requestTimeout, Long connectTimeout) {
+    public MetaApiWebsocketClient(String token, String application, String domain,
+        Long requestTimeout, Long connectTimeout) {
+        this(token, application, domain, requestTimeout, connectTimeout, null);
+    }
+    
+    /**
+     * Constructs MetaApi websocket API client instance
+     * @param token authorization token
+     * @param application application id or {@code null}. By default is {@code MetaApi}
+     * @param domain domain to connect to {@code null}. By default is {@code agiliumtrade.agiliumtrade.ai}
+     * @param requestTimeout timeout for socket requests in milliseconds or {@code null}. 
+     * By default is {@code 1 minute}
+     * @param connectTimeout timeout for connecting to server in milliseconds or {@code null}. 
+     * By default is {@code 1 minute}
+     * @param packetOrderingTimeout packet ordering timeout in seconds, or {@code null}.
+     * Default is {@code 1 minute}
+     */
+    public MetaApiWebsocketClient(String token, String application, String domain, Long requestTimeout, 
+        Long connectTimeout, Integer packetOrderingTimeout) {
         this.application = (application != null ? application : "MetaApi");
         this.url = "https://mt-client-api-v1." + (domain != null ? domain : "agiliumtrade.agiliumtrade.ai");
         this.token = token;
@@ -99,7 +119,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         this.reconnectListeners = new LinkedList<>();
         this.requestTimeout = (requestTimeout != null ? requestTimeout : 60000);
         this.connectTimeout = (connectTimeout != null ? connectTimeout : 60000);
-        this.packetOrderer = new PacketOrderer(this, null);
+        this.packetOrderer = new PacketOrderer(this, packetOrderingTimeout != null ? packetOrderingTimeout : 60);
     }
     
     /**
