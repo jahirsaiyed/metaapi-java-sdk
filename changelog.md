@@ -1,3 +1,11 @@
+11.0.0
+  - breaking change: MetaApi options are now specified via an object
+  - breaking change: CopyFactory options are now specified via an object
+  - added packet logger
+  - added close by order support
+  - added stop limit order support
+  - bugfix MetatraderAccount.connect method to throw an error to avoid creating broken connections
+
 10.1.0
   - added support for portfolio strategies (i.e. the strategies which include several other member strategies) to CopyFactory API
 

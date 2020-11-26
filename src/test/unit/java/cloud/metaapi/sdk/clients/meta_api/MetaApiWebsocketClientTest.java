@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
@@ -66,7 +66,7 @@ class MetaApiWebsocketClientTest {
     private MetatraderTrade actualTrade = null;
     
     @BeforeAll
-    static void setUpBeforeClass() {
+    static void setUpBeforeClass() throws IOException {
         Configuration serverConfiguration = new Configuration();
         serverConfiguration.setPort(6784);
         serverConfiguration.setContext("/ws");
@@ -82,7 +82,12 @@ class MetaApiWebsocketClientTest {
             }
         });
         server.start();
-        client = new MetaApiWebsocketClient("token", "application", "project-stock.agiliumlabs.cloud", 60000L, 60000L);
+        client = new MetaApiWebsocketClient("token", new MetaApiWebsocketClient.ClientOptions() {{
+            application = "application";
+            domain = "project-stock.agiliumlabs.cloud";
+            requestTimeout = 60000L;
+            connectTimeout = 60000L;
+        }});
         client.setUrl("http://localhost:6784");
     }
     
@@ -580,33 +585,6 @@ class MetaApiWebsocketClientTest {
      * Tests {@link MetaApiWebsocketClient#subscribe(String)}
      */
     @Test
-    void testSubscribesToMetatraderTerminal() throws Exception {
-        requestReceived = false;
-        server.addEventListener("request", Object.class, new DataListener<Object>() {
-            @Override
-            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
-                JsonNode request = jsonMapper.valueToTree(data);
-                if (    request.get("type").asText().equals("subscribe")
-                     && request.get("accountId").asText().equals("accountId")
-                     && request.get("application").asText().equals("application")
-                ) {
-                    requestReceived = true;
-                    ObjectNode response = jsonMapper.createObjectNode();
-                    response.put("type", "response");
-                    response.set("accountId", request.get("accountId"));
-                    response.set("requestId", request.get("requestId"));
-                    client.sendEvent("response", response.toString());
-                }
-            }
-        });
-        client.subscribe("accountId").get();
-        assertTrue(requestReceived);
-    }
-    
-    /**
-     * Tests {@link MetaApiWebsocketClient#connect()}
-     */
-    @Test
     void testConnectsToMetatarderTerminal() throws Exception {
         requestReceived = false;
         server.addEventListener("request", Object.class, new DataListener<Object>() {
@@ -654,12 +632,14 @@ class MetaApiWebsocketClientTest {
                 client.sendEvent("processingError", response.toString());
             }
         });
+        boolean success = true;
         try {
             client.subscribe("accountId").get();
+            success = false;
         } catch (ExecutionException e) {
-            assertTrue(e.getCause() instanceof CompletionException);
-            assertTrue(e.getCause().getCause() instanceof NotConnectedException);
+            assertTrue(e.getCause() instanceof NotConnectedException);
         }
+        assertTrue(success);
         assertTrue(requestReceived);
     }
     

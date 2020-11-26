@@ -15,22 +15,40 @@ public class CopyFactory {
     private TradingClient tradingClient;
     
     /**
-     * Constructs CopyFactory class instance. Domain is {@code agiliumtrade.agiliumtrade.ai}, timeout for http requests
-     * is {@code 60 seconds}, timeout for connecting to server is {@code 60 seconds}.
+     * CopyFactory options
+     */
+    public static class Options {
+        /**
+         * Domain to connect to, or {@code null}
+         */
+        public String domain;
+        /**
+         * Timeout for http requests in seconds, or {@code null}
+         */
+        public Integer requestTimeout;
+        /**
+         * Timeout for connecting to server in seconds, or {@code null}
+         */
+        public Integer connectTimeout;
+    }
+    
+    /**
+     * Constructs CopyFactory class instance with default options
      * @param token authorization token
      */
     public CopyFactory(String token) {
-        this(token, "agiliumtrade.agiliumtrade.ai", 60, 60);
+        this(token, null);
     }
     
     /**
      * Constructs CopyFactory class instance
      * @param token authorization token
-     * @param domain domain to connect to
-     * @param requestTimeout timeout for http requests in seconds
-     * @param connectTimeout timeout for connecting to server in seconds
+     * @param opts connection options, or {@code null}
      */
-    public CopyFactory(String token, String domain, int requestTimeout, int connectTimeout) {
+    public CopyFactory(String token, Options opts) {
+        String domain = opts != null && opts.domain != null ? opts.domain : "agiliumtrade.agiliumtrade.ai";
+        int requestTimeout = opts != null && opts.requestTimeout != null ? opts.requestTimeout : 60;
+        int connectTimeout = opts != null && opts.connectTimeout != null ? opts.connectTimeout : 60;
         HttpClient httpClient = new HttpClient(requestTimeout * 1000, connectTimeout * 1000);
         configurationClient = new ConfigurationClient(httpClient, token, domain);
         historyClient = new HistoryClient(httpClient, token, domain);

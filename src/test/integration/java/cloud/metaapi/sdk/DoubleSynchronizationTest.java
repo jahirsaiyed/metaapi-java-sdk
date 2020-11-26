@@ -53,8 +53,10 @@ class DoubleSynchronizationTest {
     }
 
     @Test
-    void testDoesNotCorruptFilesAfterSimultaneousSynchronization() throws ValidationException {
-        MetaApi api = new MetaApi(token, "MetaApi", "project-stock.agiliumlabs.cloud");
+    void testDoesNotCorruptFilesAfterSimultaneousSynchronization() throws ValidationException, IOException {
+        MetaApi api = new MetaApi(token, new MetaApi.Options() {{
+            domain = "project-stock.agiliumlabs.cloud";
+        }});
         final ProvisioningProfileApi profileApi = api.getProvisioningProfileApi();
         final MetatraderAccountApi accountApi = api.getMetatraderAccountApi();
         if (token != null) {

@@ -324,9 +324,12 @@ System.out.println(connection.createLimitBuyOrder("GBPUSD", 0.07, 1.0, 0.9, 2.0,
 System.out.println(connection.createLimitSellOrder("GBPUSD", 0.07, 1.5, 2.0, 0.9, options).get());
 System.out.println(connection.createStopBuyOrder("GBPUSD", 0.07, 1.5, 0.9, 2.0, options).get());
 System.out.println(connection.createStopSellOrder("GBPUSD", 0.07, 1.0, 2.0, 0.9, options).get());
+System.out.println(connection.createStopLimitBuyOrder("GBPUSD", 0.07, 1.5, 1.4, 0.9, 2.0, options).get());
+System.out.println(connection.createStopLimitSellOrder("GBPUSD", 0.07, 1.0, 1.1, 2.0, 0.9, options).get());
 System.out.println(connection.modifyPosition("46870472", 2.0, 0.9).get());
 System.out.println(connection.closePositionPartially("46870472", 0.9, null).get());
 System.out.println(connection.closePosition("46870472", null).get());
+System.out.println(connection.closeBy("46870472", "46870482", null).get());
 System.out.println(connection.closePositionsBySymbol("EURUSD", null).get());
 System.out.println(connection.modifyOrder("46870472", 1.0, 2.0, 0.9).get());
 System.out.println(connection.cancelOrder("46870472").get());
@@ -449,7 +452,7 @@ configurationApi.updateStrategy(strategyId.id, new CopyFactoryStrategyUpdate() {
   name = "Test strategy";
   description = "Some useful description about your strategy";
   positionLifecycle = "hedging";
-  connectionId = slaveMetaapiAccount.getId();
+  connectionId = masterMetaapiAccount.getId();
   maxTradeRisk = 0.1;
   stopOutRisk = new CopyFactoryStrategyStopOutRisk() {{
     value = 0.4;
@@ -462,9 +465,9 @@ configurationApi.updateStrategy(strategyId.id, new CopyFactoryStrategyUpdate() {
 }}).get();
 
 // subscribe slave CopyFactory accounts to the strategy
-configurationApi.updateAccount(masterAccountId, new CopyFactoryAccountUpdate() {{
+configurationApi.updateAccount(slaveAccountId, new CopyFactoryAccountUpdate() {{
   name = "Demo account";
-  connectionId = masterMetaapiAccount.getId();
+  connectionId = slaveMetaapiAccount.getId();
   subscriptions: List.of(new CopyFactoryStrategySubscription() {{
     strategyId = strategyId;
     multiplier = 1;
