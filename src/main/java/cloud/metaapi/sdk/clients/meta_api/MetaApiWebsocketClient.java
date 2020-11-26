@@ -1,5 +1,6 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,64 +63,79 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     private List<ReconnectListener> reconnectListeners;
     private CompletableFuture<Void> connectFuture = null;
     private PacketOrderer packetOrderer;
+    private PacketLogger packetLogger;
     private boolean isSocketConnecting = false;
     private boolean connected = false;
     
     /**
-     * Constructs MetaApi websocket API client instance with default parameters
-     * @param token authorization token
+     * Websocket client options
      */
-    public MetaApiWebsocketClient(String token) {
-        this(token, null, null, null, null, null);
+    public static class ClientOptions {
+        /**
+         * Application id, or {@code null}. By default is {@code MetaApi}
+         */
+        public String application;
+        /**
+         * Domain to connect to, or {@code null}. By default is {@code agiliumtrade.agiliumtrade.ai}
+         */
+        public String domain;
+        /**
+         * Timeout for socket requests in milliseconds or {@code null}. By default is {@code 1 minute}
+         */
+        public Long requestTimeout;
+        /**
+         * Timeout for connecting to server in milliseconds or {@code null}. By default is {@code 1 minute}
+         */
+        public Long connectTimeout;
+        /**
+         * Packet ordering timeout in seconds, or {@code null}. Default is {@code 1 minute}
+         */
+        public Integer packetOrderingTimeout;
+        /**
+         * Packet logger options, or {@code null}
+         */
+        public PacketLoggerOptions packetLogger;
+    }
+    
+    /**
+     * Packet logger options
+     */
+    public static class PacketLoggerOptions extends PacketLogger.LoggerOptions {
+        /**
+         * Whether enable packet logger
+         */
+        public boolean enabled;
     }
     
     /**
      * Constructs MetaApi websocket API client instance with default parameters
      * @param token authorization token
-     * @param application application id or {@code null}. By default is {@code MetaApi}
+     * @throws IOException if packet logger is enabled and failed to create the log directory
      */
-    public MetaApiWebsocketClient(String token, String application) {
-        this(token, application, null, null, null, null);
+    public MetaApiWebsocketClient(String token) throws IOException {
+        this(token, new ClientOptions());
     }
     
     /**
      * Constructs MetaApi websocket API client instance
      * @param token authorization token
-     * @param application application id or {@code null}. By default is {@code MetaApi}
-     * @param domain domain to connect to {@code null}. By default is {@code agiliumtrade.agiliumtrade.ai}
-     * @param requestTimeout timeout for socket requests in milliseconds or {@code null}. 
-     * By default is {@code 1 minute}
-     * @param connectTimeout timeout for connecting to server in milliseconds or {@code null}. 
-     * By default is {@code 1 minute}
+     * @param opts websocket client options
+     * @throws IOException if packet logger is enabled and failed to create the log directory
      */
-    public MetaApiWebsocketClient(String token, String application, String domain,
-        Long requestTimeout, Long connectTimeout) {
-        this(token, application, domain, requestTimeout, connectTimeout, null);
-    }
-    
-    /**
-     * Constructs MetaApi websocket API client instance
-     * @param token authorization token
-     * @param application application id or {@code null}. By default is {@code MetaApi}
-     * @param domain domain to connect to {@code null}. By default is {@code agiliumtrade.agiliumtrade.ai}
-     * @param requestTimeout timeout for socket requests in milliseconds or {@code null}. 
-     * By default is {@code 1 minute}
-     * @param connectTimeout timeout for connecting to server in milliseconds or {@code null}. 
-     * By default is {@code 1 minute}
-     * @param packetOrderingTimeout packet ordering timeout in seconds, or {@code null}.
-     * Default is {@code 1 minute}
-     */
-    public MetaApiWebsocketClient(String token, String application, String domain, Long requestTimeout, 
-        Long connectTimeout, Integer packetOrderingTimeout) {
-        this.application = (application != null ? application : "MetaApi");
-        this.url = "https://mt-client-api-v1." + (domain != null ? domain : "agiliumtrade.agiliumtrade.ai");
+    public MetaApiWebsocketClient(String token, ClientOptions opts) throws IOException {
+        this.application = (opts.application != null ? opts.application : "MetaApi");
+        this.url = "https://mt-client-api-v1." + (opts.domain != null ? opts.domain : "agiliumtrade.agiliumtrade.ai");
         this.token = token;
         this.requestResolves = new HashMap<>();
         this.synchronizationListeners = new HashMap<>();
         this.reconnectListeners = new LinkedList<>();
-        this.requestTimeout = (requestTimeout != null ? requestTimeout : 60000);
-        this.connectTimeout = (connectTimeout != null ? connectTimeout : 60000);
-        this.packetOrderer = new PacketOrderer(this, packetOrderingTimeout != null ? packetOrderingTimeout : 60);
+        this.requestTimeout = (opts.requestTimeout != null ? opts.requestTimeout : 60000);
+        this.connectTimeout = (opts.connectTimeout != null ? opts.connectTimeout : 60000);
+        this.packetOrderer = new PacketOrderer(this, opts.packetOrderingTimeout != null ? opts.packetOrderingTimeout : 60);
+        if (opts.packetLogger != null && opts.packetLogger.enabled) {
+            this.packetLogger = new PacketLogger(opts.packetLogger);
+            this.packetLogger.start();
+        }
     }
     
     /**
@@ -135,7 +151,12 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         logger.error("MetaApi websocket client received an out of order packet type "
             + packet.get("type").asText() + " for account id " + accountId + ". Expected s/n " 
             + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber);
-        subscribe(accountId);
+        subscribe(accountId).exceptionally(err -> {
+            if (!(err instanceof TimeoutException)) {
+                logger.error("MetaApi websocket client failed to receive subscribe response", err);
+            }
+            return null;
+        });
     }
     
     /**
@@ -636,11 +657,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     public CompletableFuture<Void> subscribe(String accountId) {
         ObjectNode request = jsonMapper.createObjectNode();
         request.put("type", "subscribe");
-        return rpcRequest(accountId, request)
-            .exceptionally(exception -> {
-                logger.error("MetaApi websocket client failed to receive subscribe response", exception);
-                throw new CompletionException(exception);
-            }).thenApply(response -> null);
+        return rpcRequest(accountId, request).thenApply(response -> null);
     }
     
     /**
@@ -872,7 +889,11 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     private CompletableFuture<Void> processSynchronizationPacket(String jsonPacket) {
         return CompletableFuture.runAsync(() -> {
             try {
-                List<JsonNode> packets = packetOrderer.restoreOrder(jsonMapper.readTree(jsonPacket));
+                JsonNode jsonPacketAsNode = jsonMapper.readTree(jsonPacket);
+                if (packetLogger != null) {
+                    packetLogger.logPacket(jsonPacketAsNode);
+                }
+                List<JsonNode> packets = packetOrderer.restoreOrder(jsonPacketAsNode);
                 for (JsonNode data : packets) {
                     String accountId = data.get("accountId").asText();
                     List<SynchronizationListener> listeners = synchronizationListeners.get(accountId);

@@ -409,6 +409,68 @@ class MetaApiConnectionTest {
     }
     
     /**
+     * Tests {@link MetaApiConnection#createStopLimitBuyOrder(String, double, double, double, Double, Double, PendingTradeOptions)}
+     */
+    @Test
+    void testCreatesStopLimitBuyOrder() {
+        MetatraderTradeResponse tradeResult = new MetatraderTradeResponse() {{
+            numericCode = 10009;
+            stringCode = "TRADE_RETCODE_DONE";
+            orderId = "46870472";
+        }};
+        Mockito.when(client.trade(Mockito.eq("accountId"), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(tradeResult));
+        MetatraderTradeResponse actual = api.createStopLimitBuyOrder("GBPUSD", 0.07, 1.5, 1.4, 0.9, 2.0,
+            new PendingTradeOptions() {{ comment = "comment"; clientId = "TE_GBPUSD_7hyINWqAlE"; }}).join();
+        assertThat(actual).usingRecursiveComparison().isEqualTo(tradeResult);
+        Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(new MetatraderTrade() {{
+                actionType = ActionType.ORDER_TYPE_BUY_STOP_LIMIT;
+                symbol = "GBPUSD";
+                volume = 0.07;
+                openPrice = 1.5;
+                stopLimitPrice = 1.4;
+                stopLoss = 0.9;
+                takeProfit = 2.0;
+                comment = "comment";
+                clientId = "TE_GBPUSD_7hyINWqAlE";
+            }});
+            return true;
+        }));
+    }
+    
+    /**
+     * Tests {@link MetaApiConnection#createStopLimitSellOrder(String, double, double, double, Double, Double, PendingTradeOptions)}
+     */
+    @Test
+    void testCreatesStopLimitSellOrder() {
+        MetatraderTradeResponse tradeResult = new MetatraderTradeResponse() {{
+            numericCode = 10009;
+            stringCode = "TRADE_RETCODE_DONE";
+            orderId = "46870472";
+        }};
+        Mockito.when(client.trade(Mockito.eq("accountId"), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(tradeResult));
+        MetatraderTradeResponse actual = api.createStopLimitSellOrder("GBPUSD", 0.07, 1.0, 1.1, 2.0, 0.9,
+            new PendingTradeOptions() {{ comment = "comment"; clientId = "TE_GBPUSD_7hyINWqAlE"; }}).join();
+        assertThat(actual).usingRecursiveComparison().isEqualTo(tradeResult);
+        Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(new MetatraderTrade() {{
+                actionType = ActionType.ORDER_TYPE_SELL_STOP_LIMIT;
+                symbol = "GBPUSD";
+                volume = 0.07;
+                openPrice = 1.0;
+                stopLimitPrice = 1.1;
+                stopLoss = 2.0;
+                takeProfit = 0.9;
+                comment = "comment";
+                clientId = "TE_GBPUSD_7hyINWqAlE";
+            }});
+            return true;
+        }));
+    }
+    
+    /**
      * Tests {@link MetaApiConnection#modifyPosition(String, Double, Double)}
      */
     @ParameterizedTest
@@ -472,6 +534,35 @@ class MetaApiConnectionTest {
             comment = trade.comment; clientId = trade.clientId;
         }}).get();
         assertThat(actual).usingRecursiveComparison().isEqualTo(expected);
+        Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(trade);
+            return true;
+        }));
+    }
+    
+    /**
+     * Tests {@link MetaApiConnection#closeBy(String, String, MarketTradeOptions)}
+     */
+    @Test
+    void testClosesPositionByAnOppositeOne() {
+        MetatraderTradeResponse tradeResult = new MetatraderTradeResponse() {{
+            numericCode = 10009;
+            stringCode = "TRADE_RETCODE_DONE";
+            positionId = "46870472";
+            closeByPositionId = "46870482";
+        }};
+        Mockito.when(client.trade(Mockito.eq("accountId"), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(tradeResult));
+        MetatraderTradeResponse actual = api.closeBy("46870472", "46870482", new MarketTradeOptions() {{
+            comment = "comment"; clientId = "TE_GBPUSD_7hyINWqAlE";
+        }}).join();
+        assertThat(actual).usingRecursiveComparison().isEqualTo(tradeResult);
+        MetatraderTrade trade = new MetatraderTrade();
+        trade.actionType = ActionType.POSITION_CLOSE_BY;
+        trade.positionId = "46870472";
+        trade.closeByPositionId = "46870482";
+        trade.comment = "comment";
+        trade.clientId = "TE_GBPUSD_7hyINWqAlE";
         Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
             assertThat(arg).usingRecursiveComparison().isEqualTo(trade);
             return true;

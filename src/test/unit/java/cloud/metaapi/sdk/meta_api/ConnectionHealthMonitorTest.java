@@ -53,8 +53,8 @@ class ConnectionHealthMonitorTest {
         Mockito.when(connection.getSubscribedSymbols()).thenReturn(Lists.list("EURUSD"));
         Mockito.when(connection.getTerminalState()).thenReturn(terminalState);
         Mockito.when(connection.isSynchronized()).thenReturn(true);
-        ConnectionHealthMonitor.measureInterval = 1000;
-        ConnectionHealthMonitor.minQuoteInterval = 60000;
+        ConnectionHealthMonitor.measureInterval = 250;
+        ConnectionHealthMonitor.minQuoteInterval = 15000;
         healthMonitor = new ConnectionHealthMonitor(connection);
         prices = Arrays.array(new MetatraderSymbolPrice() {{
             symbol = "EURUSD";
