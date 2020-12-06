@@ -146,15 +146,21 @@ public class Reservoir {
                 removeElementIndex = 0;
             }
             
-            updateStatisticsOnRemove(array.get(removeElementIndex), removeElementIndex);
-            array.set(removeElementIndex, new Statistics() {{
+            Statistics statistics = new Statistics() {{
                 count = 0;
                 sum = 0;
                 max = null;
                 min = null;
                 average = 0.0;
                 sumOfSquares = 0;
-            }});
+            }};
+            if (removeElementIndex < array.size()) {
+                updateStatisticsOnRemove(array.get(removeElementIndex), removeElementIndex);
+                array.set(removeElementIndex, statistics);
+            } else {
+                updateStatisticsOnRemove(null, removeElementIndex);
+                array.add(removeElementIndex, statistics);
+            }
             removeElementIndex++;
         }
         removeElementIndex--;
@@ -226,7 +232,11 @@ public class Reservoir {
     
     private void addRecord(long emptyElementsCount) {
         if (intermediaryRecord != null) {
-            array.set(firstQueueIndex, intermediaryRecord);
+            if (array.size() == firstQueueIndex) {
+                array.add(firstQueueIndex, intermediaryRecord);
+            } else {
+                array.set(firstQueueIndex, intermediaryRecord);
+            }
             intermediaryRecord = null;
         }
         int curIndexInArray = updateRunningStatisticsOnRemove(emptyElementsCount);

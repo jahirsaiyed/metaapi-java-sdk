@@ -43,6 +43,10 @@ public class CopyFactoryStrategyUpdate {
      */
     public Double maxTradeRisk;
     /**
+     * Flag indicating that the strategy should be copied in a reverse direction, or {@code null}
+     */
+    public Boolean reverse;
+    /**
      * Optional setting indicating whether to enable automatic trade correlation reduction, or {@code null}. Possible
      * settings are not specified (disable correlation risk restrictions), by-strategy (limit correlations on strategy
      * level) or by-symbol (limit correlations on symbol level)

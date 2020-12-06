@@ -16,6 +16,10 @@ public class SynchronizationListenerMock extends SynchronizationListener {
      */
     public CompletableFuture<Void> onConnectedResult = new CompletableFuture<>();
     /**
+     * Completable future which is completed when onHealthStatus event is handled
+     */
+    public CompletableFuture<HealthStatus> onHealthStatusResult = new CompletableFuture<>();
+    /**
      * Completable future which is completed when onDisconnected event is handled
      */
     public CompletableFuture<Void> onDisconnectedResult = new CompletableFuture<>();
@@ -93,9 +97,32 @@ public class SynchronizationListenerMock extends SynchronizationListener {
      */
     public CompletableFuture<MetatraderSymbolPrice> onSymbolPriceUpdatedResult = new CompletableFuture<>();
     
+    /**
+     * Received arguments of onSymbolPricesUpdate
+     */
+    public static class OnSymbolPricesUpdatedResult {
+        public List<MetatraderSymbolPrice> prices;
+        public Double equity;
+        public Double margin;
+        public Double freeMargin;
+        public Double marginLevel;
+    }
+    
+    /**
+     * Completable future which is completed when onSymbolPricesUpdated event is handled
+     * resulting with event received data
+     */
+    public CompletableFuture<OnSymbolPricesUpdatedResult> onSymbolPricesUpdatedResult = new CompletableFuture<>();
+    
     @Override
     public CompletableFuture<Void> onConnected() {
         this.onConnectedResult.complete(null);
+        return CompletableFuture.completedFuture(null);
+    }
+    
+    @Override
+    public CompletableFuture<Void> onHealthStatus(HealthStatus status) {
+        this.onHealthStatusResult.complete(status);
         return CompletableFuture.completedFuture(null);
     }
 
@@ -192,6 +219,19 @@ public class SynchronizationListenerMock extends SynchronizationListener {
     @Override
     public CompletableFuture<Void> onSymbolPriceUpdated(MetatraderSymbolPrice price) {
         this.onSymbolPriceUpdatedResult.complete(price);
+        return CompletableFuture.completedFuture(null);
+    }
+    
+    @Override
+    public CompletableFuture<Void> onSymbolPricesUpdated(List<MetatraderSymbolPrice> argPrices, Double argEquity,
+        Double argMargin, Double argFreeMargin, Double argMarginLevel) {
+        this.onSymbolPricesUpdatedResult.complete(new OnSymbolPricesUpdatedResult() {{
+            prices = argPrices;
+            equity = argEquity;
+            margin = argMargin;
+            freeMargin = argFreeMargin;
+            marginLevel = argMarginLevel;
+        }});
         return CompletableFuture.completedFuture(null);
     }
 }

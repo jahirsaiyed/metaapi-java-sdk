@@ -8,12 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.assertj.core.util.Lists;
+import org.assertj.core.util.Maps;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -30,6 +33,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.*;
+import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener.HealthStatus;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeals;
@@ -727,6 +731,32 @@ class MetaApiWebsocketClientTest {
     }
     
     /**
+     * Tests {@link MetaApiWebsocketClient#saveUptime(String, Map)}
+     */
+    @Test
+    void testSendsUptimeStatsToTheServer() {
+        server.addEventListener("request", Object.class, new DataListener<Object>() {
+            @Override
+            public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+                JsonNode request = jsonMapper.valueToTree(data);
+                if (    request.get("type").asText().equals("saveUptime")
+                     && request.get("accountId").asText().equals("accountId")
+                     && request.get("uptime").get("1h").asDouble() == 100
+                     && request.get("application").asText().equals("application")
+                ) {
+                    ObjectNode response = jsonMapper.createObjectNode();
+                    response.put("type", "response");
+                    response.set("accountId", request.get("accountId"));
+                    response.set("requestId", request.get("requestId"));
+                    client.sendEvent("response", response.toString());
+                }
+            }
+        });
+        Map<String, Double> uptime = Maps.newHashMap("1h", 100.0);
+        client.saveUptime("accountId", uptime).join();
+    }
+    
+    /**
      * Tests {@link MetaApiWebsocketClient#trade(String, MetatraderTrade)}
      */
     @Test
@@ -888,6 +918,25 @@ class MetaApiWebsocketClientTest {
         packet.put("connected", true);
         socket.sendEvent("synchronization", packet.toString());
         assertTrue(listener.onBrokerConnectionStatusChangedResult.get());
+    }
+    
+    /**
+     * Tests {@link MetaApiWebsocketClient#addSynchronizationListener(String, SynchronizationListener)}
+     */
+    @Test
+    void testProcessesServerSideHealthStatusEvent() throws Exception {
+        SynchronizationListenerMock listener = new SynchronizationListenerMock();
+        client.addSynchronizationListener("accountId", listener);
+        ObjectNode packet = jsonMapper.createObjectNode();
+        packet.put("type", "status");
+        packet.put("accountId", "accountId");
+        packet.put("connected", true);
+        HealthStatus healthStatus = new HealthStatus() {{
+            restApiHealthy = true;
+        }};
+        packet.set("healthStatus", jsonMapper.valueToTree(healthStatus));
+        socket.sendEvent("synchronization", packet.toString());
+        assertThat(listener.onHealthStatusResult.get()).usingRecursiveComparison().isEqualTo(healthStatus);
     }
     
     /**
@@ -1145,8 +1194,21 @@ class MetaApiWebsocketClientTest {
         packet.put("type", "prices");
         packet.put("accountId", "accountId");
         packet.set("prices", jsonMapper.valueToTree(Lists.list(expected)));
+        packet.put("equity", 100);
+        packet.put("margin", 200);
+        packet.put("freeMargin", 400);
+        packet.put("marginLevel", 40000);
         socket.sendEvent("synchronization", packet.toString());
-        assertThat(listener.onSymbolPriceUpdatedResult.get()).usingRecursiveComparison().isEqualTo(expected);
+        assertThat(listener.onSymbolPriceUpdatedResult.get())
+            .usingRecursiveComparison().isEqualTo(expected);
+        assertThat(listener.onSymbolPricesUpdatedResult.get())
+            .usingRecursiveComparison().isEqualTo(new SynchronizationListenerMock.OnSymbolPricesUpdatedResult() {{
+                prices = Arrays.asList(expected);
+                equity = 100.0;
+                margin = 200.0;
+                freeMargin = 400.0;
+                marginLevel = 40000.0;
+            }});
     }
     
     /**

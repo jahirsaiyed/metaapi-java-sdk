@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -52,7 +53,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     private HistoryStorage historyStorage;
     private ConnectionHealthMonitor healthMonitor;
     private HashSet<String> subscriptions = new HashSet<>();
-    private String shouldResynchronize;
+    private String shouldSynchronize;
     private int synchronizationRetryIntervalInSeconds;
     private boolean isSynchronized = false;
     private boolean closed = false;
@@ -671,6 +672,15 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     }
     
     /**
+     * Sends client uptime stats to the server.
+     * @param uptime uptime statistics to send to the server
+     * @return completable future which resolves when uptime statistics is submitted
+     */
+    public CompletableFuture<Void> saveUptime(Map<String, Double> uptime) {
+        return websocketClient.saveUptime(account.getId(), uptime);
+    }
+    
+    /**
      * Returns local copy of terminal state
      * @return local copy of terminal state
      */
@@ -706,7 +716,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     public CompletableFuture<Void> onConnected() {
         return CompletableFuture.runAsync(() -> {
             String key = RandomStringUtils.randomAlphanumeric(32);
-            shouldResynchronize = key;
+            shouldSynchronize = key;
             synchronizationRetryIntervalInSeconds = 1;
             isSynchronized = false;
             ensureSynchronized(key);
@@ -717,7 +727,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     public CompletableFuture<Void> onDisconnected() {
         lastDisconnectedSynchronizationId = lastSynchronizationId;
         lastSynchronizationId = null;
-        shouldResynchronize = null;
+        shouldSynchronize = null;
         isSynchronized = false;
         return CompletableFuture.completedFuture(null);
     }
@@ -778,6 +788,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
         String synchronizationId = opts.synchronizationId;
         int timeoutInSeconds = (opts.timeoutInSeconds != null ? opts.timeoutInSeconds : 300);
         int intervalInMilliseconds = (opts.intervalInMilliseconds != null ? opts.intervalInMilliseconds : 1000);
+        String applicationPattern = (opts.applicationPattern != null ? opts.applicationPattern :
+            (account.getApplication().equals("CopyFactory") ? "CopyFactory.*|RPC" : "RPC"));
         long startTime = Instant.now().getEpochSecond();
         long timeoutTime = startTime + timeoutInSeconds;
         return CompletableFuture.runAsync(() -> {
@@ -795,7 +807,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
                             : lastDisconnectedSynchronizationId)
                     )
                 );
-                websocketClient.waitSynchronized(account.getId(), ".*", (long) timeoutInSeconds).get();
+                websocketClient.waitSynchronized(account.getId(), applicationPattern, (long) timeoutInSeconds).get();
             } catch (Exception e) {
                 throw new CompletionException(e);
             }
@@ -807,10 +819,12 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      */
     public void close() {
         if (!closed) {
+            shouldSynchronize = null;
             websocketClient.removeSynchronizationListener(account.getId(), this);
             websocketClient.removeSynchronizationListener(account.getId(), terminalState);
             websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
             connectionRegistry.remove(account.getId());
+            healthMonitor.stop();
             closed = true;
         }
     }
@@ -849,7 +863,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
         } catch (CompletionException e) {
             logger.error("MetaApi websocket client for account " + account.getId()
                 + " failed to synchronize", e.getCause());
-            if (shouldResynchronize.equals(key)) {
+            if (shouldSynchronize.equals(key)) {
                 Timer retryTimer = new Timer();
                 MetaApiConnection self = this;
                 retryTimer.schedule(new TimerTask() {

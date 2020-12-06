@@ -405,7 +405,7 @@ Features supported:
 - synchronize subscriber account with strategy providers
 - monitor trading history
 - calculate trade copying commissions for account managers
-- [coming soon] support portfolio strategies as trading signal source, i.e. the strategies which include signals of several other strategies (also known as combos on some platforms)
+- support portfolio strategies as trading signal source, i.e. the strategies which include signals of several other strategies (also known as combos on some platforms)
 
 Please note that trade copying to MT5 netting accounts is not supported in the current API version
 
@@ -427,11 +427,11 @@ MetaApi metaapi = new MetaApi(token);
 CopyFactory copyFactory = new CopyFactory(token);
 
 // retrieve MetaApi MetaTrader accounts with CopyFactory as application field value
-MetatraderAccount masterMetaapiAccount = api.getMetatraderAccountApi().getAccount("masterMetaapiAccountId").get();
+MetatraderAccount masterMetaapiAccount = metaapi.getMetatraderAccountApi().getAccount("masterMetaapiAccountId").get();
 if (!masterMetaapiAccount.getApplication().equals("CopyFactory")) {
   throw new Exception("Please specify CopyFactory application field value in your MetaApi account in order to use it in CopyFactory API");
 }
-MetatraderAccount slaveMetaapiAccount = api.getMetatraderAccountApi().getAccount("slaveMetaapiAccountId").get();
+MetatraderAccount slaveMetaapiAccount = metaapi.getMetatraderAccountApi().getAccount("slaveMetaapiAccountId").get();
 if (!slaveMetaapiAccount.getApplication().equals("CopyFactory")) {
   throw new Exception("Please specify CopyFactory application field value in your MetaApi account in order to use it in CopyFactory API");
 }
@@ -521,10 +521,13 @@ A subscription to a strategy can be stopped if the strategy have exceeded allowe
 ```java
 TradingClient tradingApi = copyFactory.getTradingApi();
 String accountId = "..."; // CopyFactory account id
+String strategyId = "..."; // CopyFactory strategy id
+
 // retrieve list of strategy stopouts
 System.out.println(tradingApi.getStopouts(accountId).get());
+
 // reset a stopout so that subscription can continue
-tradingApi.resetStopout(accountId, "daily-equity").get();
+tradingApi.resetStopout(accountId, strategyId, "daily-equity").get();
 ```
 
 Keywords: MetaTrader API, MetaTrader REST API, MetaTrader websocket API,

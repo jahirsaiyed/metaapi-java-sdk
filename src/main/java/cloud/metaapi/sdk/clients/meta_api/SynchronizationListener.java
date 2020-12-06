@@ -19,6 +19,33 @@ public abstract class SynchronizationListener {
     }
     
     /**
+     * Server-side application health status
+     */
+    public static class HealthStatus {
+        /**
+         * Flag indicating that REST API is healthy, or {@code null}
+         */
+        public Boolean restApiHealthy;
+        /**
+         * Flag indicating that CopyFactory subscriber is healthy, or {@code null}
+         */
+        public Boolean copyFactorySubscriberHealthy;
+        /**
+         * Flag indicating that CopyFactory provider is healthy, or {@code null}
+         */
+        public Boolean copyFactoryProviderHealthy;
+    }
+    
+    /**
+     * Invoked when a server-side application health status is received from MetaApi
+     * @param status server-side application health status
+     * @return completable future which resolves when the asynchronous event is processed
+     */
+    public CompletableFuture<Void> onHealthStatus(HealthStatus status) {
+        return CompletableFuture.completedFuture(null);
+    }
+    
+    /**
      * Invoked when connection to MetaTrader terminal terminated
      * @return completable future which resolves when the asynchronous event is processed
      */
@@ -157,6 +184,20 @@ public abstract class SynchronizationListener {
      * @return completable future which resolves when the asynchronous event is processed
      */
     public CompletableFuture<Void> onSymbolPriceUpdated(MetatraderSymbolPrice price) {
+        return CompletableFuture.completedFuture(null);
+    }
+    
+    /**
+     * Invoked when prices for several symbols were updated
+     * @param prices updated MetaTrader symbol prices
+     * @param equity account liquidation value, or {@code null}
+     * @param margin margin used, or {@code null}
+     * @param freeMargin free margin, or {@code null}
+     * @param marginLevel margin level calculated as % of equity/margin, or {@code null}
+     * @return completable future which resolves when the asynchronous event is processed
+     */
+    public CompletableFuture<Void> onSymbolPricesUpdated(List<MetatraderSymbolPrice> prices, Double equity,
+        Double margin, Double freeMargin, Double marginLevel) {
         return CompletableFuture.completedFuture(null);
     }
 }

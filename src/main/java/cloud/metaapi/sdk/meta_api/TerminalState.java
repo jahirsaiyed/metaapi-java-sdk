@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
 import cloud.metaapi.sdk.clients.meta_api.models.*;
@@ -33,6 +34,7 @@ public class TerminalState extends SynchronizationListener {
     private Map<String, MetatraderSymbolSpecification> specificationsBySymbol = new HashMap<>();
     private Map<String, MetatraderSymbolPrice> pricesBySymbol = new HashMap<>();
     private MetatraderAccountInformation accountInformation = null;
+    private boolean positionsInitialized = false;
     private Timer statusTimer = null;
     
     /**
@@ -144,6 +146,7 @@ public class TerminalState extends SynchronizationListener {
         specifications.clear();
         specificationsBySymbol.clear();
         pricesBySymbol.clear();
+        positionsInitialized = false;
         return CompletableFuture.completedFuture(null);
     }
     
@@ -155,7 +158,8 @@ public class TerminalState extends SynchronizationListener {
     
     @Override
     public CompletableFuture<Void> onPositionsReplaced(List<MetatraderPosition> positions) {
-        this.positions = positions;
+        this.positions = new ArrayList<>(positions);
+        this.positionsInitialized = true;
         return CompletableFuture.completedFuture(null);
     }
 
@@ -217,44 +221,75 @@ public class TerminalState extends SynchronizationListener {
     }
 
     @Override
-    public CompletableFuture<Void> onSymbolPriceUpdated(MetatraderSymbolPrice price) {
-        pricesBySymbol.put(price.symbol, price);
-        Optional<MetatraderSymbolSpecification> specification = getSpecification(price.symbol);
-        if (specification.isPresent()) {
-            for (MetatraderPosition position : positions) {
-                if (!position.symbol.equals(price.symbol)) continue;
-                if (position.unrealizedProfit == null || position.realizedProfit == null) {
-                    position.unrealizedProfit = 
-                        (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
-                        (position.currentPrice - position.openPrice) * position.currentTickValue *
-                        position.volume / specification.get().tickSize;
-                    position.realizedProfit = position.profit - position.unrealizedProfit;
+    public CompletableFuture<Void> onSymbolPricesUpdated(List<MetatraderSymbolPrice> prices, Double equity,
+        Double margin, Double freeMargin, Double marginLevel) {
+        boolean pricesInitialized = false;
+        for (MetatraderSymbolPrice price : prices) {
+            pricesBySymbol.put(price.symbol, price);
+            List<MetatraderPosition> positions = this.positions.stream()
+                .filter(p -> p.symbol.equals(price.symbol)).collect(Collectors.toList());
+            List<MetatraderPosition> otherPositions = this.positions.stream()
+                .filter(p -> !p.symbol.equals(price.symbol)).collect(Collectors.toList());
+            List<MetatraderOrder> orders = this.orders.stream()
+                    .filter(o -> o.symbol.equals(price.symbol)).collect(Collectors.toList());
+            pricesInitialized = true;
+            for (MetatraderPosition position : otherPositions) {
+                MetatraderSymbolPrice p = pricesBySymbol.get(position.symbol);
+                if (p != null) {
+                    if (position.unrealizedProfit == null) {
+                        updatePositionProfits(position, p);
+                    }
+                } else {
+                    pricesInitialized = false;
                 }
-                double newPositionPrice = (position.type == PositionType.POSITION_TYPE_BUY ? price.bid : price.ask);
-                double isProfitable = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
-                    (newPositionPrice - position.openPrice);
-                double currentTickValue = (isProfitable > 0 ? price.profitTickValue : price.lossTickValue);
-                double unrealizedProfit = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
-                    (newPositionPrice - position.openPrice) * currentTickValue *
-                    position.volume / specification.get().tickSize;
-                position.unrealizedProfit = unrealizedProfit;
-                position.profit = position.unrealizedProfit + position.realizedProfit;
-                position.currentPrice = newPositionPrice;
-                position.currentTickValue = currentTickValue;
+            }
+            for (MetatraderPosition position : positions) {
+                updatePositionProfits(position, price);
             }
             for (MetatraderOrder order : orders) {
-                if (!order.symbol.equals(price.symbol)) continue;
-                order.currentPrice = (order.type == OrderType.ORDER_TYPE_BUY_LIMIT 
+                order.currentPrice = (order.type == OrderType.ORDER_TYPE_BUY
+                    || order.type == OrderType.ORDER_TYPE_BUY_LIMIT
                     || order.type == OrderType.ORDER_TYPE_BUY_STOP
                     || order.type == OrderType.ORDER_TYPE_BUY_STOP_LIMIT
                 ? price.ask : price.bid);
             }
-            if (accountInformation != null) {
+        }
+        if (accountInformation != null) {
+            if (positionsInitialized && pricesInitialized) {
                 double profitSum = 0;
-                for (MetatraderPosition position : positions) profitSum += position.profit;
+                for (MetatraderPosition position : this.positions) profitSum += position.unrealizedProfit;
                 accountInformation.equity = accountInformation.balance + profitSum;
+            } else {
+                accountInformation.equity = equity != null ? equity : accountInformation.equity;
             }
+            accountInformation.margin = margin != null ? margin : accountInformation.margin;
+            accountInformation.freeMargin = freeMargin != null ? freeMargin : accountInformation.freeMargin;
+            accountInformation.marginLevel = freeMargin != null ? marginLevel : accountInformation.marginLevel;
         }
         return CompletableFuture.completedFuture(null);
+    }
+    
+    private void updatePositionProfits(MetatraderPosition position, MetatraderSymbolPrice price) {
+        Optional<MetatraderSymbolSpecification> specification = getSpecification(position.symbol);
+        if (specification.isPresent()) {
+            if (position.unrealizedProfit == null || position.realizedProfit == null) {
+                position.unrealizedProfit = 
+                    (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
+                    (position.currentPrice - position.openPrice) * position.currentTickValue *
+                    position.volume / specification.get().tickSize;
+                position.realizedProfit = position.profit - position.unrealizedProfit;
+            }
+            double newPositionPrice = (position.type == PositionType.POSITION_TYPE_BUY ? price.bid : price.ask);
+            double isProfitable = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
+                (newPositionPrice - position.openPrice);
+            double currentTickValue = (isProfitable > 0 ? price.profitTickValue : price.lossTickValue);
+            double unrealizedProfit = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
+                (newPositionPrice - position.openPrice) * currentTickValue *
+                position.volume / specification.get().tickSize;
+            position.unrealizedProfit = unrealizedProfit;
+            position.profit = position.unrealizedProfit + position.realizedProfit;
+            position.currentPrice = newPositionPrice;
+            position.currentTickValue = currentTickValue;
+        }
     }
 }
