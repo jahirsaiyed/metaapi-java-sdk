@@ -38,6 +38,16 @@ public class CopyFactoryAccountUpdate {
      */
     public String closeOnly;
     /**
+     * Pptional stop out setting, or {@code null}. All trading will be terminated and positions closed once equity
+     * drawdown reaches this value
+     */
+    public CopyFactoryStrategyStopOutRisk stopOutRisk;
+    /**
+     * Optional account risk limits, or {@code null}. You can configure trading to be stopped once total drawdown
+     * generated during specific period is exceeded. Can be specified either for balance or equity drawdown
+     */
+    public List<CopyFactoryStrategyRiskLimit> riskLimits;
+    /**
      * Optional setting indicating maxumum leverage allowed when opening a new positions, or {@code null}.
      * Any trade which results in a higher leverage will be discarded.
      */

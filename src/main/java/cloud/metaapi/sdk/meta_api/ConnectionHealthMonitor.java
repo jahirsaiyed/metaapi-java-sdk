@@ -5,8 +5,10 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -32,10 +34,12 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
     protected static int minQuoteInterval = 60000;
     private static Logger logger = Logger.getLogger(ConnectionHealthMonitor.class);
     private MetaApiConnection connection;
-    private Reservoir uptimeReservoir;
+    private Map<String, Reservoir> uptimeReservoirs;
     private Date priceUpdatedAt;
     private long offset;
     private boolean quotesHealthy = false;
+    private Timer updateMeasurementsInterval;
+    private HealthStatus serverHealthStatus;
     
     /**
      * Constructs the listener
@@ -45,17 +49,29 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
         super();
         this.connection = connection;
         ConnectionHealthMonitor self = this;
-        Timer intervalTimer = new Timer();
-        intervalTimer.schedule(new TimerTask() {
+        this.updateMeasurementsInterval = new Timer();
+        this.updateMeasurementsInterval.schedule(new TimerTask() {
             @Override
             public void run() {
                 self.updateQuoteHealthStatus();
                 self.measureUptime();
             }
         }, measureInterval, measureInterval);
-        this.uptimeReservoir = new Reservoir(24 * 7, 7 * 24 * 60 * 60 * 1000);
+        this.uptimeReservoirs = new HashMap<>();
+        this.uptimeReservoirs.put("5m", new Reservoir(300, 5 * 60 * 1000));
+        this.uptimeReservoirs.put("1h", new Reservoir(600, 60 * 60 * 1000));
+        this.uptimeReservoirs.put("1d", new Reservoir(24 * 60, 24 * 60 * 60 * 1000));
+        this.uptimeReservoirs.put("1w", new Reservoir(24 * 7, 7 * 24 * 60 * 60 * 1000));
     }
     
+    /**
+     * Stops health monitor
+     */
+    public void stop() {
+        updateMeasurementsInterval.cancel();
+    }
+    
+    @Override
     public CompletableFuture<Void> onSymbolPriceUpdated(MetatraderSymbolPrice price) {
         try {
             SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
@@ -68,6 +84,20 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
             e.printStackTrace();
         }
         return CompletableFuture.completedFuture(null);
+    }
+    
+    @Override
+    public CompletableFuture<Void> onHealthStatus(HealthStatus status) {
+        serverHealthStatus = status;
+        return CompletableFuture.completedFuture(null);
+    }
+    
+    /**
+     * Returns server-side application health status
+     * @return server-side application health status
+     */
+    public Optional<HealthStatus> getServerHealthStatus() {
+        return Optional.ofNullable(serverHealthStatus);
     }
     
     /**
@@ -108,18 +138,25 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
     }
     
     /**
-     * Returns uptime in percents measured over a period of one week
-     * @return uptime in percents measured over a period of one week
+     * Returns uptime in percents measured over specific periods of time
+     * @return uptime in percents measured over specific periods of time
      */
-    public double getUptime() {
-        return uptimeReservoir.getStatistics().average;
+    public Map<String, Double> getUptime() {
+        Map<String, Double> uptime = new HashMap<>();
+        for (Map.Entry<String, Reservoir> entry : uptimeReservoirs.entrySet()) {
+            uptime.put(entry.getKey(), entry.getValue().getStatistics().average);
+        }
+        return uptime;
     }
     
     private void measureUptime() {
         try {
-            uptimeReservoir.pushMeasurement(connection.getTerminalState().isConnected()
-                && connection.getTerminalState().isConnectedToBroker() && connection.isSynchronized()
-                && quotesHealthy ? 100 : 0);
+            for (Reservoir r : uptimeReservoirs.values()) {
+                r.pushMeasurement(connection.getTerminalState().isConnected()
+                    && connection.getTerminalState().isConnectedToBroker()
+                    && connection.isSynchronized()
+                    && quotesHealthy ? 100 : 0);
+            }
         } catch (Throwable e) {
             logger.error("Failed to measure uptime for account " + connection.getAccount().getId(), e);
         }

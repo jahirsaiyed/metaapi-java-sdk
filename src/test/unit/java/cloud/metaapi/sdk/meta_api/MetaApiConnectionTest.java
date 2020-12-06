@@ -6,12 +6,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import org.assertj.core.util.Lists;
+import org.assertj.core.util.Maps;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -748,6 +750,18 @@ class MetaApiConnectionTest {
             .thenReturn(CompletableFuture.completedFuture(expected));
         MetatraderSymbolPrice actual = api.getSymbolPrice("AUDNZD").get();
         assertThat(actual).usingRecursiveComparison().isEqualTo(expected);
+    }
+    
+    /**
+     * Tests {@link MetaApiConnection#saveUptime(Map)}
+     */
+    @Test
+    void testSavesUptimeStatsToTheServer() {
+        Mockito.when(client.saveUptime(Mockito.eq("accountId"), Mockito.anyMap()))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        Map<String, Double> uptime = Maps.newHashMap("1h", 100.0); 
+        api.saveUptime(uptime).join();
+        Mockito.verify(client).saveUptime("accountId", uptime);
     }
     
     /**

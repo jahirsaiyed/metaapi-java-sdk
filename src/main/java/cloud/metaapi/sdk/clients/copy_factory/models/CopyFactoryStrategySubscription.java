@@ -30,7 +30,11 @@ public class CopyFactoryStrategySubscription {
      * Optional max risk per trade, expressed as a fraction of 1, or {@code null}. If trade has a SL, the trade size
      * will be adjusted to match the risk limit. If not, the trade SL will be applied according to the risk limit
      */
-    public Double maxTradeRisk; 
+    public Double maxTradeRisk;
+    /**
+     * Flag indicating that the strategy should be copied in a reverse direction, or {@code null}
+     */
+    public Boolean reverse;
     /**
      * Optional setting indicating whether to enable automatic trade correlation reduction, or {@code null}. Possible
      * settings are not specified (disable correlation risk restrictions), by-strategy (limit correlations on strategy

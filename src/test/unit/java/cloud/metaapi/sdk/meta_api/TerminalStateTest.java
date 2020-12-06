@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.assertj.core.util.Lists;
@@ -145,30 +147,32 @@ class TerminalStateTest {
     
     /**
      * Tests
-     * {@link TerminalState#onSymbolPriceUpdated(MetatraderSymbolPrice)},
+     * {@link TerminalState#onSymbolPricesUpdated(List)},
      * {@link TerminalState#getPrice(String)}
      */
     @Test
     void testReturnsPrice() {
         assertTrue(!state.getPrice("EURUSD").isPresent());
-        state.onSymbolPriceUpdated(new MetatraderSymbolPrice() {{ symbol = "EURUSD"; bid = 1; ask = 1.1; }});
-        state.onSymbolPriceUpdated(new MetatraderSymbolPrice() {{ symbol = "GBPUSD"; }});
-        state.onSymbolPriceUpdated(new MetatraderSymbolPrice() {{ symbol = "EURUSD"; bid = 1; ask = 1.2; }});
-        assertThat(state.getPrice("EURUSD").get()).usingRecursiveComparison().isEqualTo(new MetatraderSymbolPrice() {{
-            symbol = "EURUSD"; bid = 1; ask = 1.2;
-        }});
+        state.onSymbolPricesUpdated(Arrays.asList(
+            new MetatraderSymbolPrice() {{ symbol = "EURUSD"; bid = 1; ask = 1.1; }}), null, null, null, null);
+        state.onSymbolPricesUpdated(Arrays.asList(
+            new MetatraderSymbolPrice() {{ symbol = "GBPUSD"; }}), null, null, null, null);
+        state.onSymbolPricesUpdated(Arrays.asList(
+            new MetatraderSymbolPrice() {{ symbol = "EURUSD"; bid = 1; ask = 1.2; }}), null, null, null, null);
+        assertThat(state.getPrice("EURUSD").get()).usingRecursiveComparison()
+            .isEqualTo(new MetatraderSymbolPrice() {{ symbol = "EURUSD"; bid = 1; ask = 1.2; }});
     }
     
     /**
      * Tests
-     * {@link TerminalState#onSymbolPriceUpdated(MetatraderSymbolPrice)},
+     * {@link TerminalState#onSymbolPricesUpdated(List, Double, Double, Double, Double)},
      * {@link TerminalState#getAccountInformation()},
      * {@link TerminalState#getPositions()}
      */
     @Test
     void testUpdatesAccountEquityAndPositionProfitOnPriceUpdate() {
         state.onAccountInformationUpdated(new MetatraderAccountInformation() {{ equity = 1000; balance = 800; }});
-        state.onPositionUpdated(new MetatraderPosition() {{
+        state.onPositionsReplaced(Arrays.asList(new MetatraderPosition() {{
             id = "1";
             symbol = "EURUSD";
             type = PositionType.POSITION_TYPE_BUY;
@@ -177,7 +181,7 @@ class TerminalStateTest {
             openPrice = 8;
             profit = 100;
             volume = 2;
-        }});
+        }}));
         state.onPositionUpdated(new MetatraderPosition() {{
             id = "2";
             symbol = "AUDUSD";
@@ -186,24 +190,52 @@ class TerminalStateTest {
             currentTickValue = 0.5;
             openPrice = 8;
             profit = 100;
-            volume = 10;
+            volume = 2;
         }});
         state.onSymbolSpecificationUpdated(new MetatraderSymbolSpecification() {{ 
             symbol = "EURUSD";
             tickSize = 0.01;
         }});
-        state.onSymbolPriceUpdated(new MetatraderSymbolPrice() {{
+        state.onSymbolSpecificationUpdated(new MetatraderSymbolSpecification() {{ 
+            symbol = "AUDUSD";
+            tickSize = 0.01;
+        }});
+        state.onSymbolPricesUpdated(Arrays.asList(new MetatraderSymbolPrice() {{
             symbol = "EURUSD";
             profitTickValue = 0.5;
             lossTickValue = 0.5;
             bid = 10;
             ask = 11;
-        }});
+        }}, new MetatraderSymbolPrice() {{
+            symbol = "AUDUSD";
+            profitTickValue = 0.5;
+            lossTickValue = 0.5;
+            bid = 10;
+            ask = 11;
+        }}), null, null, null, null);
         assertThat(state.getPositions().stream().map(position -> position.profit).toArray())
-            .isEqualTo(Stream.of(200.0, 100.0).toArray());
+            .isEqualTo(Stream.of(200.0, 200.0).toArray());
+        assertThat(state.getPositions().stream().map(position -> position.unrealizedProfit).toArray())
+        .isEqualTo(Stream.of(200.0, 200.0).toArray());
         assertThat(state.getPositions().stream().map(position -> position.currentPrice).toArray())
-            .isEqualTo(Stream.of(10.0, 9.0).toArray());
-        assertEquals(1100, state.getAccountInformation().get().equity);
+            .isEqualTo(Stream.of(10.0, 10.0).toArray());
+        assertEquals(1200, state.getAccountInformation().get().equity);
+    }
+    
+    /**
+     * Tests
+     * {@link TerminalState#onSymbolPricesUpdated(List, Double, Double, Double, Double)},
+     * {@link TerminalState#getAccountInformation()},
+     * {@link TerminalState#getPositions()}
+     */
+    @Test
+    void testUpdatesMarginFieldsOnPriceUpdate() {
+        state.onAccountInformationUpdated(new MetatraderAccountInformation() {{ equity = 1000; balance = 800; }}).join();
+        state.onSymbolPricesUpdated(Arrays.asList(), 100.0, 200.0, 400.0, 40000.0).join();
+        assertEquals(100, state.getAccountInformation().get().equity);
+        assertEquals(200, state.getAccountInformation().get().margin);
+        assertEquals(400, state.getAccountInformation().get().freeMargin);
+        assertEquals(40000, state.getAccountInformation().get().marginLevel);
     }
     
     /**
@@ -229,13 +261,13 @@ class TerminalStateTest {
             symbol = "EURUSD";
             tickSize = 0.01;
         }});
-        state.onSymbolPriceUpdated(new MetatraderSymbolPrice() {{
+        state.onSymbolPricesUpdated(Arrays.asList(new MetatraderSymbolPrice() {{
             symbol = "EURUSD";
             profitTickValue = 0.5;
             lossTickValue = 0.5;
             bid = 10;
             ask = 11;
-        }});
+        }}), null, null, null, null);
         assertThat(state.getOrders().stream().map(order -> order.currentPrice).toArray())
             .isEqualTo(Stream.of(11.0, 9.0).toArray());
     }
