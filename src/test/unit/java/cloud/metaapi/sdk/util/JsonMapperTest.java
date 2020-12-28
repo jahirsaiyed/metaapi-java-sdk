@@ -5,8 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -113,5 +116,27 @@ public class JsonMapperTest {
     @Test
     void testParsesValuedEnumFromJson() throws JsonProcessingException {
         assertEquals(Version.VERSION_4, JsonMapper.getInstance().readValue("4", Version.class));
+    }
+    
+    public static class MapModel {
+        public Map<String, Object> data;
+    }
+    
+    /**
+     * Tests {@link JsonMapper#getInstance()}
+     */
+    @Test
+    void testInfersMapValueTypesAutomatically() throws JsonProcessingException {
+        MapModel object = new MapModel();
+        object.data = new HashMap<>();
+        object.data.put("a", 42);
+        object.data.put("b", "Hello");
+        Map<String, Object> child = new HashMap<>();
+        child.put("c", 3000);
+        object.data.put("children", Arrays.asList(child));
+        String json = JsonMapper.getInstance().writeValueAsString(object); 
+        assertEquals("{\"data\":{\"a\":42,\"b\":\"Hello\",\"children\":[{\"c\":3000}]}}", json);
+        MapModel actual = JsonMapper.getInstance().readValue(json, MapModel.class);
+        assertThat(actual).usingRecursiveComparison().isEqualTo(object);
     }
 }

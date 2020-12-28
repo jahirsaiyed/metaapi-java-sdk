@@ -61,6 +61,7 @@ class PacketLoggerTest {
         accountInformation.put("server", "Broker-Demo");
         accountInformation.put("balance", 20000);
         accountInformation.put("equity", 25000);
+        accountInformationPacket.put("sequenceTimestamp", 100000);
         accountInformationPacket.put("accountId", "accountId");
         packets.put("accountInformation", accountInformationPacket);
         ObjectNode pricesPacket = jsonMapper.createObjectNode();
@@ -78,17 +79,20 @@ class PacketLoggerTest {
         prices.add(price2);
         pricesPacket.set("prices", prices);
         pricesPacket.put("accountId", "accountId");
+        pricesPacket.put("sequenceTimestamp", 100000);
         pricesPacket.put("sequenceNumber", 1);
         packets.put("prices", pricesPacket);
         ObjectNode statusPacket = jsonMapper.createObjectNode();
         statusPacket.put("type", "status");
         statusPacket.put("status", "connected");
         statusPacket.put("accountId", "accountId");
+        statusPacket.put("sequenceTimestamp", 100000);
         packets.put("status", statusPacket);
         ObjectNode specificationsPacket = jsonMapper.createObjectNode();
         specificationsPacket.put("type", "specifications");
         specificationsPacket.set("specifications", jsonMapper.createArrayNode());
         specificationsPacket.put("accountId", "accountId");
+        specificationsPacket.put("sequenceTimestamp", 100000);
         specificationsPacket.put("sequenceNumber", 1);
         packets.put("specifications", specificationsPacket);
     }
@@ -135,6 +139,7 @@ class PacketLoggerTest {
         ObjectNode expected = JsonMapper.getInstance().createObjectNode();
         expected.put("type", "specifications");
         expected.put("sequenceNumber", 1);
+        expected.put("sequenceTimestamp", 100000);
         Assertions.assertThat(jsonMapper.readTree(result.get(0).message)).usingRecursiveComparison()
             .isEqualTo(expected);
     }
@@ -159,6 +164,7 @@ class PacketLoggerTest {
         expected.put("accountId", "accountId");
         expected.put("type", "specifications");
         expected.put("sequenceNumber", 1);
+        expected.put("sequenceTimestamp", 100000);
         expected.set("specifications", JsonMapper.getInstance().createArrayNode());
         Assertions.assertThat(jsonMapper.readTree(result.get(0).message)).usingRecursiveComparison()
             .isEqualTo(expected);

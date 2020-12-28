@@ -221,9 +221,10 @@ class MetaApiConnectionTest {
      */
     @Test
     void testRemovesHistory() throws Exception {
-        Mockito.when(client.removeHistory("accountId")).thenReturn(CompletableFuture.completedFuture(null));
-        api.removeHistory().get();
-        Mockito.verify(client).removeHistory("accountId");
+        Mockito.when(client.removeHistory("accountId", "app"))
+          .thenReturn(CompletableFuture.completedFuture(null));
+        api.removeHistory("app").get();
+        Mockito.verify(client).removeHistory("accountId", "app");
         Mockito.verify(storageMock).reset();
     }
     
@@ -902,8 +903,11 @@ class MetaApiConnectionTest {
     void testUnsubscribesFromEventsOnClose() {
         MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
         Mockito.when(account.getId()).thenReturn("accountId");
+        Mockito.when(client.unsubscribe(Mockito.anyString()))
+            .thenReturn(CompletableFuture.completedFuture(null));
         MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
-        api.close();
+        api.close().join();
+        Mockito.verify(client).unsubscribe("accountId");
         Mockito.verify(client).removeSynchronizationListener("accountId", api);
         Mockito.verify(client).removeSynchronizationListener("accountId", api.getTerminalState());
         Mockito.verify(client).removeSynchronizationListener("accountId", api.getHistoryStorage());

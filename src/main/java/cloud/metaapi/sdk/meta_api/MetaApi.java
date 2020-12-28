@@ -12,7 +12,6 @@ import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderDemoAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
-import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient.PacketLoggerOptions;
 import cloud.metaapi.sdk.clients.models.ValidationDetails;
 
 /**
@@ -26,35 +25,41 @@ public class MetaApi {
     private MetatraderAccountApi metatraderAccountApi;
     private ConnectionRegistry connectionRegistry;
     private MetatraderDemoAccountApi metatraderDemoAccountApi;
+    private LatencyMonitor latencyMonitor;
     
     /**
      * MetaApi options
      */
     public static class Options {
         /**
-         * Application id, or {@code null}. By default is {@code MetaApi}
+         * Application id. By default is {@code MetaApi}
          */
-        public String application;
+        public String application = "MetaApi";
         /**
-         * Domain to connect to, or {@code null}. By default is {@code agiliumtrade.agiliumtrade.ai}
+         * Domain to connect to. By default is {@code agiliumtrade.agiliumtrade.ai}
          */
-        public String domain;
+        public String domain = "agiliumtrade.agiliumtrade.ai";
         /**
-         * Timeout for socket requests in seconds or {@code null}. By default is {@code 1 minute}
+         * Timeout for socket requests in seconds. By default is {@code 1 minute}
          */
-        public Integer requestTimeout;
+        public int requestTimeout = 60;
         /**
-         * Timeout for connecting to server in seconds or {@code null}. By default is {@code 1 minute}
+         * Timeout for connecting to server in seconds. By default is {@code 1 minute}
          */
-        public Integer connectTimeout;
+        public int connectTimeout = 60;
         /**
-         * Packet ordering timeout in seconds, or {@code null}. Default is {@code 1 minute}
+         * Packet ordering timeout in seconds. Default is {@code 1 minute}
          */
-        public Integer packetOrderingTimeout;
+        public int packetOrderingTimeout = 60;
         /**
          * Packet logger options
          */
-        public MetaApiWebsocketClient.PacketLoggerOptions packetLogger;
+        public MetaApiWebsocketClient.PacketLoggerOptions packetLogger
+            = new MetaApiWebsocketClient.PacketLoggerOptions();
+        /**
+         * Flag to enable latency tracking
+         */
+        public boolean enableLatencyMonitor = false;
     }
     
     /**
@@ -106,38 +111,46 @@ public class MetaApi {
     }
     
     /**
+     * Returns MetaApi application latency monitor
+     * @return latency monitor
+     */
+    public LatencyMonitor getLatencyMonitor() {
+        return latencyMonitor;
+    }
+    
+    /**
      * Closes all clients and connections
      */
     public void close() {
+        metaApiWebsocketClient.removeLatencyListener(latencyMonitor);
         metaApiWebsocketClient.close();
     }
     
     private void initialize(String token, Options opts) throws ValidationException, IOException {
-        String application = opts != null && opts.application != null ? opts.application : "MetaApi";
-        String domain = opts != null && opts.domain != null ? opts.domain : "agiliumtrade.agiliumtrade.ai";
-        int requestTimeout = opts != null && opts.requestTimeout != null ? opts.requestTimeout : 60;
-        int connectTimeout = opts != null && opts.connectTimeout != null ? opts.connectTimeout : 60;
-        int packetOrderingTimeout = opts != null && opts.packetOrderingTimeout != null ? opts.packetOrderingTimeout : 60;
-        PacketLoggerOptions packetLogger = opts != null ? opts.packetLogger : null;
-        if (!application.matches("[a-zA-Z0-9_]+")) {
+        if (opts == null) opts = new Options();
+        if (!opts.application.matches("[a-zA-Z0-9_]+")) {
             List<ValidationDetails> details = new ArrayList<>();
             throw new ValidationException("Application name must be non-empty string consisting from letters, digits and _ only", details);
         }
-        HttpClient httpClient = new HttpClient(requestTimeout * 1000, connectTimeout * 1000);
+        HttpClient httpClient = new HttpClient(opts.requestTimeout * 1000, opts.connectTimeout * 1000);
         MetaApiWebsocketClient.ClientOptions websocketOptions = new MetaApiWebsocketClient.ClientOptions();
-        websocketOptions.application = application;
-        websocketOptions.domain = domain;
-        websocketOptions.requestTimeout = (long) requestTimeout;
-        websocketOptions.connectTimeout = (long) connectTimeout;
-        websocketOptions.packetOrderingTimeout = packetOrderingTimeout;
-        websocketOptions.packetLogger = packetLogger;
+        websocketOptions.application = opts.application;
+        websocketOptions.domain = opts.domain;
+        websocketOptions.requestTimeout = opts.requestTimeout * 1000L;
+        websocketOptions.connectTimeout = opts.connectTimeout * 1000L;
+        websocketOptions.packetOrderingTimeout = opts.packetOrderingTimeout;
+        websocketOptions.packetLogger = opts.packetLogger;
         metaApiWebsocketClient = new MetaApiWebsocketClient(token, websocketOptions);
-        provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, domain));
-        connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, application);
+        provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, opts.domain));
+        connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, opts.application);
         metatraderAccountApi = new MetatraderAccountApi(
-            new MetatraderAccountClient(httpClient, token, domain),
+            new MetatraderAccountClient(httpClient, token, opts.domain),
             metaApiWebsocketClient, connectionRegistry);
         metatraderDemoAccountApi = new MetatraderDemoAccountApi(
-            new MetatraderDemoAccountClient(httpClient, token, domain));
+            new MetatraderDemoAccountClient(httpClient, token, opts.domain));
+        if (opts.enableLatencyMonitor) {
+            latencyMonitor = new LatencyMonitor();
+            metaApiWebsocketClient.addLatencyListener(latencyMonitor);
+        }
     }
 }

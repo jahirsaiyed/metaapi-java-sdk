@@ -60,8 +60,6 @@ public class ConnectionRegistry {
             if (connections.containsKey(account.getId())) {
                 return connections.get(account.getId());
             } else {
-                MetaApiConnection connection = ServiceProvider.createMetaApiConnection(
-                    metaApiWebsocketClient, account, historyStorage, this, historyStartTime);
                 while (connectionLocks.containsKey(account.getId())) {
                     connectionLocks.get(account.getId()).join();
                 }
@@ -70,6 +68,8 @@ public class ConnectionRegistry {
                 }
                 CompletableFuture<Void> connectionLockResolve = new CompletableFuture<>();
                 connectionLocks.put(account.getId(), connectionLockResolve);
+                MetaApiConnection connection = ServiceProvider.createMetaApiConnection(
+                    metaApiWebsocketClient, account, historyStorage, this, historyStartTime);
                 try {
                     connection.initialize().join();
                     connection.subscribe().join();

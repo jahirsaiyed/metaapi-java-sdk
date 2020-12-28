@@ -1,6 +1,9 @@
 package cloud.metaapi.sdk.clients.meta_api.models;
 
 import java.util.List;
+import java.util.Map;
+
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.Extension;
 
 /**
  * Updated MetaTrader account data
@@ -32,4 +35,12 @@ public class MetatraderAccountUpdateDto {
      * MetaTrader account tags, or {@code null}.
      */
     public List<String> tags;
+    /**
+     * API extensions
+     */
+    public List<Extension> extensions;
+    /**
+     * Extra information which can be stored together with your account
+     */
+    public Map<String, Object> metadata;
 }

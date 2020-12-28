@@ -1,6 +1,7 @@
 package cloud.metaapi.sdk.clients.meta_api.models;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * MetaTrader account model
@@ -16,6 +17,20 @@ public class MetatraderAccountDto {
      * Terminal and broker connection status enum
      */
     public enum ConnectionStatus { CONNECTED, DISCONNECTED, DISCONNECTED_FROM_BROKER }
+    
+    /**
+     * Extension model
+     */
+    public static class Extension {
+        /**
+         * Extension id
+         */
+        public String id;
+        /**
+         * Extension configuration
+         */
+        public Map<String, Object> configuration;
+    }
     
     /**
      * Account unique identifier
@@ -75,4 +90,12 @@ public class MetatraderAccountDto {
      * MetaTrader account tags, or {@code null}.
      */
     public List<String> tags;
+    /**
+     * API extensions
+     */
+    public List<Extension> extensions;
+    /**
+     * Extra information which can be stored together with your account
+     */
+    public Map<String, Object> metadata;
 }

@@ -1,9 +1,12 @@
 package cloud.metaapi.sdk.meta_api;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -33,6 +36,8 @@ public class TerminalState extends SynchronizationListener {
     private List<MetatraderSymbolSpecification> specifications = new ArrayList<>();
     private Map<String, MetatraderSymbolSpecification> specificationsBySymbol = new HashMap<>();
     private Map<String, MetatraderSymbolPrice> pricesBySymbol = new HashMap<>();
+    private Map<String, Date> completedOrders = new HashMap<>();
+    private Map<String, Date> removedPositions = new HashMap<>();
     private MetatraderAccountInformation accountInformation = null;
     private boolean positionsInitialized = false;
     private Timer statusTimer = null;
@@ -146,6 +151,8 @@ public class TerminalState extends SynchronizationListener {
         specifications.clear();
         specificationsBySymbol.clear();
         pricesBySymbol.clear();
+        completedOrders.clear();
+        removedPositions.clear();
         positionsInitialized = false;
         return CompletableFuture.completedFuture(null);
     }
@@ -159,49 +166,81 @@ public class TerminalState extends SynchronizationListener {
     @Override
     public CompletableFuture<Void> onPositionsReplaced(List<MetatraderPosition> positions) {
         this.positions = new ArrayList<>(positions);
+        this.removedPositions.clear();
         this.positionsInitialized = true;
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> onPositionUpdated(MetatraderPosition position) {
+        int index = -1;
         for (int i = 0; i < positions.size(); ++i) {
             if (positions.get(i).id.equals(position.id)) {
-                positions.set(i, position);
-                return CompletableFuture.completedFuture(null);
+                index = i;
+                break;
             }
         }
-        positions.add(position);
+        if (index != -1) {
+            positions.set(index, position);
+        } else if (!removedPositions.containsKey(position.id)) {
+            positions.add(position);
+        }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> onPositionRemoved(String positionId) {
-        positions.removeIf(position -> position.id.equals(positionId));
+        Optional<MetatraderPosition> position = positions.stream().filter(p -> !p.id.equals(positionId)).findFirst();
+        if (!position.isPresent()) {
+            for (Entry<String, Date> e : removedPositions.entrySet()) {
+                if (e.getValue().getTime() + 5 * 60 * 1000 < Date.from(Instant.now()).getTime()) {
+                    removedPositions.remove(e.getKey());
+                }
+            }
+            removedPositions.put(positionId, Date.from(Instant.now()));
+        } else {
+            positions.removeIf(p -> p.id.equals(positionId));
+        }
         return CompletableFuture.completedFuture(null);
     }
     
     @Override
     public CompletableFuture<Void> onOrdersReplaced(List<MetatraderOrder> orders) {
         this.orders = orders;
+        this.completedOrders.clear();
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> onOrderUpdated(MetatraderOrder order) {
+        int index = -1;
         for (int i = 0; i < orders.size(); ++i) {
             if (orders.get(i).id.equals(order.id)) {
-                orders.set(i, order);
-                return CompletableFuture.completedFuture(null);
+                index = i;
+                break;
             }
         }
-        orders.add(order);
+        if (index != -1) {
+            orders.set(index, order);
+        } else if (!completedOrders.containsKey(order.id)) {
+            orders.add(order);
+        }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> onOrderCompleted(String orderId) {
-        orders.removeIf(order -> order.id.equals(orderId));
+        Optional<MetatraderOrder> order = orders.stream().filter(o -> !o.id.equals(orderId)).findFirst();
+        if (!order.isPresent()) {
+            for (Entry<String, Date> e : completedOrders.entrySet()) {
+                if (e.getValue().getTime() + 5 * 60 * 1000 < Date.from(Instant.now()).getTime()) {
+                    completedOrders.remove(e.getKey());
+                }
+            }
+            completedOrders.put(orderId, Date.from(Instant.now()));
+        } else {
+            orders.removeIf(o -> o.id.equals(orderId));
+        }
         return CompletableFuture.completedFuture(null);
     }
 

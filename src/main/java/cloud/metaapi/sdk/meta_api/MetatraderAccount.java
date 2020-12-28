@@ -1,6 +1,8 @@
 package cloud.metaapi.sdk.meta_api;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -14,6 +16,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountUpdateDto;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.ConnectionStatus;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.Extension;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
 /**
@@ -138,6 +141,22 @@ public class MetatraderAccount {
      */
     public boolean isManualTrades() {
         return data.manualTrades;
+    }
+    
+    /**
+     * Returns API extensions
+     * @return API extensions
+     */
+    public List<Extension> getExtensions() {
+        return data.extensions;
+    }
+    
+    /**
+     * Returns extra information which can be stored together with your account
+     * @return extra information which can be stored together with your account
+     */
+    public Map<String, Object> getMetadata() {
+        return data.metadata;
     }
     
     /**

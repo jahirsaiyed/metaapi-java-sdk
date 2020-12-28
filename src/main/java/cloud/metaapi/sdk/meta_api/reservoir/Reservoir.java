@@ -25,9 +25,9 @@ public class Reservoir {
     
     public class Statistics {
         public int count;
-        public int sum;
-        public Integer max;
-        public Integer min;
+        public long sum;
+        public Long max;
+        public Long min;
         public Double average;
         public int sumOfSquares;
         public Double msdev;
@@ -100,7 +100,7 @@ public class Reservoir {
      * Add element to Reservoir
      * @param data to add
      */
-    public void pushMeasurement(int data) {
+    public void pushMeasurement(long data) {
         updateQueue();
         updateIntermediaryRecord(data);
         updateStatisticsOnAdd(data);
@@ -203,11 +203,11 @@ public class Reservoir {
         }
     }
     
-    private void updateStatisticsOnAdd(int el) {
+    private void updateStatisticsOnAdd(long data) {
         statistics.count += 1;
-        statistics.sum += el;
-        updateStatisticsMinAndMaxOnAdd(el);
-        statistics.sumOfSquares += Math.pow(el, 2);
+        statistics.sum += data;
+        updateStatisticsMinAndMaxOnAdd(data);
+        statistics.sumOfSquares += Math.pow(data, 2);
         if (statistics.count > 0) {
             statistics.average = statistics.sum / (double) statistics.count;
             double difOfSums = calculateDifferenceOfSums(statistics.sumOfSquares, statistics.sum, statistics.count);
@@ -221,12 +221,12 @@ public class Reservoir {
         }
     }
     
-    private void updateStatisticsMinAndMaxOnAdd(int el) {
-        if (statistics.max == null || statistics.max < el) {
-            statistics.max = el;
+    private void updateStatisticsMinAndMaxOnAdd(long data) {
+        if (statistics.max == null || statistics.max < data) {
+            statistics.max = data;
         }
-        if (statistics.min == null || statistics.min > el) {
-            statistics.min = el;
+        if (statistics.min == null || statistics.min > data) {
+            statistics.min = data;
         }
     }
     
@@ -243,12 +243,12 @@ public class Reservoir {
         firstQueueIndex = curIndexInArray;
     }
     
-    private double calculateDifferenceOfSums(int sum1, int sum2, int count) {
-        double dif = sum1 - Math.pow(sum2, 2) / count;
+    private double calculateDifferenceOfSums(int sum1, long sum, int count) {
+        double dif = sum1 - Math.pow(sum, 2) / count;
         return dif;
     }
     
-    private void updateIntermediaryRecord(int el) {
+    private void updateIntermediaryRecord(long el) {
         if (intermediaryRecord == null) {
             intermediaryRecord = new Statistics() {{
                 count = 1;
@@ -271,8 +271,8 @@ public class Reservoir {
         }
     }
     
-    private Integer findMin(int index) {
-        int min = Integer.MAX_VALUE;
+    private Long findMin(int index) {
+        Long min = Long.MAX_VALUE;
         for (int i = 0; i < array.size(); ++i) {
             Statistics el = array.get(i);
             if (el != null && el.min != null && el.min < min && i != index) {
@@ -285,8 +285,8 @@ public class Reservoir {
         return min;
     }
     
-    private Integer findMax(int index) {
-        int max = Integer.MIN_VALUE;
+    private Long findMax(int index) {
+        Long max = Long.MIN_VALUE;
         for (int i = 0; i < array.size(); ++i) {
             Statistics el = array.get(i);
             if (el != null && el.max != null && el.max > max && i != index) {
