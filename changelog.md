@@ -1,3 +1,7 @@
+11.1.0
+  - added API to retrieve CopyFactory slave trading log
+  - fixed race condition when orders are being added and completed fast
+
 11.0.0
   - breaking change: MetaApi options are now specified via an object
   - breaking change: CopyFactory options are now specified via an object
@@ -14,6 +18,11 @@
   - added option for reverse copying in CopyFactory API
   - added ConnectionHealthMonitor.getServerHealthStatus API to retrieve health status of server-side applications
   - added option to specify account-wide stopout and risk limits in CopyFactory API
+  - track MetaApi application latencies
+  - send RPC requests via RPC application
+  - added extensions for accounts
+  - added metadata field for accounts to store extra information together with account
+  - increased synchronization stability
 
 10.1.0
   - added support for portfolio strategies (i.e. the strategies which include several other member strategies) to CopyFactory API

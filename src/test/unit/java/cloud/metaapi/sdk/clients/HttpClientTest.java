@@ -107,7 +107,7 @@ public class HttpClientTest {
     @Test
     public void testReturnsTimeoutExceptionIfRequestIsTimedOut() {
         httpClient = new HttpClient(1, 60000);
-        HttpRequestOptions opts = new HttpRequestOptions("http://example.com/not-found", Method.GET);
+        HttpRequestOptions opts = new HttpRequestOptions("http://metaapi.cloud", Method.GET);
         assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
             try {
                 httpClient.request(opts).get();

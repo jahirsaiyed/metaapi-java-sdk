@@ -1,5 +1,6 @@
 package cloud.metaapi.sdk.clients.meta_api.models;
 
+import cloud.metaapi.sdk.clients.meta_api.LatencyListener.SymbolPriceTimestamps;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 
 /**
@@ -39,4 +40,8 @@ public class MetatraderSymbolPrice {
      * Quote time, in broker timezone, YYYY-MM-DD HH:mm:ss.SSS format
      */
     public String brokerTime;
+    /**
+     * Contains latency information about price streaming, or {@code null}
+     */
+    public SymbolPriceTimestamps timestamps;
 }

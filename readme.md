@@ -20,11 +20,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>10.1.0</version>
+  <version>11.1.0</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/10.1.0/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/11.1.0/jar).
 
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.
@@ -343,10 +343,29 @@ System.out.println("Trade successful, result code is " + result.stringCode);
 You can monitor account connection health using MetaApiConnection.healthMonitor API.
 ```java
 ConnectionHealthMonitor monitor = connection.getHealthMonitor();
+// retrieve server-side app health status
+System.out.println(monitor.getServerHealthStatus());
 // retrieve detailed connection health status
 System.out.println(monitor.getHealthStatus());
 // retrieve account connection update measured over last 7 days
 System.out.println(monitor.getUptime());
+```
+
+## Tracking latencies
+You can track latencies uring MetaApi.latencyMonitor API. Client-side latencies include network communication delays, thus the lowest client-side latencies are achieved if you host your app in AWS Ohio region.
+```java
+MetaApi api = new MetaApi("token", new MetaApi.Options() {{
+  enableLatencyMonitor = true;
+}});
+LatencyMonitor monitor = api.getLatencyMonitor();
+// retrieve trade latecy stats
+System.out.println(monitor.getTradeLatencies());
+// retrieve update streaming latency stats
+System.out.println(monitor.getUpdateLatencies());
+// retrieve quote streaming latency stats
+System.out.println(monitor.getPriceLatencies());
+// retrieve request latency stats
+System.out.println(monitor.getRequestLatencies());
 ```
 
 ## Managing MetaTrader demo accounts via API

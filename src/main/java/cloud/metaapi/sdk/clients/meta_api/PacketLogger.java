@@ -51,10 +51,10 @@ public class PacketLogger {
      * Packet logger options
      */
     public static class LoggerOptions {
-        Integer fileNumberLimit;
-        Integer logFileSizeInHours;
-        Boolean compressSpecifications;
-        Boolean compressPrices;
+        int fileNumberLimit = 12;
+        int logFileSizeInHours = 4;
+        boolean compressSpecifications = true;
+        boolean compressPrices = true;
     }
     
     /**
@@ -89,10 +89,10 @@ public class PacketLogger {
      * @throws IOException if log directory cannot be created
      */
     public PacketLogger(LoggerOptions opts) throws IOException {
-        this.fileNumberLimit = opts.fileNumberLimit != null ? opts.fileNumberLimit : 12;
-        this.logFileSizeInHours = opts.logFileSizeInHours != null ? opts.logFileSizeInHours : 4;
-        this.compressSpecifications = opts.compressSpecifications != null ? opts.compressSpecifications : true;
-        this.compressPrices = opts.compressPrices != null ? opts.compressPrices : true;
+        this.fileNumberLimit = opts.fileNumberLimit;
+        this.logFileSizeInHours = opts.logFileSizeInHours;
+        this.compressSpecifications = opts.compressSpecifications;
+        this.compressPrices = opts.compressPrices;
         this.previousPrices = new HashMap<>();
         this.writeQueue = new HashMap<>();
         this.root = "./.metaapi/logs";
@@ -126,6 +126,7 @@ public class PacketLogger {
                 ObjectNode queueItem = JsonMapper.getInstance().createObjectNode();
                 queueItem.put("type", packetType);
                 queueItem.put("sequenceNumber", packetSequenceNumber);
+                queueItem.set("sequenceTimestamp", packet.get("sequenceTimestamp"));
                 queue.add(queueItem.toString());
             } else {
                 queue.add(packet.toString());

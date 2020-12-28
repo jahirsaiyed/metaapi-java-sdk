@@ -229,8 +229,18 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
      * @return completable future resolving when the history is cleared
      */
     public CompletableFuture<Void> removeHistory() {
+        return removeHistory(null);
+    }
+    
+    /**
+     * Clears the order and transaction history of a specified application so that it can be synchronized from scratch 
+     * (see https://metaapi.cloud/docs/client/websocket/api/removeHistory/).
+     * @param application application to remove history for, or {@code null}
+     * @return completable future resolving when the history is cleared
+     */
+    public CompletableFuture<Void> removeHistory(String application) {
         historyStorage.reset();
-        return websocketClient.removeHistory(account.getId());
+        return websocketClient.removeHistory(account.getId(), application);
     }
     
     /**
@@ -816,17 +826,22 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     
     /**
      * Closes the connection. The instance of the class should no longer be used after this method is invoked.
+     * @return completable future resolving when connection is closed
      */
-    public void close() {
-        if (!closed) {
-            shouldSynchronize = null;
-            websocketClient.removeSynchronizationListener(account.getId(), this);
-            websocketClient.removeSynchronizationListener(account.getId(), terminalState);
-            websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
-            connectionRegistry.remove(account.getId());
-            healthMonitor.stop();
-            closed = true;
-        }
+    public CompletableFuture<Void> close() {
+        return CompletableFuture.runAsync(() -> {
+            if (!closed) {
+                shouldSynchronize = null;
+                websocketClient.unsubscribe(account.getId()).join();
+                websocketClient.removeSynchronizationListener(account.getId(), this);
+                websocketClient.removeSynchronizationListener(account.getId(), terminalState);
+                websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
+                websocketClient.removeSynchronizationListener(account.getId(), healthMonitor);
+                connectionRegistry.remove(account.getId());
+                healthMonitor.stop();
+                closed = true;
+            }
+        });
     }
     
     /**
@@ -860,6 +875,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
                 subscribeToMarketData(symbol);
             }
             isSynchronized = true;
+            synchronizationRetryIntervalInSeconds = 1;
         } catch (CompletionException e) {
             logger.error("MetaApi websocket client for account " + account.getId()
                 + " failed to synchronize", e.getCause());
