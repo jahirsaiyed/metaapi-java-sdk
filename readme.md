@@ -20,11 +20,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>9.0.0</version>
+  <version>11.1.0</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/9.0.0/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/11.1.0/jar).
 
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.
@@ -324,9 +324,12 @@ System.out.println(connection.createLimitBuyOrder("GBPUSD", 0.07, 1.0, 0.9, 2.0,
 System.out.println(connection.createLimitSellOrder("GBPUSD", 0.07, 1.5, 2.0, 0.9, options).get());
 System.out.println(connection.createStopBuyOrder("GBPUSD", 0.07, 1.5, 0.9, 2.0, options).get());
 System.out.println(connection.createStopSellOrder("GBPUSD", 0.07, 1.0, 2.0, 0.9, options).get());
+System.out.println(connection.createStopLimitBuyOrder("GBPUSD", 0.07, 1.5, 1.4, 0.9, 2.0, options).get());
+System.out.println(connection.createStopLimitSellOrder("GBPUSD", 0.07, 1.0, 1.1, 2.0, 0.9, options).get());
 System.out.println(connection.modifyPosition("46870472", 2.0, 0.9).get());
 System.out.println(connection.closePositionPartially("46870472", 0.9, null).get());
 System.out.println(connection.closePosition("46870472", null).get());
+System.out.println(connection.closeBy("46870472", "46870482", null).get());
 System.out.println(connection.closePositionsBySymbol("EURUSD", null).get());
 System.out.println(connection.modifyOrder("46870472", 1.0, 2.0, 0.9).get());
 System.out.println(connection.cancelOrder("46870472").get());
@@ -334,6 +337,59 @@ System.out.println(connection.cancelOrder("46870472").get());
 // if you need to, check the extra result information in stringCode and numericCode properties of the response
 MetatraderTradeResponse result = connection.createMarketBuyOrder("GBPUSD", 0.07, 0.9, 2.0, options).get();
 System.out.println("Trade successful, result code is " + result.stringCode);
+```
+
+## Monitoring account connection health and uptime
+You can monitor account connection health using MetaApiConnection.healthMonitor API.
+```java
+ConnectionHealthMonitor monitor = connection.getHealthMonitor();
+// retrieve server-side app health status
+System.out.println(monitor.getServerHealthStatus());
+// retrieve detailed connection health status
+System.out.println(monitor.getHealthStatus());
+// retrieve account connection update measured over last 7 days
+System.out.println(monitor.getUptime());
+```
+
+## Tracking latencies
+You can track latencies uring MetaApi.latencyMonitor API. Client-side latencies include network communication delays, thus the lowest client-side latencies are achieved if you host your app in AWS Ohio region.
+```java
+MetaApi api = new MetaApi("token", new MetaApi.Options() {{
+  enableLatencyMonitor = true;
+}});
+LatencyMonitor monitor = api.getLatencyMonitor();
+// retrieve trade latecy stats
+System.out.println(monitor.getTradeLatencies());
+// retrieve update streaming latency stats
+System.out.println(monitor.getUpdateLatencies());
+// retrieve quote streaming latency stats
+System.out.println(monitor.getPriceLatencies());
+// retrieve request latency stats
+System.out.println(monitor.getRequestLatencies());
+```
+
+## Managing MetaTrader demo accounts via API
+Please note that not all MT4/MT5 servers allows you to create demo accounts using the method below.
+### Create a MetaTrader 4 demo account
+```java
+MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
+  .createMT4DemoAccount(provisioningProfile.getId(), new NewMT4DemoAccount() {{
+  balance = 100000;
+  email = "example@example.com";
+  leverage = 100;
+  serverName = "Exness-Trial4";
+}}).get();
+```
+
+### Create a MetaTrader 5 demo account
+```java
+MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
+  .createMT5DemoAccount(provisioningProfile.getId(), new NewMT5DemoAccount() {{
+  balance = 100000;
+  email = "example@example.com";
+  leverage = 100;
+  serverName = "ICMarketsSC-Demo";
+}}).get();
 ```
 
 ## CopyFactory copy trading API (experimental)
@@ -368,6 +424,9 @@ Features supported:
 - synchronize subscriber account with strategy providers
 - monitor trading history
 - calculate trade copying commissions for account managers
+- support portfolio strategies as trading signal source, i.e. the strategies which include signals of several other strategies (also known as combos on some platforms)
+
+Please note that trade copying to MT5 netting accounts is not supported in the current API version
 
 ### Configuring trade copying
 
@@ -387,11 +446,11 @@ MetaApi metaapi = new MetaApi(token);
 CopyFactory copyFactory = new CopyFactory(token);
 
 // retrieve MetaApi MetaTrader accounts with CopyFactory as application field value
-MetatraderAccount masterMetaapiAccount = api.getMetatraderAccountApi().getAccount("masterMetaapiAccountId").get();
+MetatraderAccount masterMetaapiAccount = metaapi.getMetatraderAccountApi().getAccount("masterMetaapiAccountId").get();
 if (!masterMetaapiAccount.getApplication().equals("CopyFactory")) {
   throw new Exception("Please specify CopyFactory application field value in your MetaApi account in order to use it in CopyFactory API");
 }
-MetatraderAccount slaveMetaapiAccount = api.getMetatraderAccountApi().getAccount("slaveMetaapiAccountId").get();
+MetatraderAccount slaveMetaapiAccount = metaapi.getMetatraderAccountApi().getAccount("slaveMetaapiAccountId").get();
 if (!slaveMetaapiAccount.getApplication().equals("CopyFactory")) {
   throw new Exception("Please specify CopyFactory application field value in your MetaApi account in order to use it in CopyFactory API");
 }
@@ -412,7 +471,7 @@ configurationApi.updateStrategy(strategyId.id, new CopyFactoryStrategyUpdate() {
   name = "Test strategy";
   description = "Some useful description about your strategy";
   positionLifecycle = "hedging";
-  connectionId = slaveMetaapiAccount.getId();
+  connectionId = masterMetaapiAccount.getId();
   maxTradeRisk = 0.1;
   stopOutRisk = new CopyFactoryStrategyStopOutRisk() {{
     value = 0.4;
@@ -425,9 +484,9 @@ configurationApi.updateStrategy(strategyId.id, new CopyFactoryStrategyUpdate() {
 }}).get();
 
 // subscribe slave CopyFactory accounts to the strategy
-configurationApi.updateAccount(masterAccountId, new CopyFactoryAccountUpdate() {{
+configurationApi.updateAccount(slaveAccountId, new CopyFactoryAccountUpdate() {{
   name = "Demo account";
-  connectionId = masterMetaapiAccount.getId();
+  connectionId = slaveMetaapiAccount.getId();
   subscriptions: List.of(new CopyFactoryStrategySubscription() {{
     strategyId = strategyId;
     multiplier = 1;
@@ -481,10 +540,13 @@ A subscription to a strategy can be stopped if the strategy have exceeded allowe
 ```java
 TradingClient tradingApi = copyFactory.getTradingApi();
 String accountId = "..."; // CopyFactory account id
+String strategyId = "..."; // CopyFactory strategy id
+
 // retrieve list of strategy stopouts
 System.out.println(tradingApi.getStopouts(accountId).get());
+
 // reset a stopout so that subscription can continue
-tradingApi.resetStopout(accountId, "daily-equity").get();
+tradingApi.resetStopout(accountId, strategyId, "daily-equity").get();
 ```
 
 Keywords: MetaTrader API, MetaTrader REST API, MetaTrader websocket API,

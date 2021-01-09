@@ -1,13 +1,17 @@
 package cloud.metaapi.sdk.meta_api;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
 import cloud.metaapi.sdk.clients.meta_api.models.*;
@@ -32,7 +36,10 @@ public class TerminalState extends SynchronizationListener {
     private List<MetatraderSymbolSpecification> specifications = new ArrayList<>();
     private Map<String, MetatraderSymbolSpecification> specificationsBySymbol = new HashMap<>();
     private Map<String, MetatraderSymbolPrice> pricesBySymbol = new HashMap<>();
+    private Map<String, Date> completedOrders = new HashMap<>();
+    private Map<String, Date> removedPositions = new HashMap<>();
     private MetatraderAccountInformation accountInformation = null;
+    private boolean positionsInitialized = false;
     private Timer statusTimer = null;
     
     /**
@@ -144,6 +151,9 @@ public class TerminalState extends SynchronizationListener {
         specifications.clear();
         specificationsBySymbol.clear();
         pricesBySymbol.clear();
+        completedOrders.clear();
+        removedPositions.clear();
+        positionsInitialized = false;
         return CompletableFuture.completedFuture(null);
     }
     
@@ -155,49 +165,82 @@ public class TerminalState extends SynchronizationListener {
     
     @Override
     public CompletableFuture<Void> onPositionsReplaced(List<MetatraderPosition> positions) {
-        this.positions = positions;
+        this.positions = new ArrayList<>(positions);
+        this.removedPositions.clear();
+        this.positionsInitialized = true;
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> onPositionUpdated(MetatraderPosition position) {
+        int index = -1;
         for (int i = 0; i < positions.size(); ++i) {
             if (positions.get(i).id.equals(position.id)) {
-                positions.set(i, position);
-                return CompletableFuture.completedFuture(null);
+                index = i;
+                break;
             }
         }
-        positions.add(position);
+        if (index != -1) {
+            positions.set(index, position);
+        } else if (!removedPositions.containsKey(position.id)) {
+            positions.add(position);
+        }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> onPositionRemoved(String positionId) {
-        positions.removeIf(position -> position.id.equals(positionId));
+        Optional<MetatraderPosition> position = positions.stream().filter(p -> !p.id.equals(positionId)).findFirst();
+        if (!position.isPresent()) {
+            for (Entry<String, Date> e : removedPositions.entrySet()) {
+                if (e.getValue().getTime() + 5 * 60 * 1000 < Date.from(Instant.now()).getTime()) {
+                    removedPositions.remove(e.getKey());
+                }
+            }
+            removedPositions.put(positionId, Date.from(Instant.now()));
+        } else {
+            positions.removeIf(p -> p.id.equals(positionId));
+        }
         return CompletableFuture.completedFuture(null);
     }
     
     @Override
     public CompletableFuture<Void> onOrdersReplaced(List<MetatraderOrder> orders) {
         this.orders = orders;
+        this.completedOrders.clear();
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> onOrderUpdated(MetatraderOrder order) {
+        int index = -1;
         for (int i = 0; i < orders.size(); ++i) {
             if (orders.get(i).id.equals(order.id)) {
-                orders.set(i, order);
-                return CompletableFuture.completedFuture(null);
+                index = i;
+                break;
             }
         }
-        orders.add(order);
+        if (index != -1) {
+            orders.set(index, order);
+        } else if (!completedOrders.containsKey(order.id)) {
+            orders.add(order);
+        }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> onOrderCompleted(String orderId) {
-        orders.removeIf(order -> order.id.equals(orderId));
+        Optional<MetatraderOrder> order = orders.stream().filter(o -> !o.id.equals(orderId)).findFirst();
+        if (!order.isPresent()) {
+            for (Entry<String, Date> e : completedOrders.entrySet()) {
+                if (e.getValue().getTime() + 5 * 60 * 1000 < Date.from(Instant.now()).getTime()) {
+                    completedOrders.remove(e.getKey());
+                }
+            }
+            completedOrders.put(orderId, Date.from(Instant.now()));
+        } else {
+            orders.removeIf(o -> o.id.equals(orderId));
+        }
         return CompletableFuture.completedFuture(null);
     }
 
@@ -217,44 +260,75 @@ public class TerminalState extends SynchronizationListener {
     }
 
     @Override
-    public CompletableFuture<Void> onSymbolPriceUpdated(MetatraderSymbolPrice price) {
-        pricesBySymbol.put(price.symbol, price);
-        Optional<MetatraderSymbolSpecification> specification = getSpecification(price.symbol);
-        if (specification.isPresent()) {
-            for (MetatraderPosition position : positions) {
-                if (!position.symbol.equals(price.symbol)) continue;
-                if (position.unrealizedProfit == null || position.realizedProfit == null) {
-                    position.unrealizedProfit = 
-                        (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
-                        (position.currentPrice - position.openPrice) * position.currentTickValue *
-                        position.volume / specification.get().tickSize;
-                    position.realizedProfit = position.profit - position.unrealizedProfit;
+    public CompletableFuture<Void> onSymbolPricesUpdated(List<MetatraderSymbolPrice> prices, Double equity,
+        Double margin, Double freeMargin, Double marginLevel) {
+        boolean pricesInitialized = false;
+        for (MetatraderSymbolPrice price : prices) {
+            pricesBySymbol.put(price.symbol, price);
+            List<MetatraderPosition> positions = this.positions.stream()
+                .filter(p -> p.symbol.equals(price.symbol)).collect(Collectors.toList());
+            List<MetatraderPosition> otherPositions = this.positions.stream()
+                .filter(p -> !p.symbol.equals(price.symbol)).collect(Collectors.toList());
+            List<MetatraderOrder> orders = this.orders.stream()
+                    .filter(o -> o.symbol.equals(price.symbol)).collect(Collectors.toList());
+            pricesInitialized = true;
+            for (MetatraderPosition position : otherPositions) {
+                MetatraderSymbolPrice p = pricesBySymbol.get(position.symbol);
+                if (p != null) {
+                    if (position.unrealizedProfit == null) {
+                        updatePositionProfits(position, p);
+                    }
+                } else {
+                    pricesInitialized = false;
                 }
-                double newPositionPrice = (position.type == PositionType.POSITION_TYPE_BUY ? price.bid : price.ask);
-                double isProfitable = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
-                    (newPositionPrice - position.openPrice);
-                double currentTickValue = (isProfitable > 0 ? price.profitTickValue : price.lossTickValue);
-                double unrealizedProfit = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
-                    (newPositionPrice - position.openPrice) * currentTickValue *
-                    position.volume / specification.get().tickSize;
-                position.unrealizedProfit = unrealizedProfit;
-                position.profit = position.unrealizedProfit + position.realizedProfit;
-                position.currentPrice = newPositionPrice;
-                position.currentTickValue = currentTickValue;
+            }
+            for (MetatraderPosition position : positions) {
+                updatePositionProfits(position, price);
             }
             for (MetatraderOrder order : orders) {
-                if (!order.symbol.equals(price.symbol)) continue;
-                order.currentPrice = (order.type == OrderType.ORDER_TYPE_BUY_LIMIT 
+                order.currentPrice = (order.type == OrderType.ORDER_TYPE_BUY
+                    || order.type == OrderType.ORDER_TYPE_BUY_LIMIT
                     || order.type == OrderType.ORDER_TYPE_BUY_STOP
                     || order.type == OrderType.ORDER_TYPE_BUY_STOP_LIMIT
                 ? price.ask : price.bid);
             }
-            if (accountInformation != null) {
+        }
+        if (accountInformation != null) {
+            if (positionsInitialized && pricesInitialized) {
                 double profitSum = 0;
-                for (MetatraderPosition position : positions) profitSum += position.profit;
+                for (MetatraderPosition position : this.positions) profitSum += position.unrealizedProfit;
                 accountInformation.equity = accountInformation.balance + profitSum;
+            } else {
+                accountInformation.equity = equity != null ? equity : accountInformation.equity;
             }
+            accountInformation.margin = margin != null ? margin : accountInformation.margin;
+            accountInformation.freeMargin = freeMargin != null ? freeMargin : accountInformation.freeMargin;
+            accountInformation.marginLevel = freeMargin != null ? marginLevel : accountInformation.marginLevel;
         }
         return CompletableFuture.completedFuture(null);
+    }
+    
+    private void updatePositionProfits(MetatraderPosition position, MetatraderSymbolPrice price) {
+        Optional<MetatraderSymbolSpecification> specification = getSpecification(position.symbol);
+        if (specification.isPresent()) {
+            if (position.unrealizedProfit == null || position.realizedProfit == null) {
+                position.unrealizedProfit = 
+                    (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
+                    (position.currentPrice - position.openPrice) * position.currentTickValue *
+                    position.volume / specification.get().tickSize;
+                position.realizedProfit = position.profit - position.unrealizedProfit;
+            }
+            double newPositionPrice = (position.type == PositionType.POSITION_TYPE_BUY ? price.bid : price.ask);
+            double isProfitable = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
+                (newPositionPrice - position.openPrice);
+            double currentTickValue = (isProfitable > 0 ? price.profitTickValue : price.lossTickValue);
+            double unrealizedProfit = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
+                (newPositionPrice - position.openPrice) * currentTickValue *
+                position.volume / specification.get().tickSize;
+            position.unrealizedProfit = unrealizedProfit;
+            position.profit = position.unrealizedProfit + position.realizedProfit;
+            position.currentPrice = newPositionPrice;
+            position.currentTickValue = currentTickValue;
+        }
     }
 }

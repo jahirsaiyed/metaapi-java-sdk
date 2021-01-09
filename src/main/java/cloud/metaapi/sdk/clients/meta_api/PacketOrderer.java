@@ -53,11 +53,11 @@ public class PacketOrderer {
     /**
      * Constructs the class
      * @param outOfOrderListener listener which will receive out of order packet events
-     * @param orderingTimeoutInSeconds packet ordering timeout, or {@code null}. Default is 10 seconds
+     * @param orderingTimeoutInSeconds packet ordering timeout
      */
-    public PacketOrderer(OutOfOrderListener outOfOrderListener, Integer orderingTimeoutInSeconds) {
+    public PacketOrderer(OutOfOrderListener outOfOrderListener, int orderingTimeoutInSeconds) {
         this.outOfOrderListener = outOfOrderListener;
-        this.orderingTimeoutInSeconds = (orderingTimeoutInSeconds != null ? orderingTimeoutInSeconds : 10);
+        this.orderingTimeoutInSeconds = orderingTimeoutInSeconds;
         this.isOutOfOrderEmitted = new HashMap<>();
     }
     
@@ -175,10 +175,12 @@ public class PacketOrderer {
                     String accountId = packet.accountId;
                     if (!isOutOfOrderEmitted.getOrDefault(accountId, false)) {
                         isOutOfOrderEmitted.put(accountId, true);
-                        long expectedSequenceNumber = sequenceNumberByAccount.containsKey(accountId) ?
-                            (sequenceNumberByAccount.get(accountId).get() + 1) : -1;
-                        outOfOrderListener.onOutOfOrderPacket(packet.accountId, expectedSequenceNumber,
-                            packet.sequenceNumber, packet.packet, packet.receivedAt);
+                        // Do not emit onOutOfOrderPacket for packets that come before synchronizationStarted
+                        if (sequenceNumberByAccount.containsKey(accountId)) {
+                            outOfOrderListener.onOutOfOrderPacket(packet.accountId,
+                                sequenceNumberByAccount.get(accountId).get() + 1,
+                                packet.sequenceNumber, packet.packet, packet.receivedAt);
+                        }
                     }
                 }
             }

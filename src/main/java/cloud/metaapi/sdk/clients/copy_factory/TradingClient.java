@@ -9,6 +9,7 @@ import cloud.metaapi.sdk.clients.HttpRequestOptions;
 import cloud.metaapi.sdk.clients.MetaApiClient;
 import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
 import cloud.metaapi.sdk.clients.copy_factory.models.*;
+import cloud.metaapi.sdk.clients.models.IsoTime;
 
 /**
  * metaapi.cloud CopyFactory trading API (trade copying trading API) client (see
@@ -69,18 +70,67 @@ public class TradingClient extends MetaApiClient {
     }
     
     /**
-     * Resets account stopout. See
-     * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/post_users_current_accounts_accountId_stopouts_reason_reset
+     * Resets strategy stopouts. See
+     * https://trading-api-v1.agiliumtrade.agiliumtrade.ai/swagger/#!/default/post_users_current_accounts_accountId_
+     * strategies_subscribed_strategyId_stopouts_reason_reset
      * @param accountId account id
+     * @param strategyId strategy id
      * @param reason stopout reason to reset. One of yearly-balance, monthly-balance, daily-balance,
      * yearly-equity, monthly-equity, daily-equity, max-drawdown
-     * @return completable future which resolves when the stopout is reset
+     * @return completable future which resolves when the stopouts are reset
      */
-    public CompletableFuture<Void> resetStopout(String accountId, String reason) {
-        if (isNotJwtToken()) return handleNoAccessError("resetStopout");
-        HttpRequestOptions opts = new HttpRequestOptions(
-            host + "/users/current/accounts/" + accountId + "/stopouts/" + reason + "/reset", Method.POST);
+    public CompletableFuture<Void> resetStopouts(String accountId, String strategyId, String reason) {
+        if (isNotJwtToken()) return handleNoAccessError("resetStopouts");
+        HttpRequestOptions opts = new HttpRequestOptions(host + "/users/current/accounts/" + accountId
+            + "/strategies-subscribed/" + strategyId + "/stopouts/" + reason + "/reset", Method.POST);
         opts.getHeaders().put("auth-token", token);
         return httpClient.request(opts).thenApply(response -> null);
+    }
+    
+    /**
+     * Returns copy trading user log for an account and time range. See
+     * https://trading-api-v1.project-stock.v2.agiliumlabs.cloud/swagger/#!/default/get_users_current_accounts_accountId_user_log
+     * @param accountId account id
+     * @return completable future which resolves with log records found
+     */
+    public CompletableFuture<List<CopyFactoryUserLogRecord>> getUserLog(String accountId) {
+        return getUserLog(accountId, null, null, null, null);
+    }
+    
+    /**
+     * Returns copy trading user log for an account and time range. See
+     * https://trading-api-v1.project-stock.v2.agiliumlabs.cloud/swagger/#!/default/get_users_current_accounts_accountId_user_log
+     * @param accountId account id
+     * @param startTime time to start loading data from, or {@code null}
+     * @param endTime time to stop loading data at, or {@code null}
+     * @return completable future which resolves with log records found
+     */
+    public CompletableFuture<List<CopyFactoryUserLogRecord>> getUserLog(String accountId,
+        IsoTime startTime, IsoTime endTime) {
+        return getUserLog(accountId, startTime, endTime, null, null);
+    }
+    
+    /**
+     * Returns copy trading user log for an account and time range. See
+     * https://trading-api-v1.project-stock.v2.agiliumlabs.cloud/swagger/#!/default/get_users_current_accounts_accountId_user_log
+     * @param accountId account id
+     * @param startTime time to start loading data from, or {@code null}
+     * @param endTime time to stop loading data at, or {@code null}
+     * @param offset pagination offset, or {@code null}. Default is 0
+     * @param limit pagination limit, or {@code null}. Default is 1000
+     * @return completable future which resolves with log records found
+     */
+    public CompletableFuture<List<CopyFactoryUserLogRecord>> getUserLog(String accountId,
+        IsoTime startTime, IsoTime endTime, Integer offset, Integer limit) {
+        if (isNotJwtToken()) return handleNoAccessError("getUserLog");
+        HttpRequestOptions opts = new HttpRequestOptions(
+            host + "/users/current/accounts/" + accountId + "/user-log", Method.GET);
+        opts.getHeaders().put("auth-token", token);
+        if (startTime != null) opts.getQueryParameters().put("startTime", startTime);
+        if (endTime != null) opts.getQueryParameters().put("endTime", endTime);
+        if (offset != null) opts.getQueryParameters().put("offset", offset);
+        if (limit != null) opts.getQueryParameters().put("limit", limit);
+        return httpClient.requestJson(opts, CopyFactoryUserLogRecord[].class)
+            .thenApply((array) -> Arrays.asList(array));
     }
 }

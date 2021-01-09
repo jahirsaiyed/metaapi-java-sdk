@@ -59,6 +59,7 @@ public class HttpClient {
      * If there is a json parsing error, completes exceptionally with {@link JsonProcessingException}.
      * @param options request options
      * @param valueType class into which the response will be transformed
+     * @param <T> any DTO object that can be converted from json
      * @return completable future with request results as json
      */
     public <T> CompletableFuture<T> requestJson(HttpRequestOptions options, Class<T> valueType) {

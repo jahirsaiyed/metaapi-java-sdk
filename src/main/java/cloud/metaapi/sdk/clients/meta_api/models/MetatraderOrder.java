@@ -152,4 +152,12 @@ public class MetatraderOrder {
      * Current exchange rate of account currency into USD, or {@code null}
      */
     public Double accountCurrencyExchangeRate;
+    /**
+     * Identifier of an opposite position used for closing by order ORDER_TYPE_CLOSE_BY, or {@code null}
+     */
+    public String closeByPositionId;
+    /**
+     * The Limit order price for the StopLimit order, or {@code null}
+     */
+    public Double stopLimitPrice;
 }

@@ -6,11 +6,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import org.assertj.core.util.Lists;
+import org.assertj.core.util.Maps;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -218,9 +221,10 @@ class MetaApiConnectionTest {
      */
     @Test
     void testRemovesHistory() throws Exception {
-        Mockito.when(client.removeHistory("accountId")).thenReturn(CompletableFuture.completedFuture(null));
-        api.removeHistory().get();
-        Mockito.verify(client).removeHistory("accountId");
+        Mockito.when(client.removeHistory("accountId", "app"))
+          .thenReturn(CompletableFuture.completedFuture(null));
+        api.removeHistory("app").get();
+        Mockito.verify(client).removeHistory("accountId", "app");
         Mockito.verify(storageMock).reset();
     }
     
@@ -408,6 +412,68 @@ class MetaApiConnectionTest {
     }
     
     /**
+     * Tests {@link MetaApiConnection#createStopLimitBuyOrder(String, double, double, double, Double, Double, PendingTradeOptions)}
+     */
+    @Test
+    void testCreatesStopLimitBuyOrder() {
+        MetatraderTradeResponse tradeResult = new MetatraderTradeResponse() {{
+            numericCode = 10009;
+            stringCode = "TRADE_RETCODE_DONE";
+            orderId = "46870472";
+        }};
+        Mockito.when(client.trade(Mockito.eq("accountId"), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(tradeResult));
+        MetatraderTradeResponse actual = api.createStopLimitBuyOrder("GBPUSD", 0.07, 1.5, 1.4, 0.9, 2.0,
+            new PendingTradeOptions() {{ comment = "comment"; clientId = "TE_GBPUSD_7hyINWqAlE"; }}).join();
+        assertThat(actual).usingRecursiveComparison().isEqualTo(tradeResult);
+        Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(new MetatraderTrade() {{
+                actionType = ActionType.ORDER_TYPE_BUY_STOP_LIMIT;
+                symbol = "GBPUSD";
+                volume = 0.07;
+                openPrice = 1.5;
+                stopLimitPrice = 1.4;
+                stopLoss = 0.9;
+                takeProfit = 2.0;
+                comment = "comment";
+                clientId = "TE_GBPUSD_7hyINWqAlE";
+            }});
+            return true;
+        }));
+    }
+    
+    /**
+     * Tests {@link MetaApiConnection#createStopLimitSellOrder(String, double, double, double, Double, Double, PendingTradeOptions)}
+     */
+    @Test
+    void testCreatesStopLimitSellOrder() {
+        MetatraderTradeResponse tradeResult = new MetatraderTradeResponse() {{
+            numericCode = 10009;
+            stringCode = "TRADE_RETCODE_DONE";
+            orderId = "46870472";
+        }};
+        Mockito.when(client.trade(Mockito.eq("accountId"), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(tradeResult));
+        MetatraderTradeResponse actual = api.createStopLimitSellOrder("GBPUSD", 0.07, 1.0, 1.1, 2.0, 0.9,
+            new PendingTradeOptions() {{ comment = "comment"; clientId = "TE_GBPUSD_7hyINWqAlE"; }}).join();
+        assertThat(actual).usingRecursiveComparison().isEqualTo(tradeResult);
+        Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(new MetatraderTrade() {{
+                actionType = ActionType.ORDER_TYPE_SELL_STOP_LIMIT;
+                symbol = "GBPUSD";
+                volume = 0.07;
+                openPrice = 1.0;
+                stopLimitPrice = 1.1;
+                stopLoss = 2.0;
+                takeProfit = 0.9;
+                comment = "comment";
+                clientId = "TE_GBPUSD_7hyINWqAlE";
+            }});
+            return true;
+        }));
+    }
+    
+    /**
      * Tests {@link MetaApiConnection#modifyPosition(String, Double, Double)}
      */
     @ParameterizedTest
@@ -471,6 +537,35 @@ class MetaApiConnectionTest {
             comment = trade.comment; clientId = trade.clientId;
         }}).get();
         assertThat(actual).usingRecursiveComparison().isEqualTo(expected);
+        Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(trade);
+            return true;
+        }));
+    }
+    
+    /**
+     * Tests {@link MetaApiConnection#closeBy(String, String, MarketTradeOptions)}
+     */
+    @Test
+    void testClosesPositionByAnOppositeOne() {
+        MetatraderTradeResponse tradeResult = new MetatraderTradeResponse() {{
+            numericCode = 10009;
+            stringCode = "TRADE_RETCODE_DONE";
+            positionId = "46870472";
+            closeByPositionId = "46870482";
+        }};
+        Mockito.when(client.trade(Mockito.eq("accountId"), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(tradeResult));
+        MetatraderTradeResponse actual = api.closeBy("46870472", "46870482", new MarketTradeOptions() {{
+            comment = "comment"; clientId = "TE_GBPUSD_7hyINWqAlE";
+        }}).join();
+        assertThat(actual).usingRecursiveComparison().isEqualTo(tradeResult);
+        MetatraderTrade trade = new MetatraderTrade();
+        trade.actionType = ActionType.POSITION_CLOSE_BY;
+        trade.positionId = "46870472";
+        trade.closeByPositionId = "46870482";
+        trade.comment = "comment";
+        trade.clientId = "TE_GBPUSD_7hyINWqAlE";
         Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
             assertThat(arg).usingRecursiveComparison().isEqualTo(trade);
             return true;
@@ -659,6 +754,18 @@ class MetaApiConnectionTest {
     }
     
     /**
+     * Tests {@link MetaApiConnection#saveUptime(Map)}
+     */
+    @Test
+    void testSavesUptimeStatsToTheServer() {
+        Mockito.when(client.saveUptime(Mockito.eq("accountId"), Mockito.anyMap()))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        Map<String, Double> uptime = Maps.newHashMap("1h", 100.0); 
+        api.saveUptime(uptime).join();
+        Mockito.verify(client).saveUptime("accountId", uptime);
+    }
+    
+    /**
      * Tests {@link MetaApiConnection#getTerminalState()}
      * Tests {@link MetaApiConnection#getHistoryStorage()}
      */
@@ -729,14 +836,78 @@ class MetaApiConnectionTest {
     }
     
     /**
+     * Tests {@link MetaApiConnection#onConnected()}
+     */
+    @Test
+    void testMaintainsSynchronizationIfConnectionHasFailed() {
+        IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
+        IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
+        Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.anyString(), Mockito.any(), Mockito.any()))
+            .thenThrow(new CompletionException(new Exception("test error")))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
+        MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
+        api.getHistoryStorage().onHistoryOrderAdded(new MetatraderOrder() {{
+            doneTime = startingHistoryOrderTime;
+        }});
+        api.getHistoryStorage().onDealAdded(new MetatraderDeal() {{
+            time = startingDealTime;
+        }});
+        api.onConnected().join();
+        Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.anyString(), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(startingHistoryOrderTime);
+            return true;
+        }), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(startingDealTime);
+            return true;
+        }));
+    }
+    
+    /**
+     * Tests {@link MetaApiConnection#onConnected()}
+     */
+    @Test
+    void testRestoresMarketDataSubscriptionsOnSynchronization() {
+        IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
+        IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
+        Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.anyString(), Mockito.any(), Mockito.any()))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        Mockito.when(client.subscribeToMarketData("accountId", "EURUSD"))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+        Mockito.when(account.getId()).thenReturn("accountId");
+        MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
+        api.getHistoryStorage().onHistoryOrderAdded(new MetatraderOrder() {{
+            doneTime = startingHistoryOrderTime;
+        }});
+        api.getHistoryStorage().onDealAdded(new MetatraderDeal() {{
+            time = startingDealTime;
+        }});
+        api.subscribeToMarketData("EURUSD").join();
+        api.onConnected().join();
+        Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.anyString(), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(startingHistoryOrderTime);
+            return true;
+        }), Mockito.argThat(arg -> {
+            assertThat(arg).usingRecursiveComparison().isEqualTo(startingDealTime);
+            return true;
+        }));
+        Mockito.verify(client, Mockito.times(2)).subscribeToMarketData("accountId", "EURUSD");
+    }
+    
+    /**
      * Tests {@link MetaApiConnection#close()}
      */
     @Test
     void testUnsubscribesFromEventsOnClose() {
         MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
         Mockito.when(account.getId()).thenReturn("accountId");
+        Mockito.when(client.unsubscribe(Mockito.anyString()))
+            .thenReturn(CompletableFuture.completedFuture(null));
         MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
-        api.close();
+        api.close().join();
+        Mockito.verify(client).unsubscribe("accountId");
         Mockito.verify(client).removeSynchronizationListener("accountId", api);
         Mockito.verify(client).removeSynchronizationListener("accountId", api.getTerminalState());
         Mockito.verify(client).removeSynchronizationListener("accountId", api.getHistoryStorage());

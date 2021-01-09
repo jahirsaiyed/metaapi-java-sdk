@@ -26,9 +26,13 @@ public class MetatraderTradeResponse {
     /**
      * Id of the order created or modified by the trade, or {@code null}
      */
-    public String orderId = null;
+    public String orderId;
     /**
      * Id of the position created or modified by the trade, or {@code null}
      */
-    public String positionId = null;
+    public String positionId;
+    /**
+     * Identifier of an opposite position used for closing by order ORDER_TYPE_CLOSE_BY, or {@code null}
+     */
+    public String closeByPositionId;
 }

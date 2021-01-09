@@ -1,6 +1,7 @@
 package cloud.metaapi.sdk.clients.models;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -25,6 +26,13 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 public class IsoTime {
     
     private Date date;
+    
+    /**
+     * Constructs wrapper from current time
+     */
+    public IsoTime() {
+        this(Date.from(Instant.now()));
+    }
     
     /**
      * Constructs wrapper from ISO time string

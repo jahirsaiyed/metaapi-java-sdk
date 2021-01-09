@@ -121,35 +121,86 @@ class TradingClientTest {
     }
     
     /**
-     * Tests {@link TradingClient#resetStopout(String, String)}
+     * Tests {@link TradingClient#resetStopouts(String, String, String)}
      */
     @Test
-    void testResetsStopout() throws Exception {
+    void testResetsStopouts() {
         httpClient.setRequestMock((actualOptions) -> {
             HttpRequestOptions expectedOptions = new HttpRequestOptions(
                 copyFactoryApiUrl + "/users/current/accounts/"
                     + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/"
-                    + "stopouts/daily-equity/reset", Method.POST);
+                    + "strategies-subscribed/ABCD/stopouts/daily-equity/reset", Method.POST);
             expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
             assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
             return CompletableFuture.completedFuture(null);
         });
-        tradingClient
-            .resetStopout("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "daily-equity").get();
+        tradingClient.resetStopouts("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "ABCD", "daily-equity").join();
     }
     
     /**
-     * Tests {@link TradingClient#resetStopout(String, String)}
+     * Tests {@link TradingClient#resetStopouts(String, String, String)}
      */
     @Test
-    void testDoesResetStopoutWithAccountToken() throws Exception {
+    void testDoesNotResetStopoutsWithAccountToken() throws Exception {
         tradingClient = new TradingClient(httpClient, "token");
         try {
-            tradingClient
-                .resetStopout("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "daily-equity").get();
+            tradingClient.resetStopouts("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "ABCD", "daily-equity").get();
         } catch (ExecutionException e) {
             assertEquals(
-                "You can not invoke resetStopout method, because you have connected with account access token. "
+                "You can not invoke resetStopouts method, because you have connected with account access token. "
+                + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
+                e.getCause().getMessage()
+            );
+        };
+    }
+    
+    /**
+     * Tests {@link TradingClient#getUserLog(String, IsoTime, IsoTime, Integer, Integer)}
+     */
+    @Test
+    void testRetrievesCopyTradingUserLog() {
+        List<CopyFactoryUserLogRecord> expected = Lists.list(new CopyFactoryUserLogRecord() {{
+            time = new IsoTime("2020-08-08T07:57:30.328Z");
+            level = CopyFactoryUserLogRecord.LogLevel.INFO;
+            message = "message";
+        }});
+        httpClient.setRequestMock((actualOptions) -> {
+            try {
+                HttpRequestOptions expectedOptions = new HttpRequestOptions(
+                    copyFactoryApiUrl + "/users/current/accounts/"
+                        + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/user-log", Method.GET);
+                expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
+                expectedOptions.getQueryParameters().put("startTime", new IsoTime("2020-08-01T00:00:00.000Z"));
+                expectedOptions.getQueryParameters().put("endTime", new IsoTime("2020-08-10T00:00:00.000Z"));
+                expectedOptions.getQueryParameters().put("offset", 10);
+                expectedOptions.getQueryParameters().put("limit", 100);
+                assertThat(actualOptions).usingRecursiveComparison().isEqualTo(expectedOptions);
+                return CompletableFuture.completedFuture(jsonMapper.writeValueAsString(expected));
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+                return null;
+            }
+        });
+        List<CopyFactoryUserLogRecord> records = tradingClient
+            .getUserLog("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                new IsoTime("2020-08-01T00:00:00.000Z"), new IsoTime("2020-08-10T00:00:00.000Z"),
+                10, 100).join();
+        assertThat(records).usingRecursiveComparison().isEqualTo(expected);
+    }
+    
+    /**
+     * Tests {@link TradingClient#getStopouts(String)}
+     */
+    @Test
+    void testDoesNotRetrieveCopyTradingUserLogWithAccountToken() throws Exception {
+        tradingClient = new TradingClient(httpClient, "token");
+        try {
+            tradingClient.getUserLog("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").get();
+        } catch (ExecutionException e) {
+            assertEquals(
+                "You can not invoke getUserLog method, because you have connected with account access token. "
                 + "Please use API access token from https://app.metaapi.cloud/token page to invoke this method.",
                 e.getCause().getMessage()
             );

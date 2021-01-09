@@ -26,6 +26,7 @@ public class HttpRequestOptions {
         /**
          * Constructs the file field wrapper from {@link File} object
          * @param file file object which will be sent in request
+         * @throws FileNotFoundException
          */
         public FileStreamField(File file) throws FileNotFoundException {
             setFile(file);
@@ -43,6 +44,7 @@ public class HttpRequestOptions {
         /**
          * Sets file from {@link File} object
          * @param file file object which will be sent in request
+         * @throws FileNotFoundException
          */
         public void setFile(File file) throws FileNotFoundException {
             this.setFile(new FileInputStream(file), file.getName());

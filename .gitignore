@@ -8,3 +8,4 @@ broker.srv
 servers.dat
 .env
 .metaapi
+!/src/test/resources/servers.dat

@@ -15,6 +15,7 @@ public class ConnectionRegistry {
     
     private MetaApiWebsocketClient metaApiWebsocketClient;
     private Map<String, MetaApiConnection> connections;
+    private Map<String, CompletableFuture<Void>> connectionLocks;
     private String application;
     
     /**
@@ -34,6 +35,7 @@ public class ConnectionRegistry {
         this.metaApiWebsocketClient = metaApiWebsocketClient;
         this.application = (application != null ? application : "MetaApi");
         this.connections = new HashMap<>();
+        this.connectionLocks = new HashMap<>();
     }
     
     /**
@@ -58,11 +60,24 @@ public class ConnectionRegistry {
             if (connections.containsKey(account.getId())) {
                 return connections.get(account.getId());
             } else {
+                while (connectionLocks.containsKey(account.getId())) {
+                    connectionLocks.get(account.getId()).join();
+                }
+                if (connections.containsKey(account.getId())) {
+                    return connections.get(account.getId());
+                }
+                CompletableFuture<Void> connectionLockResolve = new CompletableFuture<>();
+                connectionLocks.put(account.getId(), connectionLockResolve);
                 MetaApiConnection connection = ServiceProvider.createMetaApiConnection(
                     metaApiWebsocketClient, account, historyStorage, this, historyStartTime);
-                connection.initialize().join();
-                connection.subscribe().join();
-                connections.put(account.getId(), connection);
+                try {
+                    connection.initialize().join();
+                    connection.subscribe().join();
+                    connections.put(account.getId(), connection);
+                } finally {
+                    connectionLocks.remove(account.getId());
+                    connectionLockResolve.complete(null);
+                }
                 return connection;
             }
         });

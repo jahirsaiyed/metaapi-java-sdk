@@ -1,3 +1,44 @@
+11.1.0
+  - added API to retrieve CopyFactory slave trading log
+  - fixed race condition when orders are being added and completed fast
+
+11.0.0
+  - breaking change: MetaApi options are now specified via an object
+  - breaking change: CopyFactory options are now specified via an object
+  - added packet logger
+  - added close by order support
+  - added stop limit order support
+  - bugfix MetatraderAccount.connect method to throw an error to avoid creating broken connections
+  - add marginMode, tradeAllowed, investorMode fields to account information
+  - breaking change: waitSynchronized to synchronize CopyFactory and RPC applications by default
+  - improvements to position profit and account equity tracking on client side
+  - real-time updates for margin fields in account information
+  - breaking change: uptime now returns uptime measurements over several timeframes (1h, 1d, 1w)
+  - do not retry synchronization after MetaApiConnection is closed
+  - added option for reverse copying in CopyFactory API
+  - added ConnectionHealthMonitor.getServerHealthStatus API to retrieve health status of server-side applications
+  - added option to specify account-wide stopout and risk limits in CopyFactory API
+  - track MetaApi application latencies
+  - send RPC requests via RPC application
+  - added extensions for accounts
+  - added metadata field for accounts to store extra information together with account
+  - increased synchronization stability
+
+10.1.0
+  - added support for portfolio strategies (i.e. the strategies which include several other member strategies) to CopyFactory API
+
+10.0.0
+  - added incoming commissions to CopyFactory history API
+  - breaking change: refactored resetStopout method in CopyFactory trading API. Changed method name, added strategyId parameter.
+  - retry synchronization if synchronization attempt have failed
+  - restore market data subscriptions on successful synchronization
+  - added capability to monitor terminal connection health and measure terminal connection uptime
+  - change packet orderer timeout from 10 seconds to 1 minute to accomodate for slower connections
+
+9.1.0
+  - added API to register MetaTrader demo accounts
+  - fixed packet orderer to do not cause unnecessary resynchronization
+
 9.0.0
   - added contractSize field to MetatraderSymbolSpecification model
   - added quoteSessions and tradeSessions to MetatraderSymbolSpecification model

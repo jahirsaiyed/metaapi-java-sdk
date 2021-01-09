@@ -29,7 +29,7 @@ public class TradeOptions {
     /**
      * Optional slippage in points or {@code null}. Should be greater or equal to zero. If not set,
      * default value specified in account entity will be used. Slippage is ignored if execution mode set to
-     * SYMBOL_TRADE_EXECUTION_MARKET in symbol specification
+     * SYMBOL_TRADE_EXECUTION_MARKET in symbol specification. Not used for close by orders.
      */
     public Integer slippage;
     /**
@@ -37,7 +37,7 @@ public class TradeOptions {
      * allow all filling modes and prefer ORDER_FILLING_FOK over ORDER_FILLING_IOC. See
      * https://www.mql5.com/en/docs/constants/tradingconstants/orderproperties#enum_order_type_filling for extra
      * explanation. Note that filling modes can be specified for market orders only, i.e. createMarketBuyOrder,
-     * createMarketSellOrder, closePositionPartially, closePosition, closePositionBySymbol
+     * createMarketSellOrder, closePositionPartially, closePosition, closePositionBySymbol.
      */
     public List<FillingMode> fillingModes;
 }
