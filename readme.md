@@ -31,7 +31,7 @@ Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can
 
 You can also find code examples at [examples folder of our github repo](https://github.com/agiliumtrade-ai/metaapi-java-client/tree/master/examples) or in the examples folder of the project.
 
-We have composed a [short guide explaining how to use the example code](https://metaapi.cloud/docs/client/usingCodeExamples)
+We have composed a [short guide explaining how to use the example code](https://metaapi.cloud/docs/client/usingCodeExamples/)
 
 ### Running Java SDK examples
 In order to run Java SDK examples, follow these steps:
