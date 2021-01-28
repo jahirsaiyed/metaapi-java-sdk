@@ -69,4 +69,9 @@ public class CopyFactoryStrategySubscription {
      * Any trade which results in a higher leverage will be discarded
      */
     public Double maxLeverage;
+    /**
+     * Defines how symbol name should be changed when trading (e.g. when broker uses symbol names with unusual
+     * suffixes). By default this setting is disabled and the trades are copied using signal source symbol name
+     */
+    public List<CopyFactoryStrategySymbolMapping> symbolMapping;
 }

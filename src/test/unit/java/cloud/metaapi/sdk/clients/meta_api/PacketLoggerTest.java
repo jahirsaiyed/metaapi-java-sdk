@@ -55,6 +55,7 @@ class PacketLoggerTest {
         ObjectNode accountInformationPacket = jsonMapper.createObjectNode();
         ObjectNode accountInformation = jsonMapper.createObjectNode();
         accountInformationPacket.put("type", "accountInformation");
+        accountInformationPacket.put("instanceIndex", 7);
         accountInformationPacket.set("accountInformation", accountInformation);
         accountInformation.put("broker", "Broker");
         accountInformation.put("currency", "USD");
@@ -74,6 +75,7 @@ class PacketLoggerTest {
         price2.put("bid", 103.222);
         price2.put("ask", 103.25);
         pricesPacket.put("type", "prices");
+        pricesPacket.put("instanceIndex", 7);
         ArrayNode prices = jsonMapper.createArrayNode();
         prices.add(price1);
         prices.add(price2);
@@ -84,12 +86,20 @@ class PacketLoggerTest {
         packets.put("prices", pricesPacket);
         ObjectNode statusPacket = jsonMapper.createObjectNode();
         statusPacket.put("type", "status");
+        statusPacket.put("instanceIndex", 7);
         statusPacket.put("status", "connected");
         statusPacket.put("accountId", "accountId");
         statusPacket.put("sequenceTimestamp", 100000);
         packets.put("status", statusPacket);
+        ObjectNode keepAlivePacket = jsonMapper.createObjectNode();
+        keepAlivePacket.put("type", "keepalive");
+        keepAlivePacket.put("instanceIndex", 7);
+        keepAlivePacket.put("accountId", "accountId");
+        keepAlivePacket.put("sequenceTimestamp", 100000);
+        packets.put("keepalive", keepAlivePacket);
         ObjectNode specificationsPacket = jsonMapper.createObjectNode();
         specificationsPacket.put("type", "specifications");
+        specificationsPacket.put("instanceIndex", 7);
         specificationsPacket.set("specifications", jsonMapper.createArrayNode());
         specificationsPacket.put("accountId", "accountId");
         specificationsPacket.put("sequenceTimestamp", 100000);
@@ -120,8 +130,9 @@ class PacketLoggerTest {
      * Tests {@link PacketLogger#logPacket(JsonNode)} 
      */
     @Test
-    void testDoesNotRecordStatus() throws Exception {
+    void testDoesNotRecordStatusAndKeepalivePackets() throws Exception {
         packetLogger.logPacket(packets.get("status"));
+        packetLogger.logPacket(packets.get("keepalive"));
         sleep(1000);
         Thread.sleep(1000);
         assertFalse(Files.exists(FileSystems.getDefault().getPath(filePath)));
@@ -140,6 +151,7 @@ class PacketLoggerTest {
         expected.put("type", "specifications");
         expected.put("sequenceNumber", 1);
         expected.put("sequenceTimestamp", 100000);
+        expected.put("instanceIndex", 7);
         Assertions.assertThat(jsonMapper.readTree(result.get(0).message)).usingRecursiveComparison()
             .isEqualTo(expected);
     }
@@ -164,6 +176,7 @@ class PacketLoggerTest {
         expected.put("accountId", "accountId");
         expected.put("type", "specifications");
         expected.put("sequenceNumber", 1);
+        expected.put("instanceIndex", 7);
         expected.put("sequenceTimestamp", 100000);
         expected.set("specifications", JsonMapper.getInstance().createArrayNode());
         Assertions.assertThat(jsonMapper.readTree(result.get(0).message)).usingRecursiveComparison()
@@ -195,7 +208,8 @@ class PacketLoggerTest {
         packetLogger.logPacket(changeSN(packets.get("prices"), 2));
         packetLogger.logPacket(changeSN(packets.get("prices"), 3));
         packetLogger.logPacket(changeSN(packets.get("prices"), 4));
-        packetLogger.logPacket(changeSN(packets.get("prices"), 5));
+        packetLogger.logPacket(changeSN(packets.get("keepalive"), 5));
+        packetLogger.logPacket(changeSN(packets.get("prices"), 6));
         packetLogger.logPacket(packets.get("accountInformation"));
         sleep(1000);
         Thread.sleep(1000);
@@ -203,10 +217,48 @@ class PacketLoggerTest {
         Assertions.assertThat(jsonMapper.readTree(result.get(0).message)).usingRecursiveComparison()
             .isEqualTo(packets.get("prices"));
         Assertions.assertThat(jsonMapper.readTree(result.get(1).message)).usingRecursiveComparison()
-            .isEqualTo(changeSN(packets.get("prices"), 5));
-        assertEquals("Recorded price packets 1-5", result.get(2).message);
+            .isEqualTo(changeSN(packets.get("prices"), 6));
+        assertEquals("Recorded price packets 1-6, instanceIndex: 7", result.get(2).message);
         Assertions.assertThat(jsonMapper.readTree(result.get(3).message)).usingRecursiveComparison()
             .isEqualTo(packets.get("accountInformation"));
+    }
+    
+    /**
+     * Tests {@link PacketLogger#logPacket(JsonNode)} 
+     */
+    @Test
+    void testRecordsRangeOfPricePacketsOfDifferentInstances() throws Exception {
+        packetLogger.logPacket(packets.get("prices"));
+        packetLogger.logPacket(changeSN(packets.get("prices"), 2));
+        packetLogger.logPacket(changeSN(packets.get("prices"), 3));
+        packetLogger.logPacket(changeSN(packets.get("prices"), 1, 8));
+        packetLogger.logPacket(changeSN(packets.get("prices"), 2, 8));
+        packetLogger.logPacket(changeSN(packets.get("prices"), 3, 8));
+        packetLogger.logPacket(changeSN(packets.get("prices"), 4, 8));
+        packetLogger.logPacket(changeSN(packets.get("prices"), 4));
+        packetLogger.logPacket(changeSN(packets.get("prices"), 5, 8));
+        ObjectNode accountInformationPacket = packets.get("accountInformation").deepCopy();
+        accountInformationPacket.put("instanceIndex", 8);
+        packetLogger.logPacket(accountInformationPacket);
+        packetLogger.logPacket(changeSN(packets.get("prices"), 5));
+        packetLogger.logPacket(packets.get("accountInformation"));
+        sleep(1000);
+        Thread.sleep(1000);
+        List<LogMessage> result = packetLogger.readLogs("accountId");
+        Assertions.assertThat(jsonMapper.readTree(result.get(0).message)).usingRecursiveComparison()
+          .isEqualTo(packets.get("prices"));
+        Assertions.assertThat(jsonMapper.readTree(result.get(1).message)).usingRecursiveComparison()
+          .isEqualTo(changeSN(packets.get("prices"), 1, 8));
+        Assertions.assertThat(jsonMapper.readTree(result.get(2).message)).usingRecursiveComparison()
+          .isEqualTo(changeSN(packets.get("prices"), 5, 8));
+        assertEquals("Recorded price packets 1-5, instanceIndex: 8", result.get(3).message);
+        Assertions.assertThat(jsonMapper.readTree(result.get(4).message)).usingRecursiveComparison()
+          .isEqualTo(accountInformationPacket);
+        Assertions.assertThat(jsonMapper.readTree(result.get(5).message)).usingRecursiveComparison()
+          .isEqualTo(changeSN(packets.get("prices"), 5));
+        assertEquals("Recorded price packets 1-5, instanceIndex: 7", result.get(6).message);
+        Assertions.assertThat(jsonMapper.readTree(result.get(7).message)).usingRecursiveComparison()
+          .isEqualTo(packets.get("accountInformation"));
     }
     
     /**
@@ -261,7 +313,7 @@ class PacketLoggerTest {
             .isEqualTo(packets.get("prices"));
         Assertions.assertThat(jsonMapper.readTree(result.get(1).message)).usingRecursiveComparison()
             .isEqualTo(changeSN(packets.get("prices"), 4));
-        assertEquals("Recorded price packets 1-4", result.get(2).message);
+        assertEquals("Recorded price packets 1-4, instanceIndex: 7", result.get(2).message);
         Assertions.assertThat(jsonMapper.readTree(result.get(3).message)).usingRecursiveComparison()
             .isEqualTo(changeSN(packets.get("prices"), 6));
     }
@@ -337,8 +389,13 @@ class PacketLoggerTest {
     }
     
     private JsonNode changeSN(JsonNode obj, int sequenceNumber) {
+        return changeSN(obj, sequenceNumber, null);
+    }
+    
+    private JsonNode changeSN(JsonNode obj, int sequenceNumber, Integer instanceIndex) {
         ObjectNode result = obj.deepCopy();
         result.put("sequenceNumber", sequenceNumber);
+        result.put("instanceIndex", instanceIndex != null ? instanceIndex : 7);
         return result;
     }
 

@@ -45,7 +45,7 @@ class MemoryHistoryStorageTest {
             state = OrderState.ORDER_STATE_FILLED; symbol = "AUDNZD"; magic = 0; time = new IsoTime(new Date(50));
             doneTime = new IsoTime(new Date(100)); currentPrice = 1; volume = 0.01; currentVolume = 0;
             positionId = "61206630"; platform = "mt5"; comment = "AS_AUDNZD_5YyM6KS7Fv:"; }};
-        storage.onConnected();
+        storage.onConnected(1, 0);
     }
 
     /**
@@ -75,9 +75,9 @@ class MemoryHistoryStorageTest {
      */
     @Test
     void testReturnsLastHistoryOrderTime() throws Exception {
-        storage.onHistoryOrderAdded(createOrder(null));
-        storage.onHistoryOrderAdded(createOrder("2020-01-01T00:00:00.000Z"));
-        storage.onHistoryOrderAdded(createOrder("2020-01-02T00:00:00.000Z"));
+        storage.onHistoryOrderAdded(1, createOrder(null));
+        storage.onHistoryOrderAdded(1, createOrder("2020-01-01T00:00:00.000Z"));
+        storage.onHistoryOrderAdded(1, createOrder("2020-01-02T00:00:00.000Z"));
         assertThat(storage.getLastHistoryOrderTime().get()).usingRecursiveComparison()
             .isEqualTo(new IsoTime("2020-01-02T00:00:00.000Z"));
     }
@@ -87,9 +87,9 @@ class MemoryHistoryStorageTest {
      */
     @Test
     void testReturnsLastHistoryDealTime() throws Exception {
-        storage.onDealAdded(new MetatraderDeal() {{ time = new IsoTime(Date.from(Instant.ofEpochSecond(0))); }});
-        storage.onDealAdded(new MetatraderDeal() {{ time = new IsoTime("2020-01-01T00:00:00.000Z"); }});
-        storage.onDealAdded(new MetatraderDeal() {{ time = new IsoTime("2020-01-02T00:00:00.000Z"); }});
+        storage.onDealAdded(1, new MetatraderDeal() {{ time = new IsoTime(Date.from(Instant.ofEpochSecond(0))); }});
+        storage.onDealAdded(1, new MetatraderDeal() {{ time = new IsoTime("2020-01-01T00:00:00.000Z"); }});
+        storage.onDealAdded(1, new MetatraderDeal() {{ time = new IsoTime("2020-01-02T00:00:00.000Z"); }});
         assertThat(storage.getLastDealTime().get()).usingRecursiveComparison()
             .isEqualTo(new IsoTime("2020-01-02T00:00:00.000Z"));
     }
@@ -99,18 +99,18 @@ class MemoryHistoryStorageTest {
      */
     @Test
     void testReturnsSavedDeals() {
-        storage.onDealAdded(createDeal("1", "2020-01-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
-        storage.onDealAdded(createDeal("7", "2020-05-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
-        storage.onDealAdded(createDeal("8", "2020-02-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
-        storage.onDealAdded(createDeal("6", "2020-10-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
-        storage.onDealAdded(createDeal("4", "2020-02-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
-        storage.onDealAdded(createDeal("5", "2020-06-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
-        storage.onDealAdded(createDeal("11", null, DealType.DEAL_TYPE_SELL));
-        storage.onDealAdded(createDeal("3", "2020-09-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
-        storage.onDealAdded(createDeal("5", "2020-06-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
-        storage.onDealAdded(createDeal("2", "2020-08-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
-        storage.onDealAdded(createDeal("10", null,  DealType.DEAL_TYPE_SELL));
-        storage.onDealAdded(createDeal("12", null,  DealType.DEAL_TYPE_BUY));
+        storage.onDealAdded(1, createDeal("1", "2020-01-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
+        storage.onDealAdded(1, createDeal("7", "2020-05-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
+        storage.onDealAdded(1, createDeal("8", "2020-02-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
+        storage.onDealAdded(1, createDeal("6", "2020-10-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
+        storage.onDealAdded(1, createDeal("4", "2020-02-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
+        storage.onDealAdded(1, createDeal("5", "2020-06-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
+        storage.onDealAdded(1, createDeal("11", null, DealType.DEAL_TYPE_SELL));
+        storage.onDealAdded(1, createDeal("3", "2020-09-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
+        storage.onDealAdded(1, createDeal("5", "2020-06-01T00:00:00.000Z", DealType.DEAL_TYPE_BUY));
+        storage.onDealAdded(1, createDeal("2", "2020-08-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
+        storage.onDealAdded(1, createDeal("10", null,  DealType.DEAL_TYPE_SELL));
+        storage.onDealAdded(1, createDeal("12", null,  DealType.DEAL_TYPE_BUY));
         assertThat(storage.getDeals()).usingRecursiveComparison().isEqualTo(Lists.list(
             createDeal("10", null,  DealType.DEAL_TYPE_SELL),
             createDeal("11", null, DealType.DEAL_TYPE_SELL),
@@ -131,18 +131,18 @@ class MemoryHistoryStorageTest {
      */
     @Test
     void testReturnsSavedHistoryOrders() {
-        storage.onHistoryOrderAdded(createOrder("1", "2020-01-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
-        storage.onHistoryOrderAdded(createOrder("7", "2020-05-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
-        storage.onHistoryOrderAdded(createOrder("8", "2020-02-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
-        storage.onHistoryOrderAdded(createOrder("6", "2020-10-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
-        storage.onHistoryOrderAdded(createOrder("4", "2020-02-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
-        storage.onHistoryOrderAdded(createOrder("5", "2020-06-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
-        storage.onHistoryOrderAdded(createOrder("11", null, OrderType.ORDER_TYPE_SELL));
-        storage.onHistoryOrderAdded(createOrder("3", "2020-09-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
-        storage.onHistoryOrderAdded(createOrder("5", "2020-06-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
-        storage.onHistoryOrderAdded(createOrder("2", "2020-08-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
-        storage.onHistoryOrderAdded(createOrder("10", null,  OrderType.ORDER_TYPE_SELL));
-        storage.onHistoryOrderAdded(createOrder("12", null,  OrderType.ORDER_TYPE_BUY));
+        storage.onHistoryOrderAdded(1, createOrder("1", "2020-01-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
+        storage.onHistoryOrderAdded(1, createOrder("7", "2020-05-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
+        storage.onHistoryOrderAdded(1, createOrder("8", "2020-02-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
+        storage.onHistoryOrderAdded(1, createOrder("6", "2020-10-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
+        storage.onHistoryOrderAdded(1, createOrder("4", "2020-02-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
+        storage.onHistoryOrderAdded(1, createOrder("5", "2020-06-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
+        storage.onHistoryOrderAdded(1, createOrder("11", null, OrderType.ORDER_TYPE_SELL));
+        storage.onHistoryOrderAdded(1, createOrder("3", "2020-09-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
+        storage.onHistoryOrderAdded(1, createOrder("5", "2020-06-01T00:00:00.000Z", OrderType.ORDER_TYPE_BUY));
+        storage.onHistoryOrderAdded(1, createOrder("2", "2020-08-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
+        storage.onHistoryOrderAdded(1, createOrder("10", null,  OrderType.ORDER_TYPE_SELL));
+        storage.onHistoryOrderAdded(1, createOrder("12", null,  OrderType.ORDER_TYPE_BUY));
         assertThat(storage.getHistoryOrders()).usingRecursiveComparison().isEqualTo(Lists.list(
             createOrder("10", null,  OrderType.ORDER_TYPE_SELL),
             createOrder("11", null, OrderType.ORDER_TYPE_SELL),
@@ -164,7 +164,7 @@ class MemoryHistoryStorageTest {
     @Test
     void testReturnsSavedOrderSynchronizationStatus() {
         assertFalse(storage.isOrderSynchronizationFinished());
-        storage.onOrderSynchronizationFinished("synchronizationId");
+        storage.onOrderSynchronizationFinished(1, "synchronizationId");
         assertTrue(storage.isOrderSynchronizationFinished());
     }
     
@@ -174,7 +174,7 @@ class MemoryHistoryStorageTest {
     @Test
     void testReturnsSavedDealSynchronizationStatus() {
         assertFalse(storage.isDealSynchronizationFinished());
-        storage.onDealSynchronizationFinished("synchronizationId");
+        storage.onDealSynchronizationFinished(1, "synchronizationId");
         assertTrue(storage.isDealSynchronizationFinished());
     }
     
@@ -183,8 +183,8 @@ class MemoryHistoryStorageTest {
      */
     @Test
     void testResetsStorage() {
-        storage.onDealAdded(createDeal("1", "2020-01-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
-        storage.onHistoryOrderAdded(createOrder("1", "2020-01-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
+        storage.onDealAdded(1, createDeal("1", "2020-01-01T00:00:00.000Z", DealType.DEAL_TYPE_SELL));
+        storage.onHistoryOrderAdded(1, createOrder("1", "2020-01-01T00:00:00.000Z", OrderType.ORDER_TYPE_SELL));
         storage.reset();
         assertTrue(storage.getDeals().isEmpty());
         assertTrue(storage.getHistoryOrders().isEmpty());

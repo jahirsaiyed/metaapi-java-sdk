@@ -13,6 +13,6 @@ public class NotSynchronizedException extends Exception {
      * @param message error message
      */
     public NotSynchronizedException(String message) {
-        super(message + ". See https://metaapi.cloud/docs/client/websocket/synchronizationMode/ for more details");
+        super(message);
     }	
 }

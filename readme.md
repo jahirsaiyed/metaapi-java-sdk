@@ -20,11 +20,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>11.1.0</version>
+  <version>12.0.0</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/11.1.0/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/12.0.0/jar).
 
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.
@@ -416,6 +416,7 @@ Features supported:
 - connect arbitrary number of strategy providers and subscribers
 - subscribe accounts to multiple strategies at once
 - select arbitrary copy ratio for each subscription
+- configure symbol mapping between strategy providers and subscribers
 - apply advanced risk filters on strategy provider side
 - override risk filters on subscriber side
 - provide multiple strategies from a single account based on magic or symbol filters

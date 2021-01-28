@@ -98,4 +98,9 @@ public class MetatraderAccountDto {
      * Extra information which can be stored together with your account
      */
     public Map<String, Object> metadata;
+    /**
+     * Used to increase the reliability of the account. Allowed values are regular, high
+     * and maximum. Default is regular
+     */
+    public String reliability;
 }

@@ -70,7 +70,7 @@ class ConnectionHealthMonitorTest {
      */
     @Test
     void testReturns100Uptime() throws InterruptedException {
-        healthMonitor.onSymbolPriceUpdated(prices[0]).join();
+        healthMonitor.onSymbolPriceUpdated(1, prices[0]).join();
         sleepIntervals(10);
         assertEquals(100, healthMonitor.getUptime().get("1h"));
         assertEquals(100, healthMonitor.getUptime().get("1d"));
@@ -82,7 +82,7 @@ class ConnectionHealthMonitorTest {
      */
     @Test
     void testReturnsAverageUptime() throws InterruptedException {
-        healthMonitor.onSymbolPriceUpdated(prices[0]).join();
+        healthMonitor.onSymbolPriceUpdated(1, prices[0]).join();
         sleepIntervals(100);
         Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(59, Assertions.within(2.0));
         Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(59, Assertions.within(2.0));
@@ -94,7 +94,7 @@ class ConnectionHealthMonitorTest {
      */
     @Test
     void testChecksConnectionForDowntime() throws InterruptedException {
-        healthMonitor.onSymbolPriceUpdated(prices[0]).join();
+        healthMonitor.onSymbolPriceUpdated(1, prices[0]).join();
         sleepIntervals(4);
         Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(100, Assertions.within(2.0));
         Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(100, Assertions.within(2.0));
@@ -186,7 +186,7 @@ class ConnectionHealthMonitorTest {
     @Test
     void testShowsAsHealthyIfRecentlyUpdatedAndInSession() throws IllegalAccessException, InterruptedException {
         FieldUtils.writeField(healthMonitor, "quotesHealthy", true, true);
-        healthMonitor.onSymbolPriceUpdated(prices[0]);
+        healthMonitor.onSymbolPriceUpdated(1, prices[0]);
         sleepIntervals(1);
         assertTrue(healthMonitor.getHealthStatus().quoteStreamingHealthy);
     }
@@ -197,7 +197,7 @@ class ConnectionHealthMonitorTest {
     @Test
     void testShowsAsNotHealthyIfOldUpdatedAndInSession() throws IllegalAccessException, InterruptedException {
         FieldUtils.writeField(healthMonitor, "quotesHealthy", true, true);
-        healthMonitor.onSymbolPriceUpdated(prices[0]);
+        healthMonitor.onSymbolPriceUpdated(1, prices[0]);
         sleepIntervals(61);
         assertFalse(healthMonitor.getHealthStatus().quoteStreamingHealthy);
     }
@@ -208,7 +208,7 @@ class ConnectionHealthMonitorTest {
     @Test
     void testShowsAsHealthyIfNotInSession() throws IllegalAccessException, InterruptedException {
         FieldUtils.writeField(healthMonitor, "quotesHealthy", true, true);
-        healthMonitor.onSymbolPriceUpdated(prices[1]);
+        healthMonitor.onSymbolPriceUpdated(1, prices[1]);
         sleepIntervals(61);
         assertTrue(healthMonitor.getHealthStatus().quoteStreamingHealthy);
     }
@@ -220,7 +220,7 @@ class ConnectionHealthMonitorTest {
     void testShowsAsHealthyIfNoSymbols() throws IllegalAccessException, InterruptedException {
         Mockito.when(connection.getSubscribedSymbols()).thenReturn(Lists.emptyList());
         FieldUtils.writeField(healthMonitor, "quotesHealthy", true, true);
-        healthMonitor.onSymbolPriceUpdated(prices[0]);
+        healthMonitor.onSymbolPriceUpdated(1, prices[0]);
         sleepIntervals(61);
         assertTrue(healthMonitor.getHealthStatus().quoteStreamingHealthy);
     }

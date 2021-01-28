@@ -1,7 +1,5 @@
 package cloud.metaapi.sdk.clients.models;
 
-import java.util.List;
-
 /**
  * Contains an error message
  */
@@ -29,5 +27,5 @@ public class Error {
     /**
      * Additional information about error or {@code null}. Used to supply validation error details
      */
-    public List<ValidationDetails> details = null;
+    public Object details = null;
 }

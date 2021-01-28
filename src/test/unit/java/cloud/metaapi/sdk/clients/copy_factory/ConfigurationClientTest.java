@@ -548,7 +548,7 @@ class ConfigurationClientTest {
             .thenReturn(CompletableFuture.completedFuture(activeTasks.toArray(new ResynchronizationTask[0])))
             .thenReturn(CompletableFuture.completedFuture(Lists.emptyList().toArray(new ResynchronizationTask[0])));
         copyFactoryClient = new ConfigurationClient(httpClient, "header.payload.sign");
-        copyFactoryClient.waitResynchronizationTasksCompleted("accountId", 1, 50).join();
+        copyFactoryClient.waitResynchronizationTasksCompleted("accountId", 2, 50).join();
         Mockito.verify(httpClient, Mockito.times(3)).requestJson(Mockito.argThat(arg -> {
             HttpRequestOptions expected = new HttpRequestOptions(copyFactoryApiUrl
                 + "/users/current/configuration/connections/accountId/active-resynchronization-tasks", Method.GET);
