@@ -160,6 +160,14 @@ public class MetatraderAccount {
     }
     
     /**
+     * Returns reliability value. Possible values are regular, high and maximum
+     * @return account reliability value
+     */
+    public String getReliability() {
+        return data.reliability;
+    }
+    
+    /**
      * Reloads MetaTrader account from API
      * @return completable future resolving when MetaTrader account is updated
      */

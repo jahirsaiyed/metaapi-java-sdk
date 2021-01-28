@@ -25,7 +25,7 @@ public class MetatraderAccountUpdateDto {
     /**
      * Flag indicating if trades should be placed as manual trades, or {@code null}. Default is false.
      */
-    public boolean manualTrades;
+    public Boolean manualTrades;
     /**
      * Quote streaming interval in seconds, or {@code null}. Set to 0 in order to receive quotes on each tick.
      * Default value is 2.5 seconds. Intervals less than 2.5 seconds are supported only for G2

@@ -1,6 +1,5 @@
 package cloud.metaapi.sdk.clients;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -152,7 +151,7 @@ public class HttpClient {
         switch (response.getStatus()) {
             case 400: return new ValidationException(
                 error != null ? error.message : response.getStatusText(),
-                error != null ? error.details : new ArrayList<>()
+                error != null ? error.details : null
             );
             case 401: return new UnauthorizedException(error != null ? error.message : response.getStatusText());
             case 403: return new ForbiddenException(error != null ? error.message : response.getStatusText());

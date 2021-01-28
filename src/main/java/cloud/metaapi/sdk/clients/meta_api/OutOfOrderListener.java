@@ -12,11 +12,12 @@ public interface OutOfOrderListener {
     /**
      * Method to receive out of order packet events
      * @param accountId account id
+     * @param instanceIndex instance index
      * @param expectedSequenceNumber expected s/n
      * @param actualSequenceNumber actual s/n
      * @param packet packet data
      * @param receivedAt time the packet was received at
      */
-    void onOutOfOrderPacket(String accountId, long expectedSequenceNumber, 
+    void onOutOfOrderPacket(String accountId, int instanceIndex, long expectedSequenceNumber, 
         long actualSequenceNumber, JsonNode packet, IsoTime receivedAt);
 }

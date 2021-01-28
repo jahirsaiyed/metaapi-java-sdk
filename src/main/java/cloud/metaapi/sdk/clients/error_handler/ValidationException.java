@@ -1,9 +1,5 @@
 package cloud.metaapi.sdk.clients.error_handler;
 
-import java.util.List;
-
-import cloud.metaapi.sdk.clients.models.ValidationDetails;
-
 /**
  * Represents validation error. Throwing this error results in 400 (Bad Request) HTTP response code.
  */
@@ -14,14 +10,14 @@ public class ValidationException extends ApiException {
     /**
      * Validation error details
      */
-    public List<ValidationDetails> details;
+    public Object details;
 
     /**
      * Constructs validation error.
      * @param message error message
      * @param details error data
      */
-    public ValidationException(String message, List<ValidationDetails> details) {
+    public ValidationException(String message, Object details) {
         super(message, 400);
         this.details = details;
     }

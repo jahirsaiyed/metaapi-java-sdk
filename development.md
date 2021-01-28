@@ -3,9 +3,9 @@
 2. Make sure pom.xml version is correctly updated
 3. Make sure SDK version is updated in the readme installation section
 4. Make sure SDK version is updated in examples
-5. Publish to Maven Central
-6. Verify examples are in working condition
-7. Verify javadoc is compiled without errors
+5. Verify examples are in working condition
+6. Verify javadoc is compiled without errors
+7. Publish to Maven Central
 8. Create git tag
 
 # Publishing to Maven Central

@@ -1,6 +1,9 @@
 package cloud.metaapi.sdk.meta_api;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
@@ -13,8 +16,8 @@ import cloud.metaapi.sdk.clients.models.*;
  */
 public abstract class HistoryStorage extends SynchronizationListener {
 
-    private boolean orderSynchronizationFinished = false;
-    private boolean dealSynchronizationFinished = false;
+    private Set<Integer> orderSynchronizationFinished = new HashSet<>();
+    private Set<Integer> dealSynchronizationFinished = new HashSet<>();
     
     /**
      * Returns all deals stored in history storage
@@ -27,6 +30,18 @@ public abstract class HistoryStorage extends SynchronizationListener {
      * @return all history orders stored in history storage
      */
     public abstract List<MetatraderOrder> getHistoryOrders();
+    
+    /**
+     * Returns times of last deals by instance indices
+     * @return map of last deal times by instance indices
+     */
+    public abstract Map<Integer, Long> getLastDealTimeByInstanceIndex();
+    
+    /**
+     * Returns times of last history orders by instance indices
+     * @return map of last history orders times by instance indices
+     */
+    public abstract Map<Integer, Long> getLastHistoryOrderTimeByInstanceIndex();
     
     /**
      * Resets the storage
@@ -50,7 +65,7 @@ public abstract class HistoryStorage extends SynchronizationListener {
      * @return flag indicating whether order history synchronization have finished
      */
     public boolean isOrderSynchronizationFinished() {
-        return orderSynchronizationFinished;
+        return !orderSynchronizationFinished.isEmpty();
     }
     
     /**
@@ -58,43 +73,61 @@ public abstract class HistoryStorage extends SynchronizationListener {
      * @return flag indicating whether deal history synchronization have finished
      */
     public boolean isDealSynchronizationFinished() {
-        return dealSynchronizationFinished;
+        return !dealSynchronizationFinished.isEmpty();
     }
     
     /**
      * Returns the time of the last history order record stored in the history storage
      * @return the time of the last history order record stored in the history storage
      */
-    public abstract CompletableFuture<IsoTime> getLastHistoryOrderTime();
+    public CompletableFuture<IsoTime> getLastHistoryOrderTime() {
+      return getLastHistoryOrderTime(null);
+    }
+    
+    /**
+     * Returns the time of the last history order record stored in the history storage
+     * @param instanceIndex index of an account instance connected, or {@code null}
+     * @return the time of the last history order record stored in the history storage
+     */
+    public abstract CompletableFuture<IsoTime> getLastHistoryOrderTime(Integer instanceIndex);
     
     /**
      * Returns the time of the last history deal record stored in the history storage
      * @return the time of the last history deal record stored in the history storage
      */
-    public abstract CompletableFuture<IsoTime> getLastDealTime();
+    public CompletableFuture<IsoTime> getLastDealTime() {
+      return getLastDealTime(null);
+    }
+    
+    /**
+     * Returns the time of the last history deal record stored in the history storage
+     * @param instanceIndex index of an account instance connected, or {@code null}
+     * @return the time of the last history deal record stored in the history storage
+     */
+    public abstract CompletableFuture<IsoTime> getLastDealTime(Integer instanceIndex);
     
     @Override
-    public abstract CompletableFuture<Void> onHistoryOrderAdded(MetatraderOrder historyOrder);
+    public abstract CompletableFuture<Void> onHistoryOrderAdded(int instanceIndex, MetatraderOrder historyOrder);
     
     @Override
-    public abstract CompletableFuture<Void> onDealAdded(MetatraderDeal deal);
+    public abstract CompletableFuture<Void> onDealAdded(int instanceIndex, MetatraderDeal deal);
     
     @Override
-    public CompletableFuture<Void> onDealSynchronizationFinished(String synchronizationId) {
-        dealSynchronizationFinished = true;
+    public CompletableFuture<Void> onDealSynchronizationFinished(int instanceIndex, String synchronizationId) {
+        dealSynchronizationFinished.add(instanceIndex);
         return CompletableFuture.completedFuture(null);
     }
     
     @Override
-    public CompletableFuture<Void> onOrderSynchronizationFinished(String synchronizationId) {
-        orderSynchronizationFinished = true;
+    public CompletableFuture<Void> onOrderSynchronizationFinished(int instanceIndex, String synchronizationId) {
+        orderSynchronizationFinished.add(instanceIndex);
         return CompletableFuture.completedFuture(null);
     }
     
     @Override
-    public CompletableFuture<Void> onConnected() {
-        orderSynchronizationFinished = false;
-        dealSynchronizationFinished = false;
+    public CompletableFuture<Void> onConnected(int instanceIndex, int replicas) {
+        orderSynchronizationFinished.remove(instanceIndex);
+        dealSynchronizationFinished.remove(instanceIndex);
         return CompletableFuture.completedFuture(null);
     }
 }

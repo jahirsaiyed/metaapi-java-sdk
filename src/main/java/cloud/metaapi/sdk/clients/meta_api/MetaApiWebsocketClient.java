@@ -151,20 +151,21 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   /**
    * Restarts the account synchronization process on an out of order packet
    * @param accountId account id
+   * @param instanceIndex instance index
    * @param expectedSequenceNumber expected s/n
    * @param actualSequenceNumber actual s/n
    * @param packet packet data
    * @param receivedAt time the packet was received at
    */
-  public void onOutOfOrderPacket(String accountId, long expectedSequenceNumber, 
+  public void onOutOfOrderPacket(String accountId, int instanceIndex, long expectedSequenceNumber, 
     long actualSequenceNumber, JsonNode packet, IsoTime receivedAt) {
     logger.error("MetaApi websocket client received an out of order packet type "
       + packet.get("type").asText() + " for account id " + accountId + ". Expected s/n " 
       + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber);
-    subscribe(accountId).exceptionally(err -> {
+    subscribe(accountId, instanceIndex).exceptionally(err -> {
       if (!(err instanceof TimeoutException)) {
         logger.error("MetaApi websocket client failed to receive subscribe response for account id "
-          + accountId, err);
+          + accountId + ":" + instanceIndex, err);
       }
       return null;
     });
@@ -722,8 +723,21 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @return completable future which resolves when subscription started
    */
   public CompletableFuture<Void> subscribe(String accountId) {
+    return subscribe(accountId, null);
+  }
+  
+  /**
+   * Subscribes to the Metatrader terminal events (see https://metaapi.cloud/docs/client/websocket/api/subscribe/).
+   * @param accountId id of the MetaTrader account to subscribe to
+   * @param instanceIndex instance index, or {@code null}
+   * @return completable future which resolves when subscription started
+   */
+  public CompletableFuture<Void> subscribe(String accountId, Integer instanceIndex) {
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("type", "subscribe");
+    if (instanceIndex != null) {
+      request.put("instanceIndex", instanceIndex);
+    }
     return rpcRequest(accountId, request).thenApply(response -> null);
   }
   
@@ -742,6 +756,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * Requests the terminal to start synchronization process 
    * (see https://metaapi.cloud/docs/client/websocket/synchronizing/synchronize/).
    * @param accountId id of the MetaTrader account to synchronize
+   * @param instanceIndex instance index
    * @param synchronizationId synchronization request id
    * @param startingHistoryOrderTime from what date to start synchronizing history orders from. If not specified,
    * the entire order history will be downloaded.
@@ -749,9 +764,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * history deals will be downloaded.
    * @return completable future which resolves when synchronization started
    */
-  public CompletableFuture<Void> synchronize(
-    String accountId, String synchronizationId, IsoTime startingHistoryOrderTime, IsoTime startingDealTime
-  ) {
+  public CompletableFuture<Void> synchronize(String accountId, int instanceIndex, String synchronizationId,
+      IsoTime startingHistoryOrderTime, IsoTime startingDealTime) {
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("requestId", synchronizationId);
     request.put("type", "synchronize");
@@ -759,6 +773,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       request.put("startingHistoryOrderTime", startingHistoryOrderTime.getIsoString());
     if (startingDealTime != null)
       request.put("startingDealTime", startingDealTime.getIsoString());
+    request.put("instanceIndex", instanceIndex);
     return rpcRequest(accountId, request).thenApply((response) -> null);
   }
   
@@ -766,15 +781,18 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * Waits for server-side terminal state synchronization to complete.
    * (see https://metaapi.cloud/docs/client/websocket/synchronizing/waitSynchronized/).
    * @param accountId id of the MetaTrader account to synchronize
+   * @param instanceIndex instance index
    * @param applicationPattern MetaApi application regular expression pattern, or {@code null}, default is .*
    * @param timeoutInSeconds timeout in seconds, or {@code null}, default is 300 seconds
    * @return completable future which resolves when synchronization started
    */
-  public CompletableFuture<Void> waitSynchronized(String accountId, String applicationPattern, Long timeoutInSeconds) {
+  public CompletableFuture<Void> waitSynchronized(String accountId, int instanceIndex,
+      String applicationPattern, Long timeoutInSeconds) {
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("type", "waitSynchronized");
     if (applicationPattern != null) request.put("applicationPattern", applicationPattern);
     request.put("timeoutInSeconds", timeoutInSeconds);
+    request.put("instanceIndex", instanceIndex);
     return rpcRequest(accountId, request, timeoutInSeconds).thenApply((response) -> null);
   }
   
@@ -782,13 +800,16 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * Subscribes on market data of specified symbol (see
    * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/subscribeToMarketData/).
    * @param accountId id of the MetaTrader account
+   * @param instanceIndex instance index
    * @param symbol symbol (e.g. currency pair or an index)
    * @return completable future which resolves when subscription request was processed
    */
-  public CompletableFuture<Void> subscribeToMarketData(String accountId, String symbol) {
+  public CompletableFuture<Void> subscribeToMarketData(String accountId, int instanceIndex,
+      String symbol) {
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("type", "subscribeToMarketData");
     request.put("symbol", symbol);
+    request.put("instanceIndex", instanceIndex);
     return rpcRequest(accountId, request).thenApply((response) -> null);
   }
   
@@ -848,7 +869,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * Sends client uptime stats to the server.
    * @param accountId id of the MetaTrader account to retrieve symbol price for
    * @param uptime uptime statistics to send to the server
-   * @returns completable future which resolves when uptime statistics is submitted
+   * @return completable future which resolves when uptime statistics is submitted
    */
   public CompletableFuture<Void> saveUptime(String accountId, Map<String, Double> uptime) {
     ObjectNode request = jsonMapper.createObjectNode();
@@ -861,7 +882,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * Unsubscribe from account (see
    * https://metaapi.cloud/docs/client/websocket/api/synchronizing/unsubscribe).
    * @param accountId id of the MetaTrader account to retrieve symbol price for
-   * @returns completable future which resolves when socket unsubscribed
+   * @return completable future which resolves when socket unsubscribed
    */
   public CompletableFuture<JsonNode> unsubscribe(String accountId) {
     ObjectNode request = jsonMapper.createObjectNode();
@@ -1013,35 +1034,37 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         for (JsonNode data : packets) {
           String accountId = data.get("accountId").asText();
           String host = data.has("host") ? data.get("host").asText() : "undefined";
+          int instanceIndex = data.has("instanceIndex") ? data.get("instanceIndex").asInt() : 0;
+          String instanceId = accountId + ":" + instanceIndex;
           List<SynchronizationListener> listeners = synchronizationListeners.get(accountId);
           if (listeners == null) listeners = new ArrayList<>();
           String type = data.get("type").asText();
           if (type.equals("authenticated")) {
-            connectedHosts.put(accountId, host);
+            connectedHosts.put(instanceId, host);
             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
-              completableFutures.add(listener.onConnected().exceptionally(e -> {
+              completableFutures.add(listener.onConnected(instanceIndex, data.get("replicas").asInt()).exceptionally(e -> {
                 logger.error("Failed to notify listener about connected event", e);
                 return null;
               }));
             }
             CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
           } else if (type.equals("disconnected")) {
-            if (connectedHosts.get(accountId).equals(host)) {
+            if (connectedHosts.get(instanceId).equals(host)) {
               List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
               for (SynchronizationListener listener : listeners) {
-                completableFutures.add(listener.onDisconnected().exceptionally(e -> {
+                completableFutures.add(listener.onDisconnected(instanceIndex).exceptionally(e -> {
                   logger.error("Failed to notify listener about " + type + " event", e);
                   return null;
                 }));
               }
               CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-              connectedHosts.remove(accountId);
+              connectedHosts.remove(instanceId);
             }
           } else if (type.equals("synchronizationStarted")) {
             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
-              completableFutures.add(listener.onSynchronizationStarted().exceptionally(e -> {
+              completableFutures.add(listener.onSynchronizationStarted(instanceIndex).exceptionally(e -> {
                 logger.error(accountId + ": Failed to notify listener about synchronization "
                   + "started event", e);
                 return null;
@@ -1054,11 +1077,11 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 .treeToValue(data.get(type), MetatraderAccountInformation.class);
               List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
               for (SynchronizationListener listener : listeners) {
-                completableFutures.add(listener.onAccountInformationUpdated(accountInformation)
-                  .exceptionally(e -> {
-                    logger.error("Failed to notify listener about " + type + " event", e);
-                    return null;
-                  }));
+                completableFutures.add(listener.onAccountInformationUpdated(instanceIndex, 
+                    accountInformation).exceptionally(e -> {
+                  logger.error("Failed to notify listener about " + type + " event", e);
+                  return null;
+                }));
               }
               CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
             }
@@ -1068,7 +1091,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (MetatraderDeal deal : deals) {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onDealAdded(deal).exceptionally(e -> {
+                  completableFutures.add(listener.onDealAdded(instanceIndex, deal).exceptionally(e -> {
                     logger.error("Failed to notify listener about " + type + " event", e);
                     return null;
                   }));
@@ -1082,7 +1105,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               ? jsonMapper.treeToValue(data.get(type), MetatraderOrder[].class)
               : new MetatraderOrder[0];
             for (SynchronizationListener listener : listeners) {
-              completableFutures.add(listener.onOrdersReplaced(Arrays.asList(orders)).exceptionally(e -> {
+              completableFutures.add(listener.onOrdersReplaced(instanceIndex, Arrays.asList(orders))
+                  .exceptionally(e -> {
                 logger.error("Failed to notify listener about orders event", e);
                 return null;
               }));
@@ -1094,7 +1118,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (MetatraderOrder historyOrder : historyOrders) {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onHistoryOrderAdded(historyOrder).exceptionally(e -> {
+                  completableFutures.add(listener.onHistoryOrderAdded(instanceIndex, historyOrder)
+                      .exceptionally(e -> {
                     logger.error("Failed to notify listener about " + type + " event", e);
                     return null;
                   }));
@@ -1108,7 +1133,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               ? jsonMapper.treeToValue(data.get(type), MetatraderPosition[].class)
               : new MetatraderPosition[0];
             for (SynchronizationListener listener : listeners) {
-              completableFutures.add(listener.onPositionsReplaced(Arrays.asList(positions)).exceptionally(e -> {
+              completableFutures.add(listener.onPositionsReplaced(instanceIndex, Arrays.asList(positions))
+                  .exceptionally(e -> {
                 logger.error("Failed to notify listener about positions event", e);
                 return null;
               }));
@@ -1120,11 +1146,11 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 .treeToValue(data.get("accountInformation"), MetatraderAccountInformation.class);
               List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
               for (SynchronizationListener listener : listeners) {
-                completableFutures.add(listener.onAccountInformationUpdated(accountInformation)
-                  .exceptionally(e -> {
-                    logger.error("Failed to notify listener about update event", e);
-                    return null;
-                  }));
+                completableFutures.add(listener.onAccountInformationUpdated(instanceIndex,
+                    accountInformation).exceptionally(e -> {
+                  logger.error("Failed to notify listener about update event", e);
+                  return null;
+                }));
               }
               CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
             }
@@ -1134,7 +1160,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (MetatraderPosition position : positions) {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onPositionUpdated(position).exceptionally(e -> {
+                  completableFutures.add(listener.onPositionUpdated(instanceIndex, position)
+                      .exceptionally(e -> {
                     logger.error("Failed to notify listener about update event", e);
                     return null;
                   }));
@@ -1148,7 +1175,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (String positionId : removedPositionIds) {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onPositionRemoved(positionId).exceptionally(e -> {
+                  completableFutures.add(listener.onPositionRemoved(instanceIndex, positionId)
+                      .exceptionally(e -> {
                     logger.error("Failed to notify listener about update event", e);
                     return null;
                   }));
@@ -1162,7 +1190,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (MetatraderOrder order : updatedOrders) {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onOrderUpdated(order).exceptionally(e -> {
+                  completableFutures.add(listener.onOrderUpdated(instanceIndex, order)
+                      .exceptionally(e -> {
                     logger.error("Failed to notify listener about update event", e);
                     return null;
                   }));
@@ -1176,7 +1205,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (String orderId : completedOrderIds) {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onOrderCompleted(orderId).exceptionally(e -> {
+                  completableFutures.add(listener.onOrderCompleted(instanceIndex, orderId)
+                      .exceptionally(e -> {
                     logger.error("Failed to notify listener about update event", e);
                     return null;
                   }));
@@ -1190,7 +1220,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (MetatraderOrder historyOrder : historyOrders) {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onHistoryOrderAdded(historyOrder).exceptionally(e -> {
+                  completableFutures.add(listener.onHistoryOrderAdded(instanceIndex, historyOrder)
+                      .exceptionally(e -> {
                     logger.error("Failed to notify listener about update event", e);
                     return null;
                   }));
@@ -1204,7 +1235,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (MetatraderDeal deal : deals) {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onDealAdded(deal).exceptionally(e -> {
+                  completableFutures.add(listener.onDealAdded(instanceIndex, deal).exceptionally(e -> {
                     logger.error("Failed to notify listener about update event", e);
                     return null;
                   }));
@@ -1228,62 +1259,61 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           } else if (type.equals("dealSynchronizationFinished")) {
             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
-              completableFutures.add(listener.onDealSynchronizationFinished(data.get("synchronizationId").asText())
-                .exceptionally(e -> {
-                  logger.error("Failed to notify listener about " + type + " event", e);
-                  return null;
-                }));
+              completableFutures.add(listener.onDealSynchronizationFinished(instanceIndex,
+                  data.get("synchronizationId").asText()).exceptionally(e -> {
+                logger.error("Failed to notify listener about " + type + " event", e);
+                return null;
+              }));
             }
             CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
           } else if (type.equals("orderSynchronizationFinished")) {
             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
-              completableFutures.add(listener.onOrderSynchronizationFinished(data.get("synchronizationId").asText())
-                .exceptionally(e -> {
-                  logger.error("Failed to notify listener about " + type + " event", e);
-                  return null;
-                }));
+              completableFutures.add(listener.onOrderSynchronizationFinished(instanceIndex,
+                  data.get("synchronizationId").asText()).exceptionally(e -> {
+                logger.error("Failed to notify listener about " + type + " event", e);
+                return null;
+              }));
             }
             CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
           } else if (type.equals("status")) {
-            if (!connectedHosts.containsKey(accountId)) {
-              if (!resubscriptionTriggerTimes.containsKey(accountId)) {
-                resubscriptionTriggerTimes.put(accountId, Date.from(Instant.now()));
-              } else if (resubscriptionTriggerTimes.get(accountId).getTime() + 2 * 60
+            if (!connectedHosts.containsKey(instanceId)) {
+              if (!resubscriptionTriggerTimes.containsKey(instanceId)) {
+                resubscriptionTriggerTimes.put(instanceId, Date.from(Instant.now()));
+              } else if (resubscriptionTriggerTimes.get(instanceId).getTime() + 2 * 60
                   * 1000 < Date.from(Instant.now()).getTime()) {
-                resubscriptionTriggerTimes.remove(accountId);
-                logger.info("It seems like we are not connected to a running API server yet, retrying subscription "
-                  + accountId);
-                subscribe(accountId).exceptionally(err -> {
+                resubscriptionTriggerTimes.remove(instanceId);
+                logger.info("It seems like we are not connected to a running API server yet, "
+                    + "retrying subscription for account " + instanceId);
+                subscribe(accountId, instanceIndex).exceptionally(err -> {
                   if (!(err instanceof TimeoutException)) {
-                    logger.error("MetaApi websocket client failed to receive subscribe response for account id "
-                      + accountId, err);
+                    logger.error("MetaApi websocket client failed to receive subscribe response "
+                        + "for account id " + instanceId, err);
                   }
                   return null;
                 });
               }
-            } else if (connectedHosts.get(accountId).equals(host)) {
-              resubscriptionTriggerTimes.remove(accountId);
+            } else if (connectedHosts.get(instanceId).equals(host)) {
+              resubscriptionTriggerTimes.remove(instanceId);
               List<CompletableFuture<Void>> onBrokerConnectionStatusChangedFutures = new ArrayList<>();
               for (SynchronizationListener listener : listeners) {
                 onBrokerConnectionStatusChangedFutures.add(listener
-                  .onBrokerConnectionStatusChanged(data.get("connected").asBoolean())
-                  .exceptionally(e -> {
-                    logger.error("Failed to notify listener about brokerConnectionStatusChanged event", e);
-                    return null;
-                  }));
+                    .onBrokerConnectionStatusChanged(instanceIndex, data.get("connected").asBoolean())
+                    .exceptionally(e -> {
+                  logger.error("Failed to notify listener about brokerConnectionStatusChanged event", e);
+                  return null;
+                }));
               }
               CompletableFuture.allOf(onBrokerConnectionStatusChangedFutures.toArray(new CompletableFuture<?>[0])).get();
               if (data.hasNonNull("healthStatus")) {
                 List<CompletableFuture<Void>> onHealthStatusFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  onHealthStatusFutures.add(listener
-                    .onHealthStatus(jsonMapper.treeToValue(data.get("healthStatus"),
-                      SynchronizationListener.HealthStatus.class))
-                    .exceptionally(e -> {
-                      logger.error("Failed to notify listener about server-side healthStatus event", e);
-                      return null;
-                    }));
+                  onHealthStatusFutures.add(listener.onHealthStatus(instanceIndex, 
+                      jsonMapper.treeToValue(data.get("healthStatus"),
+                      SynchronizationListener.HealthStatus.class)).exceptionally(e -> {
+                    logger.error("Failed to notify listener about server-side healthStatus event", e);
+                    return null;
+                  }));
                 }
                 CompletableFuture.allOf(onHealthStatusFutures.toArray(new CompletableFuture<?>[0])).get();
               }
@@ -1295,11 +1325,11 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (MetatraderSymbolSpecification specification : specifications) {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onSymbolSpecificationUpdated(specification)
-                    .exceptionally(e -> {
-                      logger.error("Failed to notify listener about " + type + " event", e);
-                      return null;
-                    }));
+                  completableFutures.add(listener.onSymbolSpecificationUpdated(instanceIndex,
+                      specification).exceptionally(e -> {
+                    logger.error("Failed to notify listener about " + type + " event", e);
+                    return null;
+                  }));
                 }
                 CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
               }
@@ -1310,21 +1340,22 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               : new MetatraderSymbolPrice[0]);
             List<CompletableFuture<Void>> onPricesUpdatedFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
-              onPricesUpdatedFutures.add(listener.onSymbolPricesUpdated(prices, 
-                data.has("equity") ? data.get("equity").asDouble() : null,
-                data.has("margin") ? data.get("margin").asDouble() : null, 
-                data.has("freeMargin") ? data.get("freeMargin").asDouble() : null,
-                data.has("marginLevel") ? data.get("marginLevel").asDouble() : null)
-                .exceptionally(e -> {
-                  logger.error("Failed to notify listener about prices event", e);
-                  return null;
-                }));
+              onPricesUpdatedFutures.add(listener.onSymbolPricesUpdated(instanceIndex, prices, 
+                  data.has("equity") ? data.get("equity").asDouble() : null,
+                  data.has("margin") ? data.get("margin").asDouble() : null, 
+                  data.has("freeMargin") ? data.get("freeMargin").asDouble() : null,
+                  data.has("marginLevel") ? data.get("marginLevel").asDouble() : null)
+                  .exceptionally(e -> {
+                logger.error("Failed to notify listener about prices event", e);
+                return null;
+              }));
             }
             CompletableFuture.allOf(onPricesUpdatedFutures.toArray(new CompletableFuture<?>[0])).get();
             for (MetatraderSymbolPrice price : prices) {
               List<CompletableFuture<Void>> onPriceUpdatedFutures = new ArrayList<>();
               for (SynchronizationListener listener : listeners) {
-                onPriceUpdatedFutures.add(listener.onSymbolPriceUpdated(price).exceptionally(e -> {
+                onPriceUpdatedFutures.add(listener.onSymbolPriceUpdated(instanceIndex, price)
+                    .exceptionally(e -> {
                   logger.error("Failed to notify listener about price event", e);
                   return null;
                 }));

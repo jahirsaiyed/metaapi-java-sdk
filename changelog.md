@@ -1,6 +1,10 @@
-11.1.0
+12.0.0
   - added API to retrieve CopyFactory slave trading log
   - fixed race condition when orders are being added and completed fast
+  - breaking change: changed signatures of SynchronizationListener methods
+  - add reliability field
+  - add symbol mapping setting to CopyFactory
+  - fix quote health check logic
 
 11.0.0
   - breaking change: MetaApi options are now specified via an object

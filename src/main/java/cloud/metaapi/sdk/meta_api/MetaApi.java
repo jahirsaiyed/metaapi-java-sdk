@@ -1,8 +1,6 @@
 package cloud.metaapi.sdk.meta_api;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.log4j.Logger;
 
@@ -12,7 +10,6 @@ import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderDemoAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
-import cloud.metaapi.sdk.clients.models.ValidationDetails;
 
 /**
  * MetaApi MetaTrader API SDK
@@ -129,8 +126,7 @@ public class MetaApi {
     private void initialize(String token, Options opts) throws ValidationException, IOException {
         if (opts == null) opts = new Options();
         if (!opts.application.matches("[a-zA-Z0-9_]+")) {
-            List<ValidationDetails> details = new ArrayList<>();
-            throw new ValidationException("Application name must be non-empty string consisting from letters, digits and _ only", details);
+            throw new ValidationException("Application name must be non-empty string consisting from letters, digits and _ only", null);
         }
         HttpClient httpClient = new HttpClient(opts.requestTimeout * 1000, opts.connectTimeout * 1000);
         MetaApiWebsocketClient.ClientOptions websocketOptions = new MetaApiWebsocketClient.ClientOptions();

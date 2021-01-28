@@ -230,7 +230,7 @@ class PacketOrdererTest {
             .usingRecursiveComparison().isEqualTo(Lists.emptyList());
         Thread.sleep(3000);
         Mockito.verify(outOfOrderListener, Mockito.times(1)).onOutOfOrderPacket(Mockito.eq("accountId"), 
-            Mockito.eq(14L), Mockito.eq(15L), Mockito.eq(thirdPacket), Mockito.any());
+            Mockito.eq(0), Mockito.eq(14L), Mockito.eq(15L), Mockito.eq(thirdPacket), Mockito.any());
     }
     
     /**
@@ -241,25 +241,29 @@ class PacketOrdererTest {
     void testCallsOnOutOfOutOrderListenerIfTheFirstPacketInWaitListIsTimedOut() throws Exception {
         Packet timedOutPacket = packetOrderer.new Packet() {{
             accountId = "accountId";
+            instanceId = "accountId:0";
+            instanceIndex = 0;
             sequenceNumber = 11;
             packet = JsonMapper.getInstance().createObjectNode();
             receivedAt = new IsoTime("2010-10-19T09:58:56.000Z");
         }};
         Packet notTimedOutPacket = packetOrderer.new Packet() {{
             accountId = "accountId";
+            instanceId = "accountId:0";
+            instanceIndex = 0;
             sequenceNumber = 15;
             packet = JsonMapper.getInstance().createObjectNode();
             receivedAt = new IsoTime("3015-10-19T09:58:56.000Z");
         }};
         Map<String, AtomicLong> sequenceNumberByAccount = (Map<String, AtomicLong>) FieldUtils
-            .readField(packetOrderer, "sequenceNumberByAccount", true);
-        sequenceNumberByAccount.put("accountId", new AtomicLong(1));
+            .readField(packetOrderer, "sequenceNumberByInstance", true);
+        sequenceNumberByAccount.put("accountId:0", new AtomicLong(1));
         Map<String, List<Packet>> waitLists = (Map<String, List<Packet>>) FieldUtils
-            .readField(packetOrderer, "packetsByAccountId", true);
-        waitLists.put("accountId", Lists.list(timedOutPacket, notTimedOutPacket));
+            .readField(packetOrderer, "packetsByInstance", true);
+        waitLists.put("accountId:0", Lists.list(timedOutPacket, notTimedOutPacket));
         Thread.sleep(3000);
-        Mockito.verify(outOfOrderListener, Mockito.times(1)).onOutOfOrderPacket("accountId", 2, 11,
-            timedOutPacket.packet, timedOutPacket.receivedAt);
+        Mockito.verify(outOfOrderListener, Mockito.times(1)).onOutOfOrderPacket("accountId",
+            0, 2, 11, timedOutPacket.packet, timedOutPacket.receivedAt);
     }
     
     /**
@@ -281,14 +285,15 @@ class PacketOrdererTest {
             receivedAt = new IsoTime("3015-10-19T09:58:56.000Z");
         }};
         Map<String, AtomicLong> sequenceNumberByAccount = (Map<String, AtomicLong>) FieldUtils
-            .readField(packetOrderer, "sequenceNumberByAccount", true);
-            sequenceNumberByAccount.put("accountId", new AtomicLong(1));
+            .readField(packetOrderer, "sequenceNumberByInstance", true);
+            sequenceNumberByAccount.put("accountId:0", new AtomicLong(1));
         Map<String, List<Packet>> waitLists = (Map<String, List<Packet>>) FieldUtils
-            .readField(packetOrderer, "packetsByAccountId", true);
-        waitLists.put("accountId", Lists.list(notTimedOutPacket, timedOutPacket));
+            .readField(packetOrderer, "packetsByInstance", true);
+        waitLists.put("accountId:0", Lists.list(notTimedOutPacket, timedOutPacket));
         Thread.sleep(3000);
         Mockito.verify(outOfOrderListener, Mockito.times(0)).onOutOfOrderPacket(Mockito.anyString(), 
-            Mockito.anyInt(), Mockito.anyInt(), Mockito.any(JsonNode.class), Mockito.any(IsoTime.class));
+            Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt(), Mockito.any(JsonNode.class),
+            Mockito.any(IsoTime.class));
     }
     
     /**
@@ -306,15 +311,16 @@ class PacketOrdererTest {
         
         // There were no synchronization start packets        
         Map<String, AtomicLong> sequenceNumberByAccount = (Map<String, AtomicLong>) FieldUtils
-            .readField(packetOrderer, "sequenceNumberByAccount", true);
-            sequenceNumberByAccount.remove("accountId");
+            .readField(packetOrderer, "sequenceNumberByInstance", true);
+        sequenceNumberByAccount.remove("accountId:0");
         
         Map<String, List<Packet>> waitLists = (Map<String, List<Packet>>) FieldUtils
-            .readField(packetOrderer, "packetsByAccountId", true);
-        waitLists.put("accountId", Lists.list(outOfOrderPacket));
+            .readField(packetOrderer, "packetsByInstance", true);
+        waitLists.put("accountId:0", Lists.list(outOfOrderPacket));
         Thread.sleep(1000);
         Mockito.verify(outOfOrderListener, Mockito.times(0)).onOutOfOrderPacket(Mockito.anyString(), 
-            Mockito.anyInt(), Mockito.anyInt(), Mockito.any(JsonNode.class), Mockito.any(IsoTime.class));
+            Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt(), Mockito.any(JsonNode.class),
+            Mockito.any(IsoTime.class));
     }
     
     /**
@@ -335,13 +341,13 @@ class PacketOrdererTest {
         thirdPacket.put("sequenceNumber", 15);
         thirdPacket.put("accountId", "accountId");
         Map<String, List<Packet>> packetsByAccountId = (Map<String, List<Packet>>) FieldUtils
-            .readField(packetOrderer, "packetsByAccountId", true); 
+            .readField(packetOrderer, "packetsByInstance", true); 
         packetOrderer.restoreOrder(secondPacket);
-        assertEquals(1, packetsByAccountId.get("accountId").size());
-        assertEquals(secondPacket, packetsByAccountId.get("accountId").get(0).packet);
+        assertEquals(1, packetsByAccountId.get("accountId:0").size());
+        assertEquals(secondPacket, packetsByAccountId.get("accountId:0").get(0).packet);
         packetOrderer.restoreOrder(thirdPacket);
-        assertEquals(1, packetsByAccountId.get("accountId").size());
-        assertEquals(thirdPacket, packetsByAccountId.get("accountId").get(0).packet);
+        assertEquals(1, packetsByAccountId.get("accountId:0").size());
+        assertEquals(thirdPacket, packetsByAccountId.get("accountId:0").get(0).packet);
     }
     
     /**
@@ -356,9 +362,9 @@ class PacketOrdererTest {
         startPacket.put("sequenceNumber", 16);
         startPacket.put("accountId", "accountId");
         Map<String, List<Packet>> packetsByAccountId = (Map<String, List<Packet>>) FieldUtils
-            .readField(packetOrderer, "packetsByAccountId", true); 
+            .readField(packetOrderer, "packetsByInstance", true); 
         assertEquals(0, packetOrderer.restoreOrder(startPacket).size());
-        assertEquals(1, packetsByAccountId.get("accountId").size());
-        assertEquals(startPacket, packetsByAccountId.get("accountId").get(0).packet);
+        assertEquals(1, packetsByAccountId.get("accountId:0").size());
+        assertEquals(startPacket, packetsByAccountId.get("accountId:0").get(0).packet);
     }
 }

@@ -47,7 +47,7 @@ public class NewMetatraderAccountDto {
     /**
      * Flag indicating if trades should be placed as manual trades, or {@code null}. Default is false.
      */
-    public boolean manualTrades;
+    public Boolean manualTrades;
     /**
      * Quote streaming interval in seconds, or {@code null}. Set to 0 in order to receive quotes on each tick.
      * Default value is 2.5 seconds. Intervals less than 2.5 seconds are supported only for G2
@@ -65,4 +65,9 @@ public class NewMetatraderAccountDto {
      * Extra information which can be stored together with your account
      */
     public Map<String, Object> metadata;
+    /**
+     * Used to increase the reliability of the account. Allowed values are regular, high
+     * and maximum. Default is regular
+     */
+    public String reliability;
 }

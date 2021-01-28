@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class ConnectionHealthStatus {
     /**
-     * Flag indicating successful connection to API server
+     * Flag indicating successfull connection to API server
      */
     public boolean connected;
     /**
