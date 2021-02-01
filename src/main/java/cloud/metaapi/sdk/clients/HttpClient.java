@@ -157,6 +157,7 @@ public class HttpClient {
             case 403: return new ForbiddenException(error != null ? error.message : response.getStatusText());
             case 404: return new NotFoundException(error != null ? error.message : response.getStatusText());
             case 409: return new ConflictException(error != null ? error.message : response.getStatusText());
+            case 429: return new TooManyRequestsException(error != null ? error.message : response.getStatusText());
             case 500: return new InternalException(error != null ? error.message : response.getStatusText());
             default: return new ApiException(
                 error != null ? error.message : response.getStatusText(),

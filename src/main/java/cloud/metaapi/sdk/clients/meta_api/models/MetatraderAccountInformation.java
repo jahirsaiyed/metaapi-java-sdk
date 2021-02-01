@@ -63,4 +63,12 @@ public class MetatraderAccountInformation {
      * Margin calculation mode
      */
     public MarginMode marginMode;
+    /**
+     * Account owner name
+     */
+    public String name;
+    /**
+     * Account login
+     */
+    public int login;
 }
