@@ -1,4 +1,8 @@
-12.0.0
+12.1.0
+  - add name and login to account information
+  - add a feature to select trade scaling mode in CopyFactory (i.e. if we want the trade size to be preserved or scaled according to balance when copying)
+
+12.1.0
   - added API to retrieve CopyFactory slave trading log
   - fixed race condition when orders are being added and completed fast
   - breaking change: changed signatures of SynchronizationListener methods

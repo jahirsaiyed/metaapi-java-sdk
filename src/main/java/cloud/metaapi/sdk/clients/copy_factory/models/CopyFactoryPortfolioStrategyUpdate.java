@@ -72,7 +72,14 @@ public class CopyFactoryPortfolioStrategyUpdate {
     public Double maxLeverage;
     /**
      * Defines how symbol name should be changed when trading (e.g. when broker uses symbol names with unusual
-     * suffixes). By default this setting is disabled and the trades are copied using signal source symbol name
+     * suffixes). By default ({@code null}) this setting is disabled and the trades are copied using signal
+     * source symbol name
      */
     public List<CopyFactoryStrategySymbolMapping> symbolMapping;
+    /**
+     * If set to balance, the trade size on strategy subscriber will be scaled according to balance to preserve
+     * risk. If value is none, than trade size will be preserved irregardless of the subscriber balance. Default
+     * ({@code null}) is balance.
+     */
+    public String tradeSizeScalingMode;
 }

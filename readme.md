@@ -20,11 +20,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>12.0.0</version>
+  <version>12.1.0</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/12.0.0/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/12.1.0/jar).
 
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.
@@ -392,12 +392,12 @@ MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
 }}).get();
 ```
 
-## CopyFactory copy trading API (experimental)
+## CopyFactory copy trading API
 
 CopyFactory is a powerful trade copying API which makes developing forex
 trade copying applications as easy as writing few lines of code.
 
-At this point this feature is experimental and we have not yet defined a final price for it.
+At this point we have not yet defined a final price for this feature.
 
 ### Why do we offer CopyFactory API
 
