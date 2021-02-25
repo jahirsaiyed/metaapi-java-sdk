@@ -20,11 +20,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>12.1.0</version>
+  <version>12.2.0</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/12.1.0/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/12.2.0/jar).
 
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.
@@ -131,6 +131,7 @@ MetatraderAccount account = api.getMetatraderAccountApi().createAccount(new NewM
   application = "MetaApi";
   magic = 123456;
   quoteStreamingIntervalInSeconds = 2.5; // set to 0 to receive quote per tick
+  reliability = "regular"; // set this field to 'high' value if you want to increase uptime of your account
 });
 ```
 
@@ -406,13 +407,14 @@ which requires lots of effort, because developers have to solve a series
 of complex technical tasks to create a product.
 
 We decided to share our product as it allows developers to start with a
-powerful solution in almost no time, save on development and
+powerful solution in almost no time, saving on development and
 infrastructure maintenance costs.
 
 ### CopyFactory features
 Features supported:
 
 - low latency trade copying
+- reliable copy trading execution
 - connect arbitrary number of strategy providers and subscribers
 - subscribe accounts to multiple strategies at once
 - select arbitrary copy ratio for each subscription
@@ -489,7 +491,7 @@ configurationApi.updateAccount(slaveAccountId, new CopyFactoryAccountUpdate() {{
   name = "Demo account";
   connectionId = slaveMetaapiAccount.getId();
   subscriptions: List.of(new CopyFactoryStrategySubscription() {{
-    strategyId = strategyId;
+    strategyId = strategyId.id;
     multiplier = 1;
   }})
 }}).get();

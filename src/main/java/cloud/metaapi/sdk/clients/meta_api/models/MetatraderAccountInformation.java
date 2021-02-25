@@ -71,4 +71,8 @@ public class MetatraderAccountInformation {
      * Account login
      */
     public int login;
+    /**
+     * Account credit in the deposit currency
+     */
+    public float credit;
 }

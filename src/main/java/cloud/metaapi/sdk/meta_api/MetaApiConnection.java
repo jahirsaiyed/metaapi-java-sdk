@@ -53,17 +53,21 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   private Set<String> subscriptions = new HashSet<>();
   private Map<Integer, State> stateByInstanceIndex = new HashMap<>();
   private boolean isSynchronized = false;
+  private boolean shouldRetrySubscribe = false;
+  private boolean isSubscribing = false;
+  private Timer subscribeTask = null;
+  private CompletableFuture<Boolean> subscribeFuture = null;
   private boolean closed = false;
 
   private static class State {
     public int instanceIndex;
     public Set<String> ordersSynchronized = new HashSet<>();
     public Set<String> dealsSynchronized = new HashSet<>();
-    public String shouldSynchronize;
+    public String shouldSynchronize = "";
     public Integer synchronizationRetryIntervalInSeconds;
     public boolean isSynchronized = false;
-    public String lastDisconnectedSynchronizationId;
-    public String lastSynchronizationId;
+    public String lastDisconnectedSynchronizationId = "";
+    public String lastSynchronizationId = "";
     public boolean disconnected = false;
   }
   
@@ -248,7 +252,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving when the history is cleared
    */
   public CompletableFuture<Void> removeHistory(String application) {
-    historyStorage.reset();
+    historyStorage.clear();
     return websocketClient.removeHistory(account.getId(), application);
   }
   
@@ -258,7 +262,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving when the history is cleared and application is removed
    */
   public CompletableFuture<Void> removeApplication() {
-    historyStorage.reset();
+    historyStorage.clear();
     return websocketClient.removeApplication(account.getId());
   }
   
@@ -631,9 +635,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when meta api connection is initialized
    */
   public CompletableFuture<Void> initialize() {
-    return CompletableFuture.runAsync(() -> {
-      historyStorage.loadData().join();
-    });
+    return historyStorage.initialize();
   }
   
   /**
@@ -641,11 +643,36 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when subscription is initiated
    */
   public CompletableFuture<Void> subscribe() {
-    return websocketClient.subscribe(account.getId()).exceptionally(err -> {
-      if (!(err instanceof TimeoutException)) {
-        throw new CompletionException(err);
+    return CompletableFuture.runAsync(() -> {
+      if (!isSubscribing) {
+        isSubscribing = true;
+        shouldRetrySubscribe = true;
+        int subscribeRetryIntervalInSeconds = 3;
+        while (shouldRetrySubscribe && !closed) {
+          try {
+            websocketClient.subscribe(account.getId()).join();
+          } catch (Throwable error) {
+            //
+          }
+          int retryInterval = subscribeRetryIntervalInSeconds;
+          subscribeRetryIntervalInSeconds = Math.min(subscribeRetryIntervalInSeconds * 2, 300);
+          CompletableFuture<Boolean> subscribeFuture = new CompletableFuture<>();
+          subscribeTask = new Timer();
+          subscribeTask.schedule(new TimerTask() {
+            @Override
+            public void run() {
+              subscribeFuture.complete(true);
+            }
+          }, retryInterval * 1000);
+          this.subscribeFuture = subscribeFuture;
+          boolean result = this.subscribeFuture.join();
+          this.subscribeFuture = null;
+          if (!result) {
+            break;
+          }
+        }
+        isSubscribing = false;
       }
-      return null;
     });
   }
   
@@ -735,6 +762,12 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   @Override
   public CompletableFuture<Void> onConnected(int instanceIndex, int replicas) {
     return CompletableFuture.runAsync(() -> {
+      if (subscribeFuture != null) {
+        subscribeFuture.complete(false);
+        subscribeTask.cancel();
+        subscribeTask = null;
+      }
+      shouldRetrySubscribe = false;
       String key = RandomStringUtils.randomAlphanumeric(32);
       State state = getState(instanceIndex);
       state.shouldSynchronize = key;
@@ -770,7 +803,6 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     String synchronizationId) {
     State state = getState(instanceIndex);
     state.dealsSynchronized.add(synchronizationId);
-    historyStorage.updateStorage().join();
     return CompletableFuture.completedFuture(null);
   }
   
@@ -784,11 +816,12 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   
   @Override
   public CompletableFuture<Void> onReconnected() {
-    try {
-      return subscribe();
-    } catch (Exception e) {
-      throw new CompletionException(e);
+    if (subscribeFuture != null) {
+      subscribeFuture.complete(false);
+      subscribeTask.cancel();
+      subscribeTask = null;
     }
+    return subscribe();
   }
   
   /**

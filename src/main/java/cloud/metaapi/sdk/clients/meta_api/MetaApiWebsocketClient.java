@@ -17,6 +17,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -26,6 +27,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.*;
 import cloud.metaapi.sdk.clients.meta_api.LatencyListener.ResponseTimestamps;
@@ -62,6 +64,10 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   private String application;
   private long requestTimeout;
   private long connectTimeout;
+  private int maxConcurrentSynchronizations;
+  private int retries;
+  private int minRetryDelayInSeconds;
+  private int maxRetryDelayInSeconds;
   private ObjectMapper jsonMapper = JsonMapper.getInstance();
   private Map<String, RequestResolve> requestResolves = new HashMap<>();
   private Map<String, List<SynchronizationListener>> synchronizationListeners = new HashMap<>();
@@ -70,10 +76,12 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   private Map<String, String> connectedHosts = new HashMap<>();
   private Map<String, Date> resubscriptionTriggerTimes = new HashMap<>();
   private CompletableFuture<Void> connectFuture = null;
+  private SynchronizationThrottler synchronizationThrottler;
   private PacketOrderer packetOrderer;
   private PacketLogger packetLogger;
   private boolean isSocketConnecting = false;
   private boolean connected = false;
+  private String sessionId;
   
   private static class RequestResolve {
     public CompletableFuture<JsonNode> future;
@@ -108,6 +116,14 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
      * Packet logger options
      */
     public PacketLoggerOptions packetLogger = new PacketLoggerOptions();
+    /**
+     * Max amount of concurrent synchronizations
+     */
+    public int maxConcurrentSynchronizations = 5;
+    /**
+     * Retry options
+     */
+    public RetryOptions retryOpts = new RetryOptions();
   }
   
   /**
@@ -141,6 +157,12 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     this.token = token;
     this.requestTimeout = opts.requestTimeout;
     this.connectTimeout = opts.connectTimeout;
+    this.maxConcurrentSynchronizations = opts.maxConcurrentSynchronizations;
+    this.retries = opts.retryOpts.retries;
+    this.minRetryDelayInSeconds = opts.retryOpts.minDelayInSeconds;
+    this.maxRetryDelayInSeconds = opts.retryOpts.maxDelayInSeconds;
+    this.synchronizationThrottler = new SynchronizationThrottler(this, maxConcurrentSynchronizations);
+    this.synchronizationThrottler.start();
     this.packetOrderer = new PacketOrderer(this, opts.packetOrderingTimeout);
     if (opts.packetLogger.enabled) {
       this.packetLogger = new PacketLogger(opts.packetLogger);
@@ -191,7 +213,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       CompletableFuture<Void> result = new CompletableFuture<>();
       connectFuture = result;
       packetOrderer.start();
-      
+      sessionId = RandomStringUtils.randomAlphanumeric(32);
       String url = this.url + "?auth-token=" + token;
       IO.Options socketOptions = new IO.Options();
       socketOptions.path = "/ws";
@@ -250,6 +272,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           );
         });
         socket.on(Socket.EVENT_DISCONNECT, (Object[] args) -> {
+          synchronizationThrottler.onDisconnect();
           String reason = (String) args[0];
           logger.info("MetaApi websocket client disconnected from the MetaApi server because of " + reason);
           try {
@@ -774,7 +797,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     if (startingDealTime != null)
       request.put("startingDealTime", startingDealTime.getIsoString());
     request.put("instanceIndex", instanceIndex);
-    return rpcRequest(accountId, request).thenApply((response) -> null);
+    return synchronizationThrottler.scheduleSynchronize(accountId, request).thenApply((response) -> null);
   }
   
   /**
@@ -967,6 +990,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       Thread.sleep(1000);
       if (!socket.connected() && !isSocketConnecting && connected) {
         isSocketConnecting = true;
+        sessionId = RandomStringUtils.randomAlphanumeric(32);
         socket.connect();
       }
     } catch (InterruptedException e) {
@@ -978,41 +1002,81 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     return rpcRequest(accountId, request, null);
   }
   
-  private CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request, Long timeoutInSeconds) {
-    String requestId = request.has("requestId") ? request.get("requestId").asText() : UUID.randomUUID().toString();
+  protected CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request, Long timeoutInSeconds) {
     return CompletableFuture.supplyAsync(() -> {
+      if (!connected) {
+        connect().join();
+      } else {
+        connectFuture.join();
+      }
       try {
-        ObjectNode timestamps = jsonMapper.createObjectNode();
-        timestamps.put("clientProcessingStarted", new IsoTime(Date.from(Instant.now())).toString());
-        request.set("timestamps", timestamps);
-        if (!connected) connect().join();
-        else connectFuture.join();
-        RequestResolve resolve = new RequestResolve() {{
-          future = new CompletableFuture<>();
-          type = request.get("type").asText();
-        }};
-        requestResolves.put(requestId, resolve);
-        request.put("accountId", accountId);
-        if (!request.has("application")) request.put("application", application);
-        if (!request.has("requestId")) request.put("requestId", requestId);
-        socket.emit("request", new JSONObject(jsonMapper.writeValueAsString(request)));
-        if (timeoutInSeconds != null) return resolve.future.get(timeoutInSeconds, TimeUnit.SECONDS);
-        else return resolve.future.get(requestTimeout, TimeUnit.MILLISECONDS);
-      } catch (java.util.concurrent.TimeoutException e) {
-      	throw new CompletionException(new TimeoutException("MetaApi websocket client request " + requestId 
-    	    + " of type " + request.get("type").asText() + " timed out. Please make sure your account is "
-    	    + "connected to broker before retrying your request."));
-      } catch (InterruptedException | JsonProcessingException | JSONException e) {
-        throw new CompletionException(e);
-      } catch (ExecutionException e) {
-      	throw new CompletionException(e.getCause());
+        if (request.get("type").asText().equals("subscribe")) {
+          request.put("sessionId", sessionId);
+        }
+        if (Arrays.asList("trade", "subscribe").indexOf(request.get("type").asText()) != -1) {
+          return makeRequest(accountId, request, timeoutInSeconds);
+        }
+        int retryCounter = 0;
+        while (true) {
+          try {
+            return makeRequest(accountId, request, timeoutInSeconds);
+          } catch (Throwable err) {
+            if (Arrays.asList(NotSynchronizedException.class, TimeoutException.class, NotConnectedException.class,
+              InternalException.class).indexOf(err.getClass()) != -1 && retryCounter < retries) {
+              Thread.sleep((long) (Math.min(Math.pow(2, retryCounter) * minRetryDelayInSeconds,
+                maxRetryDelayInSeconds) * 1000));
+              retryCounter++;
+            } else {
+              throw err;
+            }
+          }
+        }
+      } catch (Throwable err) {
+        throw new CompletionException(err);
       }
     });
   }
   
+  private JsonNode makeRequest(String accountId, ObjectNode request, Long timeoutInSeconds) throws Throwable {
+    String requestId = request.has("requestId") ? request.get("requestId").asText() : UUID.randomUUID().toString();
+    try {
+      ObjectNode timestamps = jsonMapper.createObjectNode();
+      timestamps.put("clientProcessingStarted", new IsoTime(Date.from(Instant.now())).toString());
+      request.set("timestamps", timestamps);
+      RequestResolve resolve = new RequestResolve() {{
+        future = new CompletableFuture<>();
+        type = request.get("type").asText();
+      }};
+      requestResolves.put(requestId, resolve);
+      request.put("accountId", accountId);
+      if (!request.has("application")) request.put("application", application);
+      if (!request.has("requestId")) request.put("requestId", requestId);
+      socket.emit("request", new JSONObject(jsonMapper.writeValueAsString(request)));
+      if (timeoutInSeconds != null) return resolve.future.get(timeoutInSeconds, TimeUnit.SECONDS);
+      else return resolve.future.get(requestTimeout, TimeUnit.MILLISECONDS);
+    } catch (java.util.concurrent.TimeoutException e) {
+      throw new TimeoutException("MetaApi websocket client request " + requestId 
+          + " of type " + request.get("type").asText() + " timed out. Please make sure your account is "
+          + "connected to broker before retrying your request.");
+    } catch (InterruptedException | JsonProcessingException | JSONException e) {
+      throw e;
+    } catch (ExecutionException e) {
+      throw e.getCause();
+    }
+  }
+  
   private Exception convertError(WebsocketError error) {
     switch (error.error) {
-      case "ValidationError": return new ValidationException(error.message, error.details);
+      case "ValidationError":
+        Object details = null;
+        try {
+          if (error.details != null) {
+            details = JsonMapper.getInstance().treeToValue(error.details, Object.class);
+          }
+        } catch (JsonProcessingException e) {
+          logger.error("Failed to parse validation error details: " + error.details.toString());
+        }
+        return new ValidationException(error.message, details);
       case "NotFoundError": return new NotFoundException(error.message);
       case "NotSynchronizedError": return new NotSynchronizedException(error.message);
       case "TimeoutError": return new TimeoutException(error.message);
@@ -1032,6 +1096,10 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         }
         List<JsonNode> packets = packetOrderer.restoreOrder(jsonPacketAsNode);
         for (JsonNode data : packets) {
+          String synchronizationId = data.has("synchronizationId") ? data.get("synchronizationId").asText() : null;
+          if (synchronizationId != null) {
+            synchronizationThrottler.updateSynchronizationId(synchronizationId);
+          }
           String accountId = data.get("accountId").asText();
           String host = data.has("host") ? data.get("host").asText() : "undefined";
           int instanceIndex = data.has("instanceIndex") ? data.get("instanceIndex").asInt() : 0;
@@ -1040,15 +1108,18 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           if (listeners == null) listeners = new ArrayList<>();
           String type = data.get("type").asText();
           if (type.equals("authenticated")) {
-            connectedHosts.put(instanceId, host);
-            List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-            for (SynchronizationListener listener : listeners) {
-              completableFutures.add(listener.onConnected(instanceIndex, data.get("replicas").asInt()).exceptionally(e -> {
-                logger.error("Failed to notify listener about connected event", e);
-                return null;
-              }));
+            if (!data.has("sessionId") || data.get("sessionId").asText().equals(sessionId)) {
+              connectedHosts.put(instanceId, host);
+              List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+              for (SynchronizationListener listener : listeners) {
+                completableFutures.add(listener.onConnected(instanceIndex, data.get("replicas").asInt())
+                  .exceptionally(e -> {
+                  logger.error("Failed to notify listener about connected event", e);
+                  return null;
+                }));
+              }
+              CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
             }
-            CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
           } else if (type.equals("disconnected")) {
             if (connectedHosts.get(instanceId).equals(host)) {
               List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
@@ -1259,6 +1330,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           } else if (type.equals("dealSynchronizationFinished")) {
             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
+              synchronizationThrottler.removeSynchronizationId(synchronizationId);
               completableFutures.add(listener.onDealSynchronizationFinished(instanceIndex,
                   data.get("synchronizationId").asText()).exceptionally(e -> {
                 logger.error("Failed to notify listener about " + type + " event", e);

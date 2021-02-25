@@ -1,6 +1,7 @@
 package cloud.metaapi.sdk.copy_factory;
 
 import cloud.metaapi.sdk.clients.HttpClient;
+import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.copy_factory.ConfigurationClient;
 import cloud.metaapi.sdk.clients.copy_factory.HistoryClient;
 import cloud.metaapi.sdk.clients.copy_factory.TradingClient;
@@ -30,6 +31,10 @@ public class CopyFactory {
          * Timeout for connecting to server in seconds, or {@code null}
          */
         public Integer connectTimeout;
+        /**
+         * Retry options
+         */
+        public RetryOptions retryOpts = new RetryOptions();
     }
     
     /**
@@ -49,7 +54,7 @@ public class CopyFactory {
         String domain = opts != null && opts.domain != null ? opts.domain : "agiliumtrade.agiliumtrade.ai";
         int requestTimeout = opts != null && opts.requestTimeout != null ? opts.requestTimeout : 60;
         int connectTimeout = opts != null && opts.connectTimeout != null ? opts.connectTimeout : 60;
-        HttpClient httpClient = new HttpClient(requestTimeout * 1000, connectTimeout * 1000);
+        HttpClient httpClient = new HttpClient(requestTimeout * 1000, connectTimeout * 1000, opts.retryOpts);
         configurationClient = new ConfigurationClient(httpClient, token, domain);
         historyClient = new HistoryClient(httpClient, token, domain);
         tradingClient = new TradingClient(httpClient, token, domain);

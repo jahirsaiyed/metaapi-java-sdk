@@ -1,0 +1,208 @@
+package cloud.metaapi.sdk.clients.meta_api;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
+import org.apache.log4j.Logger;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import cloud.metaapi.sdk.util.ServiceProvider;
+
+/**
+ * Synchronization throttler used to limit the amount of concurrent synchronizations to prevent application
+ * from being overloaded due to excessive number of synchronisation responses being sent.
+ */
+public class SynchronizationThrottler {
+  
+  private static Logger logger = Logger.getLogger(SynchronizationThrottler.class);
+  private int maxConcurrentSynchronizations;
+  private MetaApiWebsocketClient client;
+  protected Map<String, Long> synchronizationIds = new HashMap<>();
+  private Map<String, String> accountsBySynchronizationIds = new HashMap<>();
+  private List<SynchronizationQueueItem> synchronizationQueue = new ArrayList<>();
+  private Timer removeOldSyncIdsTimer = null;
+  private Timer processQueueTimer = null;
+  private boolean isProcessingQueue = false;
+  
+  private static class SynchronizationQueueItem {
+    String synchronizationId;
+    CompletableFuture<Boolean> future;
+    long queueTime;
+  }
+  
+  /**
+   * Constructs the synchronization throttler
+   * @param client MetaApi websocket client
+   * @param maxConcurrentSynchronizations Limit of concurrent synchronizations
+   */
+  public SynchronizationThrottler(MetaApiWebsocketClient client, int maxConcurrentSynchronizations) {
+    this.maxConcurrentSynchronizations = maxConcurrentSynchronizations;
+    this.client = client;
+  }
+  
+  /**
+   * Initializes the synchronization throttler
+   */
+  void start() {
+    if (removeOldSyncIdsTimer == null) {
+      removeOldSyncIdsTimer = new Timer();
+      removeOldSyncIdsTimer.schedule(new TimerTask() {
+        @Override
+        public void run() {
+          removeOldSyncIdsJob();
+        }
+      }, 1000, 1000);
+      processQueueTimer = new Timer();
+      processQueueTimer.schedule(new TimerTask() {
+        @Override
+        public void run() {
+          processQueueJob();
+        }
+      }, 1000, 1000);
+    }
+  }
+  
+  /**
+   * Deinitializes the throttler
+   */
+  void stop() {
+    if (removeOldSyncIdsTimer != null) {
+      removeOldSyncIdsTimer.cancel();
+      removeOldSyncIdsTimer = null;
+      processQueueTimer.cancel();
+      processQueueTimer = null;
+    }
+  }
+  
+  private void removeOldSyncIdsJob() {
+    long now = ServiceProvider.getNow().toEpochMilli();
+    for (String key : new ArrayList<>(synchronizationIds.keySet())) {
+      if ((now - synchronizationIds.get(key)) > 10 * 1000) {
+        advanceQueue();
+        synchronizationIds.remove(key);
+      }
+    }
+    while (synchronizationQueue.size() != 0 && (ServiceProvider.getNow().toEpochMilli() 
+      - synchronizationQueue.get(0).queueTime > 300 * 1000)) {
+      removeFromQueue(synchronizationQueue.get(0).synchronizationId);
+    }
+  }
+  
+  /**
+   * Fills a synchronization slot with synchronization id
+   * @param synchronizationId Synchronization id
+   */
+  public void updateSynchronizationId(String synchronizationId) {
+    synchronizationIds.put(synchronizationId, ServiceProvider.getNow().toEpochMilli());
+  }
+  
+  /**
+   * Returns flag whether there are free slots for synchronization requests
+   * @return Flag whether there are free slots for synchronization requests
+   */
+  public boolean isSynchronizationAvailable() {
+    return synchronizationIds.size() < maxConcurrentSynchronizations;
+  }
+  
+  /**
+   * Removes synchronization id from slots and removes ids for the same account from the queue
+   * @param synchronizationId Synchronization id
+   */
+  public void removeSynchronizationId(String synchronizationId) {
+    if (accountsBySynchronizationIds.containsKey(synchronizationId)) {
+      String accountId = accountsBySynchronizationIds.get(synchronizationId);
+      for (String key : new ArrayList<>(accountsBySynchronizationIds.keySet())) {
+        if (accountsBySynchronizationIds.get(key).equals(accountId)) {
+          removeFromQueue(key);
+          accountsBySynchronizationIds.remove(key);
+        }
+      }
+    }
+    if (synchronizationIds.containsKey(synchronizationId)) {
+      synchronizationIds.remove(synchronizationId);
+    }
+    advanceQueue();
+  }
+  
+  /**
+   * Clears synchronization ids on disconnect
+   */
+  public void onDisconnect() {
+    synchronizationIds.clear();
+    advanceQueue();
+  }
+  
+  private void advanceQueue() {
+    if (isSynchronizationAvailable() && synchronizationQueue.size() != 0) {
+      synchronizationQueue.get(0).future.complete(true);
+    }
+  }
+  
+  private void removeFromQueue(String synchronizationId) {
+    for (int i = 0; i < synchronizationQueue.size(); ++i) {
+      if (synchronizationQueue.get(i).synchronizationId.equals(synchronizationId)) {
+        synchronizationQueue.get(i).future.complete(false);
+      }
+    }
+    synchronizationQueue = synchronizationQueue.stream()
+      .filter(item -> !item.synchronizationId.equals(synchronizationId))
+      .collect(Collectors.toList());
+  }
+  
+  private CompletableFuture<Void> processQueueJob() {
+    return CompletableFuture.runAsync(() -> {
+      if (!isProcessingQueue) {
+        isProcessingQueue = true;
+        try {
+          while (synchronizationQueue.size() != 0 && synchronizationIds.size() < maxConcurrentSynchronizations) {
+            synchronizationQueue.get(0).future.join();
+            synchronizationQueue.remove(0);
+          }
+        } catch (Throwable err) {
+          logger.info("Error processing queue job", err);
+        }
+        isProcessingQueue = false;
+      }
+    });
+  }
+  
+  /**
+   * Schedules to send a synchronization request for account
+   * @param accountId Account id
+   * @param request Request to send
+   */
+  public CompletableFuture<JsonNode> scheduleSynchronize(String accountId, ObjectNode request) {
+    return CompletableFuture.supplyAsync(() -> {
+      String synchronizationId = request.get("requestId").asText();
+      for (String key : new ArrayList<>(accountsBySynchronizationIds.keySet())) {
+        if (accountsBySynchronizationIds.get(key).equals(accountId)) {
+          removeSynchronizationId(key);
+        }
+      }
+      accountsBySynchronizationIds.put(synchronizationId, accountId);
+      if (!isSynchronizationAvailable()) {
+        CompletableFuture<Boolean> requestFuture = new CompletableFuture<>();
+        String sid = synchronizationId;
+        synchronizationQueue.add(new SynchronizationQueueItem() {{
+          synchronizationId = sid;
+          future = requestFuture;
+          queueTime = ServiceProvider.getNow().toEpochMilli();
+        }});
+        boolean result = requestFuture.join();
+        if (!result) {
+          return null;
+        }
+      }
+      updateSynchronizationId(synchronizationId);
+      return client.rpcRequest(accountId, request, null).join();
+    });
+  }
+}

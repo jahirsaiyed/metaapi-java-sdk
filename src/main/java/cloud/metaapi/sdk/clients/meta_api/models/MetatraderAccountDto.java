@@ -99,8 +99,7 @@ public class MetatraderAccountDto {
      */
     public Map<String, Object> metadata;
     /**
-     * Used to increase the reliability of the account. Allowed values are regular, high
-     * and maximum. Default is regular
+     * Used to increase the reliability of the account. Allowed values are regular and high. Default is regular
      */
     public String reliability;
 }
