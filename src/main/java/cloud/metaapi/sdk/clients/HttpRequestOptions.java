@@ -134,7 +134,7 @@ public class HttpRequestOptions {
     /**
      * Returns query parameters of request. The returned value can be used for setting parameters.
      * @return map of query parameters where the key is the parameter name and the value is its 
-     * parsable into a string value. The value cal also be a {@link Collection} of parsable into
+     * parsable into a string value. The value can also be a {@link Collection} of parsable into
      * a string values.
      */
     public Map<String, Object> getQueryParameters() {

@@ -48,6 +48,11 @@ public class MemoryHistoryStorage extends HistoryStorage {
   }
   
   @Override
+  public CompletableFuture<Void> initialize() {
+    return loadDataFromDisk();
+  }
+  
+  @Override
   public List<MetatraderDeal> getDeals() {
     return deals;
   }
@@ -68,12 +73,12 @@ public class MemoryHistoryStorage extends HistoryStorage {
   }
   
   @Override
-  public void reset() {
+  public CompletableFuture<Void> clear() {
     deals.clear();
     historyOrders.clear();
     lastDealTimeByInstanceIndex.clear();
     lastHistoryOrderTimeByInstanceIndex.clear();
-    fileManager.deleteStorageFromDisk();
+    return fileManager.deleteStorageFromDisk();
   }
   
   @Override
@@ -206,6 +211,12 @@ public class MemoryHistoryStorage extends HistoryStorage {
       fileManager.setStartNewDealIndex(insertIndex);
     }
     return CompletableFuture.completedFuture(null);
+  }
+  
+  @Override
+  public CompletableFuture<Void> onDealSynchronizationFinished(int instanceIndex, String synchronizationId) {
+    super.onDealSynchronizationFinished(instanceIndex, synchronizationId);
+    return updateDiskStorage(); 
   }
   
   private Date getOrderDoneTime(MetatraderOrder order) {

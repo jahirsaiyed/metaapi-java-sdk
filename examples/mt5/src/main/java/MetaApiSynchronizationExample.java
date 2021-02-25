@@ -87,6 +87,7 @@ public class MetaApiSynchronizationExample {
             // connect to MetaApi API
             MetaApiConnection connection = account.get().connect().get();
             
+            // wait until terminal state synchronized to the local state
             System.out.println("Waiting for SDK to synchronize to terminal state "
                 + "(may take some time depending on your history size)");
             connection.waitSynchronized().get();

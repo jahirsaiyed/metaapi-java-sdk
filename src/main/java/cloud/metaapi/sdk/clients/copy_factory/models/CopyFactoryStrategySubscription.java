@@ -77,8 +77,8 @@ public class CopyFactoryStrategySubscription {
     public List<CopyFactoryStrategySymbolMapping> symbolMapping;
     /**
      * If set to balance, the trade size on strategy subscriber will be scaled according to balance to preserve
-     * risk. If value is none, than trade size will be preserved irregardless of the subscriber balance. Default
-     * ({@code null}) is balance.
+     * risk. If value is none, than trade size will be preserved irregardless of the subscriber balance. If value
+     * is contractSize, then trade size will be scaled according to contract size. Default ({@code null}) is balance.
      */
     public String tradeSizeScalingMode;
 }

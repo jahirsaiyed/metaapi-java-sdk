@@ -1,3 +1,9 @@
+12.3.0
+  - added retryOpts option to configure retries of certain REST/RPC requests upon failure
+  - improve account connection reliability
+  - added credit account property
+  - removed maximum reliability value
+
 12.1.0
   - add name and login to account information
   - add a feature to select trade scaling mode in CopyFactory (i.e. if we want the trade size to be preserved or scaled according to balance when copying)

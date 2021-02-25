@@ -36,7 +36,7 @@ public class CopyFactoryStrategyUpdate {
      * Commission rate the platform charges for strategy copying, applied to commissions charged by provider.
      * This commission applies only to accounts not managed directly by provider. Should be fraction of 1
      */
-    public double platformCommissionRate;
+    public Double platformCommissionRate;
     /**
      * Optional max risk per trade, expressed as a fraction of 1, or {@code null}. If trade has a SL, the trade size
      * will be adjusted to match the risk limit. If not, the trade SL will be applied according to the risk limit
@@ -97,8 +97,8 @@ public class CopyFactoryStrategyUpdate {
     public List<CopyFactoryStrategySymbolMapping> symbolMapping;
     /**
      * If set to balance, the trade size on strategy subscriber will be scaled according to balance to preserve
-     * risk. If value is none, than trade size will be preserved irregardless of the subscriber balance. Default
-     * ({@code null}) is balance.
+     * risk. If value is none, than trade size will be preserved irregardless of the subscriber balance. If value
+     * is contractSize, then trade size will be scaled according to contract size. Default ({@code null}) is balance.
      */
     public String tradeSizeScalingMode;
 }

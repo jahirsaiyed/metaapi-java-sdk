@@ -60,7 +60,7 @@ class SyncPositionsTest {
     if (token != null && login != null) {
       MetaApi api = new MetaApi(token, new MetaApi.Options() {{
         application = "MetaApi";
-        domain = "project-stock.v2.agiliumlabs.cloud";
+        domain = "project-stock.v3.agiliumlabs.cloud";
       }});
       List<ProvisioningProfile> profiles = api.getProvisioningProfileApi()
         .getProvisioningProfiles().join();

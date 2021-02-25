@@ -128,6 +128,7 @@ public class TerminalState extends SynchronizationListener {
   @Override
   public CompletableFuture<Void> onConnected(int instanceIndex, int replicas) {
     getState(instanceIndex).connected = true;
+    resetDisconnectTimer(instanceIndex);
     return CompletableFuture.completedFuture(null);
   }
 
@@ -138,10 +139,8 @@ public class TerminalState extends SynchronizationListener {
     state.connectedToBroker = false;
     return CompletableFuture.completedFuture(null);
   }
-
-  @Override
-  public CompletableFuture<Void> onBrokerConnectionStatusChanged(int instanceIndex, boolean connected) {
-    getState(instanceIndex).connectedToBroker = connected;
+  
+  private void resetDisconnectTimer(int instanceIndex) {
     if (statusTimer != null) statusTimer.cancel();
     final TerminalState self = this;
     // Recreate the timer because once it has been terminated, 
@@ -153,6 +152,12 @@ public class TerminalState extends SynchronizationListener {
         self.onDisconnected(instanceIndex);
       }
     }, statusTimerTimeoutInMilliseconds);
+  }
+
+  @Override
+  public CompletableFuture<Void> onBrokerConnectionStatusChanged(int instanceIndex, boolean connected) {
+    getState(instanceIndex).connectedToBroker = connected;
+    resetDisconnectTimer(instanceIndex);
     return CompletableFuture.completedFuture(null);
   }
 
