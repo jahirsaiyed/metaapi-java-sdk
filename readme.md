@@ -20,11 +20,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>12.2.0</version>
+  <version>12.3.1</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/12.2.0/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/12.3.1/jar).
 
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.
@@ -131,7 +131,7 @@ MetatraderAccount account = api.getMetatraderAccountApi().createAccount(new NewM
   application = "MetaApi";
   magic = 123456;
   quoteStreamingIntervalInSeconds = 2.5; // set to 0 to receive quote per tick
-  reliability = "regular"; // set this field to 'high' value if you want to increase uptime of your account
+  reliability = "regular"; // set this field to 'high' value if you want to increase uptime of your account (recommended for production environments)
 });
 ```
 
@@ -309,6 +309,9 @@ connection.subscribeToMarketData("GBPUSD").get();
 System.out.println(terminalState.getSpecification("EURUSD"));
 // read current price
 System.out.println(terminalState.getPrice("EURUSD"));
+
+// unsubscribe from market data when no longer needed
+connection.unsubscribeFromMarketData("GBPUSD").get();
 ```
 
 ### Execute trades (both RPC and streaming APIs)

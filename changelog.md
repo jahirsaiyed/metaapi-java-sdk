@@ -1,3 +1,7 @@
+12.3.1
+  - added feature to unsubscribe from market data (remove symbol from market watch)
+  - fixed synchronization throttling
+
 12.3.0
   - added retryOpts option to configure retries of certain REST/RPC requests upon failure
   - improve account connection reliability
