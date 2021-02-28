@@ -803,6 +803,17 @@ class MetaApiConnectionTest {
   }
   
   /**
+   * Tests {@link MetaApiConnection#unsubscribeFromMarketData(String)}
+   */
+  @Test
+  void testUnsubscribesFromMarketData() throws Exception {
+    Mockito.when(client.unsubscribeFromMarketData("accountId", 1, "EURUSD"))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    api.unsubscribeFromMarketData("EURUSD", 1).get();
+    Mockito.verify(client).unsubscribeFromMarketData("accountId", 1, "EURUSD");
+  }
+  
+  /**
    * Tests {@link MetaApiConnection#getSymbolSpecification(String)}
    */
   @Test

@@ -1,6 +1,7 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import org.assertj.core.api.Assertions;
@@ -51,6 +52,25 @@ class SynchronizationThrottlerTest {
    * Tests {@link SynchronizationThrottler#scheduleSynchronize(String, ObjectNode)}
    */
   @Test
+  void testDoesNotRemovesSyncIfDifferentInstanceIndex() {
+    throttler.scheduleSynchronize("accountId", provideRequest("test", 0)).join();
+    throttler.scheduleSynchronize("accountId", provideRequest("test1", 1)).join();
+    Map<String, Long> expectedSynchronizationIds = new HashMap<>();
+    expectedSynchronizationIds.put("test", 1601892000000L);
+    expectedSynchronizationIds.put("test1", 1601892000000L);
+    Assertions.assertThat(throttler.synchronizationIds).usingRecursiveComparison()
+      .isEqualTo(expectedSynchronizationIds);
+    throttler.removeSynchronizationId("test");
+    Assertions.assertThat(throttler.synchronizationIds).usingRecursiveComparison()
+      .isEqualTo(Maps.newHashMap("test1", 1601892000000L));
+    Mockito.verify(websocketClient).rpcRequest("accountId", provideRequest("test", 0), null);
+    Mockito.verify(websocketClient).rpcRequest("accountId", provideRequest("test1", 1), null);
+  }
+  
+  /**
+   * Tests {@link SynchronizationThrottler#scheduleSynchronize(String, ObjectNode)}
+   */
+  @Test
   void testWaitsForOtherSyncRequestsToFinishIfSlotsAreFull() throws InterruptedException {
     throttler.scheduleSynchronize("accountId1", provideRequest("test1")).join();
     throttler.scheduleSynchronize("accountId2", provideRequest("test2")).join();
@@ -62,6 +82,25 @@ class SynchronizationThrottlerTest {
     throttler.removeSynchronizationId("test1");
     Thread.sleep(20);
     Mockito.verify(websocketClient, Mockito.times(3)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+  }
+  
+  /**
+   * Tests {@link SynchronizationThrottler#scheduleSynchronize(String, ObjectNode)}
+   */
+  @Test
+  void testDoesNotTakeExtraSlotsIfSyncIdsBelongToTheSameAccount() throws InterruptedException {
+    throttler.scheduleSynchronize("accountId", provideRequest("test", 0));
+    Thread.sleep(20);
+    throttler.scheduleSynchronize("accountId", provideRequest("test1", 1));
+    Thread.sleep(20);
+    throttler.scheduleSynchronize("accountId2", provideRequest("test2"));
+    Thread.sleep(20);
+    throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
+    Thread.sleep(20);
+    Mockito.verify(websocketClient, Mockito.times(3)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+    Mockito.verify(websocketClient).rpcRequest("accountId", provideRequest("test", 0), null);
+    Mockito.verify(websocketClient).rpcRequest("accountId", provideRequest("test1", 1), null);
+    Mockito.verify(websocketClient).rpcRequest("accountId2", provideRequest("test2"), null);
   }
   
   /**
@@ -113,6 +152,8 @@ class SynchronizationThrottlerTest {
     Thread.sleep(20);
     throttler.scheduleSynchronize("accountId3", provideRequest("test5"));
     Thread.sleep(20);
+    throttler.scheduleSynchronize("accountId3", provideRequest("test3", 0));
+    Thread.sleep(20);
     Mockito.verify(websocketClient, Mockito.times(4)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
   }
   
@@ -140,7 +181,7 @@ class SynchronizationThrottlerTest {
     throttler.scheduleSynchronize("accountId2", provideRequest("test2")).join();
     throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
     Thread.sleep(20);
-    throttler.scheduleSynchronize("accountId3", provideRequest("test4"));
+    throttler.scheduleSynchronize("accountId3", provideRequest("test4", 0));
     Thread.sleep(20);
     throttler.scheduleSynchronize("accountId4", provideRequest("test5"));
     Thread.sleep(20);
@@ -151,13 +192,18 @@ class SynchronizationThrottlerTest {
     throttler.scheduleSynchronize("accountId3", provideRequest("test8"));
     Thread.sleep(20);
     throttler.scheduleSynchronize("accountId5", provideRequest("test9"));
+    Thread.sleep(20);
+    throttler.scheduleSynchronize("accountId3", provideRequest("test10", 0));
     tick(11000);
     tick(11000);
     tick(11000);
-    Mockito.verify(websocketClient, Mockito.times(5)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+    tick(11000);
+    tick(11000);
+    Mockito.verify(websocketClient, Mockito.times(6)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
     Mockito.verify(websocketClient).rpcRequest("accountId1", provideRequest("test1"), null);
     Mockito.verify(websocketClient).rpcRequest("accountId2", provideRequest("test2"), null);
     Mockito.verify(websocketClient).rpcRequest("accountId3", provideRequest("test8"), null);
+    Mockito.verify(websocketClient).rpcRequest("accountId3", provideRequest("test10", 0), null);
     Mockito.verify(websocketClient).rpcRequest("accountId4", provideRequest("test7"), null);
     Mockito.verify(websocketClient).rpcRequest("accountId5", provideRequest("test9"), null);
   }
@@ -192,6 +238,12 @@ class SynchronizationThrottlerTest {
   private ObjectNode provideRequest(String requestId) {
     ObjectNode request = JsonMapper.getInstance().createObjectNode();
     request.put("requestId", requestId);
+    return request;
+  }
+  
+  private ObjectNode provideRequest(String requestId, int instanceIndex) {
+    ObjectNode request = provideRequest(requestId);
+    request.put("instanceIndex", instanceIndex);
     return request;
   }
   

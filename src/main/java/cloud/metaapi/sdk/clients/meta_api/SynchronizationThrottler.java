@@ -26,16 +26,21 @@ public class SynchronizationThrottler {
   private int maxConcurrentSynchronizations;
   private MetaApiWebsocketClient client;
   protected Map<String, Long> synchronizationIds = new HashMap<>();
-  private Map<String, String> accountsBySynchronizationIds = new HashMap<>();
+  private Map<String, AccountData> accountsBySynchronizationIds = new HashMap<>();
   private List<SynchronizationQueueItem> synchronizationQueue = new ArrayList<>();
   private Timer removeOldSyncIdsTimer = null;
   private Timer processQueueTimer = null;
   private boolean isProcessingQueue = false;
   
+  private static class AccountData {
+    public String accountId;
+    public int instanceIndex;
+  }
+  
   private static class SynchronizationQueueItem {
-    String synchronizationId;
-    CompletableFuture<Boolean> future;
-    long queueTime;
+    public String synchronizationId;
+    public CompletableFuture<Boolean> future;
+    public long queueTime;
   }
   
   /**
@@ -101,7 +106,9 @@ public class SynchronizationThrottler {
    * @param synchronizationId Synchronization id
    */
   public void updateSynchronizationId(String synchronizationId) {
-    synchronizationIds.put(synchronizationId, ServiceProvider.getNow().toEpochMilli());
+    if (accountsBySynchronizationIds.containsKey(synchronizationId)) {
+      synchronizationIds.put(synchronizationId, ServiceProvider.getNow().toEpochMilli());
+    }
   }
   
   /**
@@ -109,7 +116,14 @@ public class SynchronizationThrottler {
    * @return Flag whether there are free slots for synchronization requests
    */
   public boolean isSynchronizationAvailable() {
-    return synchronizationIds.size() < maxConcurrentSynchronizations;
+    List<String> synchronizingAccounts = new ArrayList<>();
+    for (String synchronizationId : synchronizationIds.keySet()) {
+      AccountData accountData = accountsBySynchronizationIds.get(synchronizationId);
+      if (accountData != null && synchronizingAccounts.indexOf(accountData.accountId) == -1) {
+        synchronizingAccounts.add(accountData.accountId);
+      }
+    }
+    return synchronizingAccounts.size() < maxConcurrentSynchronizations;
   }
   
   /**
@@ -118,9 +132,11 @@ public class SynchronizationThrottler {
    */
   public void removeSynchronizationId(String synchronizationId) {
     if (accountsBySynchronizationIds.containsKey(synchronizationId)) {
-      String accountId = accountsBySynchronizationIds.get(synchronizationId);
+      String accountId = accountsBySynchronizationIds.get(synchronizationId).accountId;
+      int instanceIndex = accountsBySynchronizationIds.get(synchronizationId).instanceIndex;
       for (String key : new ArrayList<>(accountsBySynchronizationIds.keySet())) {
-        if (accountsBySynchronizationIds.get(key).equals(accountId)) {
+        if (accountsBySynchronizationIds.get(key).accountId.equals(accountId) &&
+            instanceIndex == accountsBySynchronizationIds.get(key).instanceIndex) {
           removeFromQueue(key);
           accountsBySynchronizationIds.remove(key);
         }
@@ -182,12 +198,17 @@ public class SynchronizationThrottler {
   public CompletableFuture<JsonNode> scheduleSynchronize(String accountId, ObjectNode request) {
     return CompletableFuture.supplyAsync(() -> {
       String synchronizationId = request.get("requestId").asText();
+      int instanceIndex = request.has("instanceIndex") ? request.get("instanceIndex").asInt() : -1;
       for (String key : new ArrayList<>(accountsBySynchronizationIds.keySet())) {
-        if (accountsBySynchronizationIds.get(key).equals(accountId)) {
+        if (accountsBySynchronizationIds.get(key).accountId.equals(accountId) &&
+            accountsBySynchronizationIds.get(key).instanceIndex == instanceIndex) {
           removeSynchronizationId(key);
         }
       }
-      accountsBySynchronizationIds.put(synchronizationId, accountId);
+      AccountData accountData = new AccountData();
+      accountData.accountId = accountId;
+      accountData.instanceIndex = instanceIndex;
+      accountsBySynchronizationIds.put(synchronizationId, accountData);
       if (!isSynchronizationAvailable()) {
         CompletableFuture<Boolean> requestFuture = new CompletableFuture<>();
         String sid = synchronizationId;
