@@ -11,6 +11,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import org.assertj.core.util.Lists;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -47,6 +48,11 @@ public class MetatraderAccountApiTest {
         metaApiWebsocketClient = Mockito.mock(MetaApiWebsocketClient.class);
         connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
         api = new MetatraderAccountApi(client, metaApiWebsocketClient, connectionRegistry);
+    }
+    
+    @AfterEach
+    void tearDown() {
+        ServiceProvider.reset();
     }
     
     /**

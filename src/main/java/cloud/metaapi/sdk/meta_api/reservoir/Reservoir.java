@@ -159,7 +159,7 @@ public class Reservoir {
                 array.set(removeElementIndex, statistics);
             } else {
                 updateStatisticsOnRemove(null, removeElementIndex);
-                array.add(removeElementIndex, statistics);
+                array.add(statistics);
             }
             removeElementIndex++;
         }

@@ -23,6 +23,16 @@ public class ServiceProvider {
     private static Instant nowInstantMock = null;
     
     /**
+     * Removes all mocks
+     */
+    public static void reset() {
+      historyFileManagerMock = null;
+      metaApiConnectionMock = null;
+      metaApiConnectionMockProvider = null;
+      nowInstantMock = null;
+    }
+    
+    /**
      * Interface for creating {@link MetaApiConnection}. Using this interface it is possible to set MetaApiConnection
      * mock with function instead of passing already created object.
      */

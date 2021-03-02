@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -53,6 +54,11 @@ class ConnectionRegistryTest {
     Mockito.when(storage.loadDataFromDisk())
       .thenReturn(CompletableFuture.completedFuture(null));
     registry = new ConnectionRegistry(metaApiWebsocketClient);
+  }
+  
+  @AfterEach
+  void tearDown() {
+    ServiceProvider.reset();
   }
 
   /**

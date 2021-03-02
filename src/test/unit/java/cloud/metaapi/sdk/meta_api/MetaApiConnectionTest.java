@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 
 import org.assertj.core.util.Lists;
 import org.assertj.core.util.Maps;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -72,6 +73,11 @@ class MetaApiConnectionTest {
     connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
     Mockito.when(connectionRegistry.getApplication()).thenReturn("MetaApi");
     api = new MetaApiConnection(client, account, storageMock, connectionRegistry);
+  }
+  
+  @AfterEach
+  void tearDown() {
+    ServiceProvider.reset();
   }
 
   /**
