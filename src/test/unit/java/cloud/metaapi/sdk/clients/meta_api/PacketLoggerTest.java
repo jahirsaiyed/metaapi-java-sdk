@@ -111,6 +111,7 @@ class PacketLoggerTest {
     void tearDown() throws IOException, InterruptedException {
         packetLogger.stop();
         FileUtils.cleanDirectory(new File(folder));
+        ServiceProvider.reset();
     }
 
     /**

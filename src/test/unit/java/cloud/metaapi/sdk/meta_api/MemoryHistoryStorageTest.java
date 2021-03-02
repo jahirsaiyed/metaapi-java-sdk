@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import org.assertj.core.util.Lists;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -49,6 +50,11 @@ class MemoryHistoryStorageTest {
     storage.onConnected(1, 0);
   }
 
+  @AfterEach
+  void tearDown() {
+    ServiceProvider.reset();
+  }
+  
   /**
    * Tests {@link MemoryHistoryStorage#loadDataFromDisk()}
    */

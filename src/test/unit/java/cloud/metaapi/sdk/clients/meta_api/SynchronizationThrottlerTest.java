@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Maps;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -32,6 +33,11 @@ class SynchronizationThrottlerTest {
       .thenReturn(CompletableFuture.completedFuture(null));
     throttler = new SynchronizationThrottler(websocketClient, 2);
     throttler.start();
+  }
+  
+  @AfterEach
+  void tearDown() {
+    ServiceProvider.reset();
   }
 
   /**

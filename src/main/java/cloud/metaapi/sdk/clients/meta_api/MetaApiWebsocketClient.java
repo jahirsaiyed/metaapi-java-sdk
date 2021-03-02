@@ -854,6 +854,23 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   /**
+   * Unsubscribes from market data of specified symbol (see
+   * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/unsubscribeFromMarketData/).
+   * @param accountId id of the MetaTrader account
+   * @param instanceIndex instance index
+   * @param symbol symbol (e.g. currency pair or an index)
+   * @return completable future which resolves when unsubscription request was processed
+   */
+  public CompletableFuture<Void> unsubscribeFromMarketData(String accountId, int instanceIndex,
+      String symbol) {
+    ObjectNode request = jsonMapper.createObjectNode();
+    request.put("type", "unsubscribeFromMarketData");
+    request.put("symbol", symbol);
+    request.put("instanceIndex", instanceIndex);
+    return rpcRequest(accountId, request).thenApply((response) -> null);
+  }
+  
+  /**
    * Retrieves specification for a symbol (see
    * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/getSymbolSpecification/).
    * @param accountId id of the MetaTrader account to retrieve symbol specification for

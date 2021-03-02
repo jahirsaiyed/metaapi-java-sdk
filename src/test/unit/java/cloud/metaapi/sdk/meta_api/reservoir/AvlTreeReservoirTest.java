@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
@@ -15,6 +16,11 @@ import cloud.metaapi.sdk.util.ServiceProvider;
  */
 class AvlTreeReservoirTest {
 
+  @AfterEach
+  void tearDown() {
+    ServiceProvider.reset();
+  }
+  
   /**
    * Tests {@link AvlTreeReservoir#pushSome(Object)}
    */

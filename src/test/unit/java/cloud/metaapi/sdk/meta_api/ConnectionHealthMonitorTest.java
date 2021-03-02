@@ -9,6 +9,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Arrays;
 import org.assertj.core.util.Lists;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -63,6 +64,11 @@ class ConnectionHealthMonitorTest {
             symbol = "EURUSD";
             brokerTime = brokerTimes[1];
         }});
+    }
+    
+    @AfterEach
+    void tearDown() {
+        ServiceProvider.reset();
     }
 
     /**
