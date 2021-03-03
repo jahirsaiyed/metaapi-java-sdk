@@ -37,6 +37,7 @@ class SynchronizationThrottlerTest {
   
   @AfterEach
   void tearDown() {
+	throttler.stop();
     ServiceProvider.reset();
   }
 
