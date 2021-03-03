@@ -1508,35 +1508,6 @@ class MetaApiWebsocketClientTest {
   }
   
   /**
-   * Tests {@link MetaApiWebsocketClient#unsubscribeFromMarketData(String, String)}
-   */
-  @Test
-  void testUnubscribesFromMarketDataWithMetatraderTerminal() throws Exception {
-    requestReceived = false;
-    server.addEventListener("request", Object.class, new DataListener<Object>() {
-      @Override
-      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
-        JsonNode request = jsonMapper.valueToTree(data);
-        if (  request.get("type").asText().equals("unsubscribeFromMarketData")
-           && request.get("accountId").asText().equals("accountId")
-           && request.get("symbol").asText().equals("EURUSD")
-           && request.get("application").asText().equals("application")
-           && request.get("instanceIndex").asInt() == 1
-        ) {
-          requestReceived = true;
-          ObjectNode response = jsonMapper.createObjectNode();
-          response.put("type", "response");
-          response.set("accountId", request.get("accountId"));
-          response.set("requestId", request.get("requestId"));
-          client.sendEvent("response", response.toString());
-        }
-      }
-    });
-    client.unsubscribeFromMarketData("accountId", 1, "EURUSD").get();
-    assertTrue(requestReceived);
-  }
-  
-  /**
    * Tests {@link MetaApiWebsocketClient#addSynchronizationListener(String, SynchronizationListener)}
    */
   @ParameterizedTest
