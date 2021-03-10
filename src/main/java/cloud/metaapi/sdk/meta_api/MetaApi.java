@@ -11,6 +11,7 @@ import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderDemoAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
+import cloud.metaapi.sdk.clients.meta_api.SynchronizationThrottler;
 
 /**
  * MetaApi MetaTrader API SDK
@@ -61,6 +62,10 @@ public class MetaApi {
      * Max amount of concurrent synchronizations
      */
     public int maxConcurrentSynchronizations = 5;
+    /**
+     * Options for synchronization throttler
+     */
+    public SynchronizationThrottler.Options synchronizationThrottler = new SynchronizationThrottler.Options();
     /**
      * Retry options
      */
@@ -144,7 +149,7 @@ public class MetaApi {
     websocketOptions.connectTimeout = opts.connectTimeout * 1000L;
     websocketOptions.packetOrderingTimeout = opts.packetOrderingTimeout;
     websocketOptions.packetLogger = opts.packetLogger;
-    websocketOptions.maxConcurrentSynchronizations = opts.maxConcurrentSynchronizations;
+    websocketOptions.synchronizationThrottler = opts.synchronizationThrottler;
     websocketOptions.retryOpts = opts.retryOpts;
     metaApiWebsocketClient = new MetaApiWebsocketClient(token, websocketOptions);
     provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, opts.domain));

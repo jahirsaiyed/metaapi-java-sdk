@@ -149,6 +149,8 @@ public class HttpClient {
   /**
    * Makes request and returns HTTP response. If request fails, completable future completes exceptionally
    * with {@link UnirestException}.
+   * @param options request options
+   * @return completable future resolving with http response object
    */
   protected CompletableFuture<HttpResponse<String>> makeRequest(HttpRequestOptions options) {
     return CompletableFuture.supplyAsync(() -> {

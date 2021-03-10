@@ -47,6 +47,7 @@ public class Reservoir {
      * Constructs Reservoir
      * @param size Reservoir size
      * @param observationIntervalInMS Reservoir observation Interval In ms
+     * @param object Object
      */
     public Reservoir(int size, int observationIntervalInMS, Reservoir object) {
         if (object == null) {

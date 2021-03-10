@@ -32,7 +32,9 @@ public class ProvisioningProfileClient extends MetaApiClient {
     }
     
     /**
-     * @see ProvisioningProfileClient#ProvisioningProfileClient(HttpClient, String, String)
+     * Constructs provisioning API client instance
+     * @param httpClient HTTP client
+     * @param token authorization token
      * @param domain domain to connect to
      */
     public ProvisioningProfileClient(HttpClient httpClient, String token, String domain) {

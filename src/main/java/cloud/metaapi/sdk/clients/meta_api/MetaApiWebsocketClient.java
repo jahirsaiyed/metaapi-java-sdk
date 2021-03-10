@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -64,7 +63,6 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   private String application;
   private long requestTimeout;
   private long connectTimeout;
-  private int maxConcurrentSynchronizations;
   private int retries;
   private int minRetryDelayInSeconds;
   private int maxRetryDelayInSeconds;
@@ -82,6 +80,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   private boolean isSocketConnecting = false;
   private boolean connected = false;
   private String sessionId;
+  private double clientId;
   
   private static class RequestResolve {
     public CompletableFuture<JsonNode> future;
@@ -113,13 +112,13 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
      */
     public int packetOrderingTimeout = 60;
     /**
+     * Synchronization throttler options
+     */
+    public SynchronizationThrottler.Options synchronizationThrottler = new SynchronizationThrottler.Options();
+    /**
      * Packet logger options
      */
     public PacketLoggerOptions packetLogger = new PacketLoggerOptions();
-    /**
-     * Max amount of concurrent synchronizations
-     */
-    public int maxConcurrentSynchronizations = 5;
     /**
      * Retry options
      */
@@ -129,12 +128,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   /**
    * Packet logger options
    */
-  public static class PacketLoggerOptions extends PacketLogger.LoggerOptions {
-    /**
-     * Whether enable packet logger
-     */
-    public boolean enabled = false;
-  }
+  public static class PacketLoggerOptions extends PacketLogger.LoggerOptions {}
   
   /**
    * Constructs MetaApi websocket API client instance with default parameters
@@ -157,11 +151,10 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     this.token = token;
     this.requestTimeout = opts.requestTimeout;
     this.connectTimeout = opts.connectTimeout;
-    this.maxConcurrentSynchronizations = opts.maxConcurrentSynchronizations;
     this.retries = opts.retryOpts.retries;
     this.minRetryDelayInSeconds = opts.retryOpts.minDelayInSeconds;
     this.maxRetryDelayInSeconds = opts.retryOpts.maxDelayInSeconds;
-    this.synchronizationThrottler = new SynchronizationThrottler(this, maxConcurrentSynchronizations);
+    this.synchronizationThrottler = new SynchronizationThrottler(this, opts.synchronizationThrottler);
     this.synchronizationThrottler.start();
     this.packetOrderer = new PacketOrderer(this, opts.packetOrderingTimeout);
     if (opts.packetLogger.enabled) {
@@ -214,7 +207,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       connectFuture = result;
       packetOrderer.start();
       sessionId = RandomStringUtils.randomAlphanumeric(32);
-      String url = this.url + "?auth-token=" + token;
+      clientId = Math.random();
       IO.Options socketOptions = new IO.Options();
       socketOptions.path = "/ws";
       socketOptions.reconnection = true;
@@ -227,18 +220,11 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       try {
         socket = IO.socket(url, socketOptions);
         
-        // Every EVENT_TRANSPORT during one session the same clientId must be used
-        Random random = new Random();
-        float clientId = random.nextFloat();
-
-        // Adding extra headers
+        // Adding query during every connection
         socket.io().on(Manager.EVENT_TRANSPORT, (Object[] socketEventArgs) -> {
           Transport transport = (Transport) socketEventArgs[0];
-          transport.on(Transport.EVENT_REQUEST_HEADERS, (Object[] transportEventArgs) -> {
-            @SuppressWarnings("unchecked")
-            Map<String, List<String>> headers = (Map<String, List<String>>) transportEventArgs[0];
-            headers.put("Client-id", Arrays.asList(String.valueOf(clientId)));
-          });
+          transport.query.put("auth-token", token);
+          transport.query.put("clientId", String.valueOf(clientId));
         });
         
         socket.on(Socket.EVENT_CONNECT, (Object[] args) -> {
@@ -342,7 +328,18 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           }
         });
         socket.on("synchronization", (Object[] args) -> {
-          processSynchronizationPacket(args[0].toString());
+          JsonNode packet;
+          try {
+            packet = jsonMapper.readTree(args[0].toString());
+            String synchronizationId = packet.has("synchronizationId")
+              ? packet.get("synchronizationId").asText() : null;
+            if (synchronizationId == null || synchronizationThrottler.getActiveSynchronizationIds()
+              .contains(synchronizationId)) {
+              processSynchronizationPacket(packet);
+            }
+          } catch (JsonProcessingException e) {
+            logger.error("Failed to parse incoming synchronization packet", e);
+          }
         });
         socket.connect();
       } catch (URISyntaxException e) {
@@ -1008,6 +1005,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       if (!socket.connected() && !isSocketConnecting && connected) {
         isSocketConnecting = true;
         sessionId = RandomStringUtils.randomAlphanumeric(32);
+        clientId = Math.random();
         socket.connect();
       }
     } catch (InterruptedException e) {
@@ -1104,14 +1102,13 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     }
   }
   
-  private CompletableFuture<Void> processSynchronizationPacket(String jsonPacket) {
+  private CompletableFuture<Void> processSynchronizationPacket(JsonNode jsonPacket) {
     return CompletableFuture.runAsync(() -> {
       try {
-        JsonNode jsonPacketAsNode = jsonMapper.readTree(jsonPacket);
         if (packetLogger != null) {
-          packetLogger.logPacket(jsonPacketAsNode);
+          packetLogger.logPacket(jsonPacket);
         }
-        List<JsonNode> packets = packetOrderer.restoreOrder(jsonPacketAsNode);
+        List<JsonNode> packets = packetOrderer.restoreOrder(jsonPacket);
         for (JsonNode data : packets) {
           String synchronizationId = data.has("synchronizationId") ? data.get("synchronizationId").asText() : null;
           if (synchronizationId != null) {

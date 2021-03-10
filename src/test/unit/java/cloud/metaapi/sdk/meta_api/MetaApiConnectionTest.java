@@ -739,7 +739,9 @@ class MetaApiConnectionTest {
     Mockito.when(client.unsubscribe("accountId")).thenReturn(CompletableFuture.completedFuture(null));
     api.subscribe();
     api.close();
-    Thread.sleep(3100);
+    Thread.sleep(1100);
+    Thread.sleep(1100);
+    Thread.sleep(1100);
     Mockito.verify(client, Mockito.times(1)).subscribe("accountId");
     Mockito.verify(client).unsubscribe("accountId");
   }

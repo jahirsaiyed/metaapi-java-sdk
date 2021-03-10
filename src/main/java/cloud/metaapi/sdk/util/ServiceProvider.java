@@ -85,6 +85,7 @@ public class ServiceProvider {
      * By default an instance of MemoryHistoryStorage will be used.
      * @param connectionRegistry metatrader account connection registry
      * @param historyStartTime history start sync time, or {@code null}
+     * @return Metaapi connection
      * @see #setHistoryFileManagerMock(HistoryFileManager)
      */
     public static MetaApiConnection createMetaApiConnection(

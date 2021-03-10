@@ -31,7 +31,9 @@ class SynchronizationThrottlerTest {
     websocketClient = Mockito.mock(MetaApiWebsocketClient.class);
     Mockito.when(websocketClient.rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    throttler = new SynchronizationThrottler(websocketClient, 2);
+    throttler = new SynchronizationThrottler(websocketClient, new SynchronizationThrottler.Options() {{
+      maxConcurrentSynchronizations = 2;
+    }});
     throttler.start();
   }
   

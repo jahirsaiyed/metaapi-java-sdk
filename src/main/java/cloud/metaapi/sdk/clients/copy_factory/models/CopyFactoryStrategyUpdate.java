@@ -101,4 +101,9 @@ public class CopyFactoryStrategyUpdate {
      * is contractSize, then trade size will be scaled according to contract size. Default ({@code null}) is balance.
      */
     public String tradeSizeScalingMode;
+    /**
+     * Filter which permits the trades only if account equity is greater than balance moving
+     * average, or {@code null}
+     */
+    public CopyFactoryStrategyEquityCurveFilter equityCurveFilter;
 }

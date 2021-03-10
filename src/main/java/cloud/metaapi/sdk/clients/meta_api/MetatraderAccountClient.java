@@ -32,7 +32,9 @@ public class MetatraderAccountClient extends MetaApiClient {
     }
     
     /**
-     * @see MetatraderAccountClient#MetatraderAccountClient(HttpClient, String, String)
+     * Constructs MetaTrader account API client instance
+     * @param httpClient HTTP client
+     * @param token authorization token
      * @param domain domain to connect to
      */
     public MetatraderAccountClient(HttpClient httpClient, String token, String domain) {

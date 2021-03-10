@@ -1,6 +1,13 @@
+12.4.0
+  - added clientId to query websocket url
+  - added equity curve filter to CopyFactory
+  - fixed health state tracking for multiple replicas
+  - extended synchronization throttler options
+
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
   - fixed synchronization throttling
+  - bugfix for unsubscribeFromMarketData API
 
 12.3.0
   - added retryOpts option to configure retries of certain REST/RPC requests upon failure
