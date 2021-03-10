@@ -9,3 +9,4 @@ servers.dat
 .env
 .metaapi
 !/src/test/resources/servers.dat
+.docker

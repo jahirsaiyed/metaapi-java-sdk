@@ -2,6 +2,7 @@ package cloud.metaapi.sdk.clients.meta_api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -76,6 +77,7 @@ class MetaApiWebsocketClientTest {
   private static MetaApiWebsocketClient client;
   private static SocketIOServer server;
   private static SocketIOClient socket;
+  private SynchronizationThrottler clientSyncThrottler;
   
   // Some variables that cannot be written from request callbacks 
   // if they are local test variables
@@ -83,9 +85,11 @@ class MetaApiWebsocketClientTest {
   private MetatraderTrade actualTrade = null;
   private ResponseTimestamps timestamps = null;
   private int requestCounter = 0;
+  private int connectAmount = 0;
+  private double clientId = 0;
   
   @BeforeAll
-  static void setUpBeforeClass() throws IOException {
+  static void setUpBeforeClass() throws IOException, IllegalAccessException {
     Configuration serverConfiguration = new Configuration();
     serverConfiguration.setPort(6784);
     serverConfiguration.setContext("/ws");
@@ -118,6 +122,11 @@ class MetaApiWebsocketClientTest {
 
   @BeforeEach
   void setUp() throws Throwable {
+    clientSyncThrottler = (SynchronizationThrottler) FieldUtils.readField(client,
+      "synchronizationThrottler", true);
+    clientSyncThrottler = Mockito.spy(clientSyncThrottler);
+    Mockito.when(clientSyncThrottler.getActiveSynchronizationIds()).thenReturn(Lists.emptyList());
+    FieldUtils.writeField(client, "synchronizationThrottler", clientSyncThrottler, true);
     client.connect().get();
   }
 
@@ -134,9 +143,35 @@ class MetaApiWebsocketClientTest {
    */
   @Test
   void testSendsClientIdWhenConnects() {
-    String clientId = socket.getHandshakeData().getHttpHeaders().get("Client-id");
+    String clientId = socket.getHandshakeData().getSingleUrlParam("clientId");
     assertTrue(clientId != null);
-    assertTrue(Float.valueOf(clientId) >= 0 && Float.valueOf(clientId) < 1);
+    assertTrue(Double.valueOf(clientId) >= 0 && Double.valueOf(clientId) < 1);
+  }
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#tryReconnect()}
+   */
+  @Test
+  void testChangesClientIdOnReconnect() throws InterruptedException {
+    clientId = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
+    connectAmount = 0;
+    client.close();
+    server.addConnectListener(new ConnectListener() {
+      @Override
+      public void onConnect(SocketIOClient connected) {
+        socket = connected;
+        connectAmount++;
+        double cid = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
+        assertNotEquals(clientId, cid);
+        clientId = cid;
+        if (connectAmount == 1) {
+          socket.disconnect();
+        }
+      }
+    });
+    client.connect().join();
+    Thread.sleep(2000);
+    assertTrue(connectAmount >= 2);
   }
 
   /**
@@ -1097,6 +1132,42 @@ class MetaApiWebsocketClientTest {
     socket.sendEvent("synchronization", disconnectPacket.toString());
     Thread.sleep(200);
     Mockito.verify(listener).onDisconnected(1);
+  }
+  
+  @Test
+  void testOnlyAcceptsPacketsWithOwnSynchronizationIds() throws InterruptedException {
+    SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
+    Mockito.when(listener.onAccountInformationUpdated(Mockito.anyInt(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    client.addSynchronizationListener("accountId", listener);
+    Mockito.when(clientSyncThrottler.getActiveSynchronizationIds())
+      .thenReturn(Lists.list("synchronizationId"));
+    ObjectNode packet1 = jsonMapper.createObjectNode();
+    packet1.put("type", "accountInformation");
+    packet1.put("accountId", "accountId");
+    packet1.set("accountInformation", jsonMapper.createObjectNode());
+    packet1.put("instanceIndex", 1);
+    socket.sendEvent("synchronization", packet1.toString());
+    Thread.sleep(200);
+    Mockito.verify(listener, Mockito.times(1)).onAccountInformationUpdated(Mockito.anyInt(), Mockito.any());
+    ObjectNode packet2 = jsonMapper.createObjectNode();
+    packet2.put("type", "accountInformation");
+    packet2.put("accountId", "accountId");
+    packet2.set("accountInformation", jsonMapper.createObjectNode());
+    packet2.put("instanceIndex", 1);
+    packet2.put("synchronizationId", "wrong");
+    socket.sendEvent("synchronization", packet2.toString());
+    Thread.sleep(200);
+    Mockito.verify(listener, Mockito.times(1)).onAccountInformationUpdated(Mockito.anyInt(), Mockito.any());
+    ObjectNode packet3 = jsonMapper.createObjectNode();
+    packet3.put("type", "accountInformation");
+    packet3.put("accountId", "accountId");
+    packet3.set("accountInformation", jsonMapper.createObjectNode());
+    packet3.put("instanceIndex", 1);
+    packet3.put("synchronizationId", "synchronizationId");
+    socket.sendEvent("synchronization", packet3.toString());
+    Thread.sleep(200);
+    Mockito.verify(listener, Mockito.times(2)).onAccountInformationUpdated(Mockito.anyInt(), Mockito.any());
   }
   
   /**

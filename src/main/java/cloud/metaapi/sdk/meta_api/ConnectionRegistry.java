@@ -42,6 +42,7 @@ public class ConnectionRegistry {
      * Creates and returns a new account connection if doesnt exist, otherwise returns old
      * @param account MetaTrader account id to connect to
      * @param historyStorage terminal history storage
+     * @return Completable future resolving with connection object
      */
     public CompletableFuture<MetaApiConnection> connect(MetatraderAccount account, HistoryStorage historyStorage) {
         return connect(account, historyStorage, null);
@@ -52,6 +53,7 @@ public class ConnectionRegistry {
      * @param account MetaTrader account id to connect to
      * @param historyStorage terminal history storage
      * @param historyStartTime history start time, or {@code null}
+     * @return Completable future resolving with connection object
      */
     public CompletableFuture<MetaApiConnection> connect(
         MetatraderAccount account, HistoryStorage historyStorage, IsoTime historyStartTime

@@ -396,6 +396,11 @@ MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
 }}).get();
 ```
 
+## Rate limits & quotas
+
+MetaApi applies rate limits to requests. See [MT account management API](https://metaapi.cloud/docs/provisioning/rateLimiting/) and [MetaApi API](https://metaapi.cloud/docs/client/restApi/rateLimiting/) for details.
+Also, MetaApi applies quotas to limit the number of accounts and provisioning profiles, for more details see the [MT account management API quotas](https://metaapi.cloud/docs/provisioning/userQuota/)
+
 ## CopyFactory copy trading API
 
 CopyFactory is a powerful trade copying API which makes developing forex
@@ -514,7 +519,7 @@ System.out.println(historyApi.getSubscribers().get());
 // retrieve list of strategies provided
 System.out.println(historyApi.getProvidedStrategies().get());
 // retrieve trading history, please note that this method support pagination and limits number of records
-System.out.println(historyApi.getProvidedStrategiesTransactions(new IsoTime("2020-08-01T00:00:00.000Z"), new IsoTime("2020-09-01T00:00:00.000Z")).get();
+System.out.println(historyApi.getProvidedStrategiesTransactions(new IsoTime("2020-08-01T00:00:00.000Z"), new IsoTime("2020-09-01T00:00:00.000Z")).get());
 ```
 
 #### Retrieving trading history on subscriber side
@@ -525,7 +530,7 @@ System.out.println(historyApi.getProviders().get());
 // retrieve list of strategies subscribed to
 System.out.println(historyApi.getStrategiesSubscribed().get());
 // retrieve trading history, please note that this method support pagination and limits number of records
-System.out.println(historyApi.getStrategiesSubscribedTransactions(new IsoTime("2020-08-01T00:00:00.000Z"), new IsoTime("2020-09-01T00:00:00.000Z")).get();
+System.out.println(historyApi.getStrategiesSubscribedTransactions(new IsoTime("2020-08-01T00:00:00.000Z"), new IsoTime("2020-09-01T00:00:00.000Z")).get());
 ```
 
 #### Resynchronizing slave accounts to masters
@@ -553,6 +558,18 @@ System.out.println(tradingApi.getStopouts(accountId).get());
 
 // reset a stopout so that subscription can continue
 tradingApi.resetStopout(accountId, strategyId, "daily-equity").get();
+```
+
+#### Retrieving slave trading logs
+```java
+TradingClient tradingApi = copyFactory.getTradingApi();
+String accountId = "..."; // CopyFactory account id
+// retrieve slave trading log
+System.out.println(tradingApi.getUserLog(accountId).get());
+// retrieve paginated slave trading log by time range
+IsoTime from = new IsoTime(Date.from(Instant.now().minusSeconds(24 * 60 * 60)));
+System.out.println(tradingApi.getUserLog(accountId, from, null, 20, 10).get());
+System.out.println(tradingApi.getUserLog(accountId, from, null, 20, 10).get());
 ```
 
 Keywords: MetaTrader API, MetaTrader REST API, MetaTrader websocket API,

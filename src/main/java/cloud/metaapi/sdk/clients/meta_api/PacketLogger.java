@@ -42,7 +42,7 @@ public class PacketLogger {
   private boolean compressSpecifications;
   private boolean compressPrices;
   private Map<String, Map<Integer, PreviousPrice>> previousPrices = new HashMap<>();
-  private Map<String, Map<Integer, JsonNode>> lastKeepAlive = new HashMap<>();
+  private Map<String, Map<Integer, JsonNode>> lastSNPacket = new HashMap<>();
   private Map<String, WriteQueueItem> writeQueue = new HashMap<>();
   private Timer recordInterval;
   private Timer deleteOldLogsInterval;
@@ -52,9 +52,25 @@ public class PacketLogger {
    * Packet logger options
    */
   public static class LoggerOptions {
+    /**
+     * Whether enable packet logger
+     */
+    public boolean enabled = false;
+    /**
+     * Maximum amount of files per account, default value is 12
+     */
     int fileNumberLimit = 12;
+    /**
+     * Amount of logged hours per account file, default value is 4
+     */
     int logFileSizeInHours = 4;
+    /**
+     * Whether to compress specifications packets, default value is true
+     */
     boolean compressSpecifications = true;
+    /**
+     * Whether to compress specifications packets, default value is true
+     */
     boolean compressPrices = true;
   }
   
@@ -116,11 +132,11 @@ public class PacketLogger {
     if (packetType.equals("status")) {
       return;
     }
-    if (!lastKeepAlive.containsKey(packetAccountId)) {
-      lastKeepAlive.put(packetAccountId, new HashMap<>());
+    if (!lastSNPacket.containsKey(packetAccountId)) {
+      lastSNPacket.put(packetAccountId, new HashMap<>());
     }
-    if (packetType.equals("keepalive")) {
-      lastKeepAlive.get(packetAccountId).put(instanceIndex, packet);
+    if (packetType.equals("keepalive") || packetType.equals("noop")) {
+      lastSNPacket.get(packetAccountId).put(instanceIndex, packet);
       return;
     }
     List<String> queue = writeQueue.get(packetAccountId).queue;
@@ -153,8 +169,8 @@ public class PacketLogger {
           if (validSequenceNumbers.get(0) != null) {
             validSequenceNumbers.add(validSequenceNumbers.get(0) + 1);
           }
-          if (lastKeepAlive.get(packetAccountId).containsKey(instanceIndex)) {
-            JsonNode lastKeepAlivePacket = lastKeepAlive.get(packetAccountId).get(instanceIndex); 
+          if (lastSNPacket.get(packetAccountId).containsKey(instanceIndex)) {
+            JsonNode lastKeepAlivePacket = lastSNPacket.get(packetAccountId).get(instanceIndex); 
             if (lastKeepAlivePacket.has("sequenceNumber")) {
               validSequenceNumbers.add(lastKeepAlivePacket.get("sequenceNumber").asInt() + 1);
             }

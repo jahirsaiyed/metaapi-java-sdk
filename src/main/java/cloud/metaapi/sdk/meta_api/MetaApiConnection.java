@@ -695,7 +695,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/unsubscribeFromMarketData/).
    * @param symbol symbol (e.g. currency pair or an index)
    * @param instanceIndex instance index
-   * @returns completable future which resolves when unsubscription request was processed
+   * @return completable future which resolves when unsubscription request was processed
    */
   public CompletableFuture<Void> unsubscribeFromMarketData(String symbol, int instanceIndex) {
     return CompletableFuture.runAsync(() -> {

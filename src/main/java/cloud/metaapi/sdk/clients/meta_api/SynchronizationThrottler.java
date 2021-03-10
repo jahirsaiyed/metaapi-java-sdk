@@ -24,6 +24,8 @@ public class SynchronizationThrottler {
   
   private static Logger logger = Logger.getLogger(SynchronizationThrottler.class);
   private int maxConcurrentSynchronizations;
+  private int queueTimeoutInSeconds;
+  private int synchronizationTimeoutInSeconds;
   private MetaApiWebsocketClient client;
   protected Map<String, Long> synchronizationIds = new HashMap<>();
   private Map<String, AccountData> accountsBySynchronizationIds = new HashMap<>();
@@ -31,6 +33,24 @@ public class SynchronizationThrottler {
   private Timer removeOldSyncIdsTimer = null;
   private Timer processQueueTimer = null;
   private boolean isProcessingQueue = false;
+  
+  /**
+   * Options for synchronization throttler
+   */
+  public static class Options {
+    /**
+     * Amount of maximum allowed concurrent synchronizations
+     */
+    public int maxConcurrentSynchronizations = 10;
+    /**
+     * Allowed time for a synchronization in queue
+     */
+    public int queueTimeoutInSeconds = 300;
+    /**
+     * Time after which a synchronization slot is freed to be used by another synchronization
+     */
+    public int synchronizationTimeoutInSeconds = 10;
+  }
   
   private static class AccountData {
     public String accountId;
@@ -46,10 +66,12 @@ public class SynchronizationThrottler {
   /**
    * Constructs the synchronization throttler
    * @param client MetaApi websocket client
-   * @param maxConcurrentSynchronizations Limit of concurrent synchronizations
+   * @param opts Synchronization throttler options
    */
-  public SynchronizationThrottler(MetaApiWebsocketClient client, int maxConcurrentSynchronizations) {
-    this.maxConcurrentSynchronizations = maxConcurrentSynchronizations;
+  public SynchronizationThrottler(MetaApiWebsocketClient client, Options opts) {
+    this.maxConcurrentSynchronizations = opts.maxConcurrentSynchronizations;
+    this.queueTimeoutInSeconds = opts.queueTimeoutInSeconds;
+    this.synchronizationTimeoutInSeconds = opts.synchronizationTimeoutInSeconds;
     this.client = client;
   }
   
@@ -90,13 +112,13 @@ public class SynchronizationThrottler {
   private void removeOldSyncIdsJob() {
     long now = ServiceProvider.getNow().toEpochMilli();
     for (String key : new ArrayList<>(synchronizationIds.keySet())) {
-      if ((now - synchronizationIds.get(key)) > 10 * 1000) {
+      if ((now - synchronizationIds.get(key)) > synchronizationTimeoutInSeconds * 1000) {
         advanceQueue();
         synchronizationIds.remove(key);
       }
     }
     while (synchronizationQueue.size() != 0 && (ServiceProvider.getNow().toEpochMilli() 
-      - synchronizationQueue.get(0).queueTime > 300 * 1000)) {
+      - synchronizationQueue.get(0).queueTime > queueTimeoutInSeconds * 1000)) {
       removeFromQueue(synchronizationQueue.get(0).synchronizationId);
     }
   }
@@ -109,6 +131,14 @@ public class SynchronizationThrottler {
     if (accountsBySynchronizationIds.containsKey(synchronizationId)) {
       synchronizationIds.put(synchronizationId, ServiceProvider.getNow().toEpochMilli());
     }
+  }
+  
+  /**
+   * Returns the list of currenly active synchronization ids
+   * @return Synchronization ids
+   */
+  public List<String> getActiveSynchronizationIds() {
+    return new ArrayList<>(accountsBySynchronizationIds.keySet());
   }
   
   /**
@@ -194,6 +224,7 @@ public class SynchronizationThrottler {
    * Schedules to send a synchronization request for account
    * @param accountId Account id
    * @param request Request to send
+   * @return Completable future resolving when synchronization is scheduled
    */
   public CompletableFuture<JsonNode> scheduleSynchronize(String accountId, ObjectNode request) {
     return CompletableFuture.supplyAsync(() -> {

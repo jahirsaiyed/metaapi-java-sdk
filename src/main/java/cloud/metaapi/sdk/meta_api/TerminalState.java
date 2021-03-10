@@ -30,7 +30,7 @@ public class TerminalState extends SynchronizationListener {
   protected int statusTimerTimeoutInMilliseconds = 60000;
   
   private Map<Integer, State> stateByInstanceIndex = new HashMap<>();
-  private Timer statusTimer = null;
+  private Map<Integer, Timer> statusTimers = new HashMap<>();
   
   private static class State {
     public boolean connected = false;
@@ -141,17 +141,20 @@ public class TerminalState extends SynchronizationListener {
   }
   
   private void resetDisconnectTimer(int instanceIndex) {
-    if (statusTimer != null) statusTimer.cancel();
+    if (statusTimers.containsKey(instanceIndex)) {
+      statusTimers.get(instanceIndex).cancel();
+    }
     final TerminalState self = this;
     // Recreate the timer because once it has been terminated, 
     // no more tasks can be scheduled on it
-    statusTimer = new Timer();
+    Timer statusTimer = new Timer();
     statusTimer.schedule(new TimerTask() {
       @Override
       public void run() {
         self.onDisconnected(instanceIndex);
       }
     }, statusTimerTimeoutInMilliseconds);
+    statusTimers.put(instanceIndex, statusTimer);
   }
 
   @Override
