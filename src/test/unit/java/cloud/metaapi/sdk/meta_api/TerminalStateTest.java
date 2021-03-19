@@ -59,46 +59,6 @@ class TerminalStateTest {
   }
   
   /**
-   * Tests {@link TerminalState#onBrokerConnectionStatusChanged(boolean)}
-   */
-  @Test
-  void testCallsDisconnectEventIfThereWasNoSignalForALongTime() throws InterruptedException {
-    TerminalState state = new TerminalState() {{ statusTimerTimeoutInMilliseconds = 937; }};
-    state.onConnected(1, 1);
-    state.onBrokerConnectionStatusChanged(1, true);
-    Thread.sleep(390);
-    assertTrue(state.isConnectedToBroker());
-    assertTrue(state.isConnected());
-    Thread.sleep(702);
-    assertFalse(state.isConnectedToBroker());
-    assertFalse(state.isConnected());
-  }
-  
-  /**
-   * Tests {@link TerminalState#onBrokerConnectionStatusChanged(boolean)}
-   */
-  @Test
-  void testCallsDisconnectEventIfThereWasNoSignalForALongTimeOnMultipleInstances() throws InterruptedException {
-    TerminalState state = new TerminalState() {{ statusTimerTimeoutInMilliseconds = 937; }};
-    state.onConnected(1, 1);
-    state.onConnected(0, 2);
-    state.onBrokerConnectionStatusChanged(1, true);
-    Thread.sleep(390);
-    state.onBrokerConnectionStatusChanged(1, true);
-    state.onBrokerConnectionStatusChanged(0, true);
-    Thread.sleep(702);
-    assertTrue(state.isConnectedToBroker());
-    assertTrue(state.isConnected());
-    state.onBrokerConnectionStatusChanged(0, true);
-    Thread.sleep(390);
-    assertTrue(state.isConnectedToBroker());
-    assertTrue(state.isConnected());
-    Thread.sleep(702);
-    assertFalse(state.isConnectedToBroker());
-    assertFalse(state.isConnected());
-  }
-  
-  /**
    * Tests
    * {@link TerminalState#onAccountInformationUpdated(MetatraderAccountInformation)},
    * {@link TerminalState#getAccountInformation()}
@@ -182,13 +142,13 @@ class TerminalStateTest {
     IsoTime isoTime = new IsoTime();
     state.onSymbolPricesUpdated(1, Arrays.asList(
       new MetatraderSymbolPrice() {{ time = isoTime; symbol = "EURUSD";
-      bid = 1; ask = 1.1; }}), null, null, null, null);
+      bid = 1; ask = 1.1; }}), null, null, null, null, null);
     state.onSymbolPricesUpdated(1, Arrays.asList(
       new MetatraderSymbolPrice() {{ time = isoTime; symbol = "GBPUSD"; }}),
-      null, null, null, null);
+      null, null, null, null, null);
     state.onSymbolPricesUpdated(1, Arrays.asList(
       new MetatraderSymbolPrice() {{ time = isoTime; symbol = "EURUSD";
-      bid = 1; ask = 1.2; }}), null, null, null, null);
+      bid = 1; ask = 1.2; }}), null, null, null, null, null);
     assertThat(state.getPrice("EURUSD").get()).usingRecursiveComparison()
       .isEqualTo(new MetatraderSymbolPrice() {{ time = isoTime; symbol = "EURUSD";
       bid = 1; ask = 1.2; }});
@@ -245,7 +205,7 @@ class TerminalStateTest {
       lossTickValue = 0.5;
       bid = 10;
       ask = 11;
-    }}), null, null, null, null);
+    }}), null, null, null, null, null);
     assertThat(state.getPositions().stream().map(position -> position.profit).toArray())
       .isEqualTo(Stream.of(200.0, 200.0).toArray());
     assertThat(state.getPositions().stream().map(position -> position.unrealizedProfit).toArray())
@@ -265,7 +225,7 @@ class TerminalStateTest {
   void testUpdatesMarginFieldsOnPriceUpdate() {
     state.onAccountInformationUpdated(1, new MetatraderAccountInformation() {{
       equity = 1000; balance = 800; }}).join();
-    state.onSymbolPricesUpdated(1, Arrays.asList(), 100.0, 200.0, 400.0, 40000.0).join();
+    state.onSymbolPricesUpdated(1, Arrays.asList(), 100.0, 200.0, 400.0, 40000.0, null).join();
     assertEquals(100, state.getAccountInformation().get().equity);
     assertEquals(200, state.getAccountInformation().get().margin);
     assertEquals(400, state.getAccountInformation().get().freeMargin);
@@ -302,7 +262,7 @@ class TerminalStateTest {
       lossTickValue = 0.5;
       bid = 10;
       ask = 11;
-    }}), null, null, null, null);
+    }}), null, null, null, null, null);
     assertThat(state.getOrders().stream().map(order -> order.currentPrice).toArray())
       .isEqualTo(Stream.of(11.0, 9.0).toArray());
   }

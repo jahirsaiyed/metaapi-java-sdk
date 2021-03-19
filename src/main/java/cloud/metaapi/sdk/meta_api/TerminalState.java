@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -30,7 +28,6 @@ public class TerminalState extends SynchronizationListener {
   protected int statusTimerTimeoutInMilliseconds = 60000;
   
   private Map<Integer, State> stateByInstanceIndex = new HashMap<>();
-  private Map<Integer, Timer> statusTimers = new HashMap<>();
   
   private static class State {
     public boolean connected = false;
@@ -128,7 +125,6 @@ public class TerminalState extends SynchronizationListener {
   @Override
   public CompletableFuture<Void> onConnected(int instanceIndex, int replicas) {
     getState(instanceIndex).connected = true;
-    resetDisconnectTimer(instanceIndex);
     return CompletableFuture.completedFuture(null);
   }
 
@@ -140,27 +136,9 @@ public class TerminalState extends SynchronizationListener {
     return CompletableFuture.completedFuture(null);
   }
   
-  private void resetDisconnectTimer(int instanceIndex) {
-    if (statusTimers.containsKey(instanceIndex)) {
-      statusTimers.get(instanceIndex).cancel();
-    }
-    final TerminalState self = this;
-    // Recreate the timer because once it has been terminated, 
-    // no more tasks can be scheduled on it
-    Timer statusTimer = new Timer();
-    statusTimer.schedule(new TimerTask() {
-      @Override
-      public void run() {
-        self.onDisconnected(instanceIndex);
-      }
-    }, statusTimerTimeoutInMilliseconds);
-    statusTimers.put(instanceIndex, statusTimer);
-  }
-
   @Override
   public CompletableFuture<Void> onBrokerConnectionStatusChanged(int instanceIndex, boolean connected) {
     getState(instanceIndex).connectedToBroker = connected;
-    resetDisconnectTimer(instanceIndex);
     return CompletableFuture.completedFuture(null);
   }
 
@@ -296,7 +274,7 @@ public class TerminalState extends SynchronizationListener {
   @Override
   public CompletableFuture<Void> onSymbolPricesUpdated(int instanceIndex,
     List<MetatraderSymbolPrice> prices, Double equity, Double margin, Double freeMargin,
-    Double marginLevel) {
+    Double marginLevel, Double accountCurrencyExchangeRate) {
     State state = getState(instanceIndex);
     state.lastUpdateTime = 0;
     for (MetatraderSymbolPrice price : prices) {

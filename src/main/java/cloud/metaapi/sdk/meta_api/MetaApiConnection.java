@@ -13,6 +13,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.log4j.Logger;
@@ -22,14 +23,20 @@ import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.ReconnectListener;
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
 import cloud.metaapi.sdk.clients.meta_api.TradeException;
+import cloud.metaapi.sdk.clients.meta_api.models.MarketDataSubscription;
+import cloud.metaapi.sdk.clients.meta_api.models.MarketDataUnsubscription;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketTradeOptions;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderBook;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderCandle;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeals;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderHistoryOrders;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderPosition;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolPrice;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolSpecification;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
@@ -50,13 +57,14 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   private TerminalState terminalState;
   private HistoryStorage historyStorage;
   private ConnectionHealthMonitor healthMonitor;
-  private Set<String> subscriptions = new HashSet<>();
+  private Map<String, Subscriptions> subscriptions = new HashMap<>();
   private Map<Integer, State> stateByInstanceIndex = new HashMap<>();
   private boolean isSynchronized = false;
   private boolean shouldRetrySubscribe = false;
   private boolean isSubscribing = false;
   private Timer subscribeTask = null;
   private CompletableFuture<Boolean> subscribeFuture = null;
+  private long lastAccountReloadTime = 0;
   private boolean closed = false;
 
   private static class State {
@@ -69,6 +77,10 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     public String lastDisconnectedSynchronizationId = "";
     public String lastSynchronizationId = "";
     public boolean disconnected = false;
+  }
+  
+  private static class Subscriptions {
+    List<MarketDataSubscription> subscriptions;
   }
   
   /**
@@ -643,12 +655,12 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when subscription is initiated
    */
   public CompletableFuture<Void> subscribe() {
-    return CompletableFuture.runAsync(() -> {
-      if (!isSubscribing) {
-        isSubscribing = true;
-        shouldRetrySubscribe = true;
+    if (!isSubscribing) {
+      isSubscribing = true;
+      shouldRetrySubscribe = true;
+      return CompletableFuture.runAsync(() -> {
         int subscribeRetryIntervalInSeconds = 3;
-        while (shouldRetrySubscribe && !closed) {
+        while (shouldRetrySubscribe && !closed && account.getState() == DeploymentState.DEPLOYED) {
           try {
             websocketClient.subscribe(account.getId()).join();
           } catch (Throwable error) {
@@ -672,36 +684,96 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
           }
         }
         isSubscribing = false;
-      }
-    });
+      });
+    } else {
+      return CompletableFuture.completedFuture(null);
+    }
   }
   
   /**
    * Subscribes on market data of specified symbol (see
    * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/subscribeToMarketData/).
    * @param symbol symbol (e.g. currency pair or an index)
+   * @return completable future which resolves when subscription request was processed
+   */
+  public CompletableFuture<Void> subscribeToMarketData(String symbol) {
+    return subscribeToMarketData(symbol, new ArrayList<>(), 0);
+  }
+  
+  /**
+   * Subscribes on market data of specified symbol (see
+   * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/subscribeToMarketData/).
+   * @param symbol symbol (e.g. currency pair or an index)
+   * @param subscriptions array of market data subscription to create or update. Please
+   * note that this feature is not fully implemented on server-side yet
+   * @return completable future which resolves when subscription request was processed
+   */
+  public CompletableFuture<Void> subscribeToMarketData(String symbol,
+    List<MarketDataSubscription> subscriptions) {
+    return subscribeToMarketData(symbol, subscriptions, 0);
+  }
+  
+  /**
+   * Subscribes on market data of specified symbol (see
+   * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/subscribeToMarketData/).
+   * @param symbol symbol (e.g. currency pair or an index)
+   * @param subscriptions array of market data subscription to create or update. Please
+   * note that this feature is not fully implemented on server-side yet
    * @param instanceIndex instance index
    * @return completable future which resolves when subscription request was processed
    */
-  public CompletableFuture<Void> subscribeToMarketData(String symbol, int instanceIndex) {
-    return CompletableFuture.runAsync(() -> {
-      subscriptions.add(symbol);
-      websocketClient.subscribeToMarketData(account.getId(), instanceIndex, symbol).join();
-    });
+  public CompletableFuture<Void> subscribeToMarketData(String symbol,
+    List<MarketDataSubscription> subscriptions, int instanceIndex) {
+    Subscriptions subscriptionsItem = new Subscriptions();
+    subscriptionsItem.subscriptions = subscriptions;
+    this.subscriptions.put(symbol, subscriptionsItem);
+    return websocketClient.subscribeToMarketData(account.getId(), instanceIndex, symbol, subscriptions);
   }
   
   /**
    * Unsubscribes from market data of specified symbol (see
    * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/unsubscribeFromMarketData/).
    * @param symbol symbol (e.g. currency pair or an index)
+   * @return completable future which resolves when unsubscription request was processed
+   */
+  public CompletableFuture<Void> unsubscribeFromMarketData(String symbol) {
+    return unsubscribeFromMarketData(symbol, new ArrayList<>(), 0);
+  }
+  
+  /**
+   * Unsubscribes from market data of specified symbol (see
+   * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/unsubscribeFromMarketData/).
+   * @param symbol symbol (e.g. currency pair or an index)
+   * @param subscriptions array of subscriptions to cancel
+   * @return completable future which resolves when unsubscription request was processed
+   */
+  public CompletableFuture<Void> unsubscribeFromMarketData(String symbol,
+    List<MarketDataUnsubscription> subscriptions) {
+    return unsubscribeFromMarketData(symbol, subscriptions, 0);
+  }
+  
+  /**
+   * Unsubscribes from market data of specified symbol (see
+   * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/unsubscribeFromMarketData/).
+   * @param symbol symbol (e.g. currency pair or an index)
+   * @param subscriptions array of subscriptions to cancel
    * @param instanceIndex instance index
    * @return completable future which resolves when unsubscription request was processed
    */
-  public CompletableFuture<Void> unsubscribeFromMarketData(String symbol, int instanceIndex) {
-    return CompletableFuture.runAsync(() -> {
-      subscriptions.remove(symbol);
-      websocketClient.unsubscribeFromMarketData(account.getId(), instanceIndex, symbol).join();
-    });
+  public CompletableFuture<Void> unsubscribeFromMarketData(String symbol,
+    List<MarketDataUnsubscription> subscriptions, int instanceIndex) {
+    if (subscriptions.size() == 0) {
+      this.subscriptions.remove(symbol);
+    } else if (this.subscriptions.containsKey(symbol)) {
+      this.subscriptions.get(symbol).subscriptions = this.subscriptions.get(symbol).subscriptions
+        .stream().filter(s -> !subscriptions.stream()
+          .filter(s2 -> s.type.equals(s2.type)).findFirst().isPresent()
+        ).collect(Collectors.toList());
+      if (this.subscriptions.get(symbol).subscriptions.size() == 0) {
+        this.subscriptions.remove(symbol);
+      }
+    }
+    return websocketClient.unsubscribeFromMarketData(account.getId(), instanceIndex, symbol, subscriptions);
   }
   
   /**
@@ -709,12 +781,25 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return list of the symbols connection is subscribed to
    */
   public List<String> getSubscribedSymbols() {
-    return new ArrayList<>(subscriptions);
+    return new ArrayList<>(subscriptions.keySet());
+  }
+  
+  /**
+   * Returns subscriptions for a symbol
+   * @param symbol symbol to retrieve subscriptions for
+   * @return list of market data subscriptions for the symbol, or {@code null}
+   */
+  public List<MarketDataSubscription> getSubscriptions(String symbol) {
+    if (subscriptions.containsKey(symbol)) {
+      return subscriptions.get(symbol).subscriptions;
+    } else {
+      return null;
+    }
   }
   
   /**
    * Retrieves specification for a symbol (see
-   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/getSymbolSpecification/).
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readSymbolSpecification/).
    * @param symbol symbol to retrieve specification for
    * @return completable future which resolves with specification retrieved
    */
@@ -723,13 +808,46 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   }
   
   /**
-   * Retrieves specification for a symbol (see
-   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/getSymbolPrice/).
+   * Retrieves latest price for a symbol (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readSymbolPrice/).
    * @param symbol symbol to retrieve price for
    * @return completable future which resolves with price retrieved
    */
   public CompletableFuture<MetatraderSymbolPrice> getSymbolPrice(String symbol) {
     return websocketClient.getSymbolPrice(account.getId(), symbol);
+  }
+  
+  /**
+   * Retrieves latest candle for a symbol and timeframe (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readCandle/).
+   * @param symbol symbol to retrieve candle for
+   * @param timeframe defines the timeframe according to which the candle must be generated.
+   * Allowed values for MT5 are 1m, 2m, 3m, 4m, 5m, 6m, 10m, 12m, 15m, 20m, 30m, 1h, 2h, 3h, 4h,
+   * 6h, 8h, 12h, 1d, 1w, 1mn. Allowed values for MT4 are 1m, 5m, 15m 30m, 1h, 4h, 1d, 1w, 1mn
+   * @return completable future which resolves when candle is retrieved
+   */
+  public CompletableFuture<MetatraderCandle> getCandle(String symbol, String timeframe) {
+    return websocketClient.getCandle(account.getId(), symbol, timeframe);
+  }
+  
+  /**
+   * Retrieves latest tick for a symbol (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readTick/).
+   * @param symbol symbol to retrieve tick for
+   * @return completable future which resolves when tick is retrieved
+   */
+  public CompletableFuture<MetatraderTick> getTick(String symbol) {
+    return websocketClient.getTick(account.getId(), symbol);
+  }
+  
+  /**
+   * Retrieves latest order book for a symbol (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readBook/).
+   * @param symbol symbol to retrieve order book for
+   * @return completable future which resolves when order book is retrieved
+   */
+  public CompletableFuture<MetatraderBook> getBook(String symbol) {
+    return websocketClient.getBook(account.getId(), symbol);
   }
   
   /**
@@ -804,12 +922,19 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
 
   @Override
   public CompletableFuture<Void> onDisconnected(int instanceIndex) {
-    State state = getState(instanceIndex);
-    state.lastDisconnectedSynchronizationId = state.lastSynchronizationId;
-    state.lastSynchronizationId = null;
-    state.shouldSynchronize = null;
-    state.isSynchronized = false;
-    return CompletableFuture.completedFuture(null);
+    return CompletableFuture.runAsync(() -> {
+      State state = getState(instanceIndex);
+      state.lastDisconnectedSynchronizationId = state.lastSynchronizationId;
+      state.lastSynchronizationId = null;
+      state.shouldSynchronize = null;
+      state.isSynchronized = false;
+      state.disconnected = true;
+      if ((Instant.now().toEpochMilli() - 10 * 60 * 1000) > lastAccountReloadTime) {
+        account.reload().join();
+        lastAccountReloadTime = Instant.now().toEpochMilli();
+      }
+      subscribe();
+    });
   }
   
   @Override
@@ -834,6 +959,11 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
       subscribeFuture.complete(false);
       subscribeTask.cancel();
       subscribeTask = null;
+    }
+    try {
+      Thread.sleep(50);
+    } catch (InterruptedException e) {
+      logger.error("Failed to sleep thread", e);
     }
     return subscribe();
   }
@@ -973,8 +1103,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     if (state != null) {
       try {
         synchronize(instanceIndex).join();
-        for (String symbol : subscriptions) {
-          subscribeToMarketData(symbol, instanceIndex);
+        for (String symbol : subscriptions.keySet()) {
+          subscribeToMarketData(symbol, subscriptions.get(symbol).subscriptions, instanceIndex);
         }
         state.isSynchronized = true;
         state.synchronizationRetryIntervalInSeconds = 1;

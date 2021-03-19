@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -23,12 +25,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
+import cloud.metaapi.sdk.clients.meta_api.models.MarketDataSubscription;
+import cloud.metaapi.sdk.clients.meta_api.models.MarketDataUnsubscription;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketTradeOptions;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderBook;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderBookEntry;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderCandle;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeals;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderHistoryOrders;
@@ -36,6 +46,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderPosition;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolPrice;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolSpecification;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
@@ -56,18 +67,20 @@ import cloud.metaapi.sdk.util.ServiceProvider;
 class MetaApiConnectionTest {
 
   private MetaApiConnection api;
+  private MetatraderAccount account;
   private MetaApiWebsocketClient client;
   private HistoryStorage storageMock;
   private ConnectionRegistry connectionRegistry;
   
   @BeforeEach
   void setUp() throws Exception {
+    account = Mockito.mock(MetatraderAccount.class);
+    Mockito.when(account.getId()).thenReturn("accountId");
+    Mockito.when(account.getState()).thenReturn(DeploymentState.DEPLOYED);
     HistoryFileManager historyFileManagerMock = Mockito.mock(HistoryFileManager.class);
     Mockito.when(historyFileManagerMock.getHistoryFromDisk()).thenReturn(CompletableFuture.completedFuture(
       new History() {{ deals = Lists.list(); historyOrders = Lists.list(); }}));
     ServiceProvider.setHistoryFileManagerMock(historyFileManagerMock);
-    MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
-    Mockito.when(account.getId()).thenReturn("accountId");
     client = Mockito.mock(MetaApiWebsocketClient.class);
     storageMock = Mockito.mock(HistoryStorage.class);
     connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
@@ -677,6 +690,24 @@ class MetaApiConnectionTest {
    * Tests {@link MetaApiConnection#subscribe()}
    */
   @Test
+  void testDoesNotSubscribeUndeployedAccounts() throws Exception {
+    Mockito.when(client.subscribe("accountId")).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(account.getState()).thenReturn(DeploymentState.UNDEPLOYED);
+    Timer timer = new Timer();
+    timer.schedule(new TimerTask() {
+      @Override
+      public void run() {
+        api.onConnected(1, 1);
+      }
+    }, 20);
+    api.subscribe().join();
+    Mockito.verify(client, Mockito.never()).subscribe("accountId");
+  }
+  
+  /**
+   * Tests {@link MetaApiConnection#subscribe()}
+   */
+  @Test
   void testRetriesSubscribeToTerminalIfNoResponseReceived() throws InterruptedException {
     CompletableFuture<Void> rejectedFuture = new CompletableFuture<>();
     rejectedFuture.completeExceptionally(new Exception("Reject reason"));
@@ -735,13 +766,19 @@ class MetaApiConnectionTest {
   void testDoesNotRetriesSubscribeToTerminalIfConnectionIsClosed() throws InterruptedException {
     CompletableFuture<Void> rejectedFuture = new CompletableFuture<>();
     rejectedFuture.completeExceptionally(new Exception("Reject reason"));
-    Mockito.when(client.subscribe("accountId")).thenReturn(rejectedFuture);
+    CompletableFuture<Void> subscribeCallFuture = new CompletableFuture<>();
+    Mockito.when(client.subscribe("accountId")).thenAnswer(new Answer<CompletableFuture<Void>>() {
+      @Override
+      public CompletableFuture<Void> answer(InvocationOnMock invocation) throws Throwable {
+        subscribeCallFuture.complete(null);
+        return rejectedFuture;
+      }
+    });
     Mockito.when(client.unsubscribe("accountId")).thenReturn(CompletableFuture.completedFuture(null));
     api.subscribe();
     api.close();
-    Thread.sleep(1100);
-    Thread.sleep(1100);
-    Thread.sleep(1100);
+    subscribeCallFuture.join();
+    Thread.sleep(3100);
     Mockito.verify(client, Mockito.times(1)).subscribe("accountId");
     Mockito.verify(client).unsubscribe("accountId");
   }
@@ -804,10 +841,13 @@ class MetaApiConnectionTest {
    */
   @Test
   void testSubscribesToMarketData() throws Exception {
-    Mockito.when(client.subscribeToMarketData("accountId", 1, "EURUSD"))
-      .thenReturn(CompletableFuture.completedFuture(null));
-    api.subscribeToMarketData("EURUSD", 1).get();
-    Mockito.verify(client).subscribeToMarketData("accountId", 1, "EURUSD");
+    Mockito.when(client.subscribeToMarketData(Mockito.anyString(), Mockito.anyInt(),
+      Mockito.anyString(), Mockito.anyList())).thenReturn(CompletableFuture.completedFuture(null));
+    List<MarketDataSubscription> subscriptions = Arrays.asList(new MarketDataSubscription() {{
+      type = "quotes";
+    }});
+    api.subscribeToMarketData("EURUSD", subscriptions, 1).get();
+    Mockito.verify(client).subscribeToMarketData("accountId", 1, "EURUSD", subscriptions);
   }
   
   /**
@@ -815,10 +855,13 @@ class MetaApiConnectionTest {
    */
   @Test
   void testUnsubscribesFromMarketData() throws Exception {
-    Mockito.when(client.unsubscribeFromMarketData("accountId", 1, "EURUSD"))
-      .thenReturn(CompletableFuture.completedFuture(null));
-    api.unsubscribeFromMarketData("EURUSD", 1).get();
-    Mockito.verify(client).unsubscribeFromMarketData("accountId", 1, "EURUSD");
+    Mockito.when(client.unsubscribeFromMarketData(Mockito.anyString(), Mockito.anyInt(),
+      Mockito.anyString(), Mockito.anyList())).thenReturn(CompletableFuture.completedFuture(null));
+    List<MarketDataUnsubscription> subscriptions = Arrays.asList(new MarketDataUnsubscription() {{
+      type = "quotes";
+    }});
+    api.unsubscribeFromMarketData("EURUSD", subscriptions, 1).get();
+    Mockito.verify(client).unsubscribeFromMarketData("accountId", 1, "EURUSD", subscriptions);
   }
   
   /**
@@ -853,6 +896,74 @@ class MetaApiConnectionTest {
       .thenReturn(CompletableFuture.completedFuture(expected));
     MetatraderSymbolPrice actual = api.getSymbolPrice("AUDNZD").get();
     assertThat(actual).usingRecursiveComparison().isEqualTo(expected);
+  }
+  
+  /**
+   * Tests {@link MetaApiConnection#getCandle(String, String)}
+   */
+  @Test
+  void testRetrievesCurrentCandle() {
+    MetatraderCandle candle = new MetatraderCandle() {{
+      symbol = "AUDNZD";
+      timeframe = "15m";
+      time = new IsoTime("2020-04-07T03:45:00.000Z");
+      brokerTime = "2020-04-07 06:45:00.000";
+      open = 1.03297;
+      high = 1.06309;
+      low = 1.02705;
+      close = 1.043;
+      tickVolume = 1435;
+      spread = 17;
+      volume = 345;
+    }};
+    Mockito.when(client.getCandle("accountId", "AUDNZD", "15m"))
+      .thenReturn(CompletableFuture.completedFuture(candle));
+    MetatraderCandle actual = api.getCandle("AUDNZD", "15m").join();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(candle);
+  }
+  
+  /**
+   * Tests {@link MetaApiConnection#getTick(String)}
+   */
+  @Test
+  void testRetrievesLatestTick() {
+    MetatraderTick tick = new MetatraderTick() {{
+      symbol = "AUDNZD";
+      time = new IsoTime("2020-04-07T03:45:00.000Z");
+      brokerTime = "2020-04-07 06:45:00.000";
+      bid = 1.05297;
+      ask = 1.05309;
+      last = 0.5298;
+      volume = 0.13;
+      side = "buy";
+    }};
+    Mockito.when(client.getTick("accountId", "AUDNZD")).thenReturn(CompletableFuture.completedFuture(tick));
+    MetatraderTick actual = api.getTick("AUDNZD").join();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(tick);
+  }
+  
+  /**
+   * Tests {@link MetaApiConnection#getBook(String)}
+   */
+  @Test
+  void testRetrievesLatestOrderBook() {
+    MetatraderBook book = new MetatraderBook() {{
+      symbol = "AUDNZD";
+      time = new IsoTime("2020-04-07T03:45:00.000Z");
+      brokerTime = "2020-04-07 06:45:00.000";
+      book = Arrays.asList(new MetatraderBookEntry() {{
+        type = MetatraderBookEntry.BookType.BOOK_TYPE_SELL;
+        price = 1.05309;
+        volume = 5.67;
+      }}, new MetatraderBookEntry() {{
+        type = MetatraderBookEntry.BookType.BOOK_TYPE_BUY;
+        price = 1.05297;
+        volume = 3.45;
+      }});
+    }};
+    Mockito.when(client.getBook("accountId", "AUDNZD")).thenReturn(CompletableFuture.completedFuture(book));
+    MetatraderBook actual = api.getBook("AUDNZD").join();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(book);
   }
   
   /**
@@ -973,10 +1084,10 @@ class MetaApiConnectionTest {
   void testRestoresMarketDataSubscriptionsOnSynchronization() {
     IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
     IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
-    Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(), Mockito.any(), Mockito.any()))
-      .thenReturn(CompletableFuture.completedFuture(null));
-    Mockito.when(client.subscribeToMarketData("accountId", 1, "EURUSD"))
-      .thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(),
+      Mockito.any(), Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(client.subscribeToMarketData(Mockito.anyString(), Mockito.anyInt(),
+      Mockito.anyString(), Mockito.anyList())).thenReturn(CompletableFuture.completedFuture(null));
     MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
     Mockito.when(account.getId()).thenReturn("accountId");
     MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
@@ -986,7 +1097,8 @@ class MetaApiConnectionTest {
     api.getHistoryStorage().onDealAdded(1, new MetatraderDeal() {{
       time = startingDealTime;
     }});
-    api.subscribeToMarketData("EURUSD", 1).join();
+    List<MarketDataSubscription> subscriptions = new ArrayList<>();
+    api.subscribeToMarketData("EURUSD", subscriptions, 1).join();
     api.onConnected(1, 0).join();
     Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), 
       Mockito.anyString(), Mockito.argThat(arg -> {
@@ -996,7 +1108,8 @@ class MetaApiConnectionTest {
       assertThat(arg).usingRecursiveComparison().isEqualTo(startingDealTime);
       return true;
     }));
-    Mockito.verify(client, Mockito.times(2)).subscribeToMarketData("accountId", 1, "EURUSD");
+    Mockito.verify(client, Mockito.times(2)).subscribeToMarketData("accountId", 1, "EURUSD",
+      subscriptions);
   }
   
   /**
@@ -1070,6 +1183,20 @@ class MetaApiConnectionTest {
   }
   
   /**
+   * Tests {@link MetaApiConnection#onReconnected()}
+   */
+  @Test
+  void testOverwritesPreviousSubscribeOnReconnect() throws InterruptedException {
+    MetaApiConnection apiSpy = Mockito.spy(api);
+    Mockito.doReturn(CompletableFuture.completedFuture(null)).when(apiSpy).subscribe();
+    apiSpy.subscribe().join();
+    Thread.sleep(50);
+    apiSpy.onReconnected().join();
+    Thread.sleep(75);
+    Mockito.verify(apiSpy, Mockito.times(2)).subscribe();
+  }
+  
+  /**
    * Tests {@link MetaApiConnection#initialize()}
    */
   @Test
@@ -1077,6 +1204,35 @@ class MetaApiConnectionTest {
     Mockito.when(storageMock.initialize()).thenReturn(CompletableFuture.completedFuture(null));
     api.initialize().get();
     Mockito.verify(storageMock).initialize();
+  }
+  
+  /**
+   * Tests {@link MetaApiConnection#onDisconnected(int)}
+   */
+  @Test
+  void testResubscribesAccountOnDisconnect() {
+    CompletableFuture<Void> subscribeFuture = new CompletableFuture<>();
+    Mockito.when(client.subscribe(Mockito.anyString())).thenAnswer(new Answer<CompletableFuture<Void>>() {
+      public CompletableFuture<Void> answer(InvocationOnMock invocation) {
+        subscribeFuture.complete(null);
+        return subscribeFuture;
+      }
+    });
+    CompletableFuture<Void> reloadFuture = new CompletableFuture<>();
+    Mockito.when(account.reload()).thenAnswer(new Answer<CompletableFuture<Void>>() {
+      public CompletableFuture<Void> answer(InvocationOnMock invocation) {
+        reloadFuture.complete(null);
+        return reloadFuture;
+      }
+    });
+    api.onDisconnected(0).join();
+    assertFalse(api.isSynchronized());
+    reloadFuture.join();
+    subscribeFuture.join();
+    Mockito.verify(account).reload();
+    Mockito.verify(client).subscribe("accountId");
+    api.onDisconnected(0).join();
+    Mockito.verify(account, Mockito.times(1)).reload();
   }
   
   private static Stream<Arguments> providePosition() {

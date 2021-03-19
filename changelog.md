@@ -3,6 +3,10 @@
   - added equity curve filter to CopyFactory
   - fixed health state tracking for multiple replicas
   - extended synchronization throttler options
+  - move CopyFactory trade copying API to a separate npm module
+  - increase socket connection stability
+  - added API for advanced market data subscriptions
+  - added API to increase account reliability
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
