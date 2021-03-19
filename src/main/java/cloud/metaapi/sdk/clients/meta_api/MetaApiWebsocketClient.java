@@ -10,11 +10,14 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.log4j.Logger;
@@ -32,7 +35,11 @@ import cloud.metaapi.sdk.clients.error_handler.*;
 import cloud.metaapi.sdk.clients.meta_api.LatencyListener.ResponseTimestamps;
 import cloud.metaapi.sdk.clients.meta_api.LatencyListener.TradeTimestamps;
 import cloud.metaapi.sdk.clients.meta_api.LatencyListener.UpdateTimestamps;
+import cloud.metaapi.sdk.clients.meta_api.models.MarketDataSubscription;
+import cloud.metaapi.sdk.clients.meta_api.models.MarketDataUnsubscription;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderBook;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderCandle;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeals;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderHistoryOrders;
@@ -40,6 +47,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderPosition;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolPrice;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolSpecification;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.models.*;
@@ -56,6 +64,7 @@ import io.socket.engineio.client.transports.WebSocket;
 public class MetaApiWebsocketClient implements OutOfOrderListener {
 
   private static Logger logger = Logger.getLogger(MetaApiWebsocketClient.class);
+  protected static int resetDisconnectTimerTimeout = 60000;
   
   private String url;
   private String token;
@@ -72,9 +81,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   private List<LatencyListener> latencyListeners = new LinkedList<>();
   private List<ReconnectListener> reconnectListeners = new LinkedList<>();
   private Map<String, String> connectedHosts = new HashMap<>();
-  private Map<String, Date> resubscriptionTriggerTimes = new HashMap<>();
   private CompletableFuture<Void> connectFuture = null;
   private SynchronizationThrottler synchronizationThrottler;
+  private Map<String, Timer> statusTimers = new HashMap<>();
   private PacketOrderer packetOrderer;
   private PacketLogger packetLogger;
   private boolean isSocketConnecting = false;
@@ -220,11 +229,16 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       try {
         socket = IO.socket(url, socketOptions);
         
-        // Adding query during every connection
+        // Adding headers and query during every connection
         socket.io().on(Manager.EVENT_TRANSPORT, (Object[] socketEventArgs) -> {
           Transport transport = (Transport) socketEventArgs[0];
           transport.query.put("auth-token", token);
           transport.query.put("clientId", String.valueOf(clientId));
+          transport.on(Transport.EVENT_REQUEST_HEADERS, (Object[] transportEventArgs) -> {
+            @SuppressWarnings("unchecked")
+            Map<String, List<String>> headers = (Map<String, List<String>>) transportEventArgs[0];
+            headers.put("Client-Id", Arrays.asList(String.valueOf(clientId)));
+          });
         });
         
         socket.on(Socket.EVENT_CONNECT, (Object[] args) -> {
@@ -822,13 +836,16 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @param accountId id of the MetaTrader account
    * @param instanceIndex instance index
    * @param symbol symbol (e.g. currency pair or an index)
+   * @param subscriptions array of market data subscription to create or update. Please
+   * note that this feature is not fully implemented on server-side yet
    * @return completable future which resolves when subscription request was processed
    */
   public CompletableFuture<Void> subscribeToMarketData(String accountId, int instanceIndex,
-      String symbol) {
+      String symbol, List<MarketDataSubscription> subscriptions) {
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("type", "subscribeToMarketData");
     request.put("symbol", symbol);
+    request.set("subscriptions", jsonMapper.valueToTree(subscriptions));
     request.put("instanceIndex", instanceIndex);
     return rpcRequest(accountId, request).thenApply((response) -> null);
   }
@@ -839,67 +856,126 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @param accountId id of the MetaTrader account
    * @param instanceIndex instance index
    * @param symbol symbol (e.g. currency pair or an index)
+   * @param subscriptions array of subscriptions to cancel
    * @return completable future which resolves when unsubscription request was processed
    */
   public CompletableFuture<Void> unsubscribeFromMarketData(String accountId, int instanceIndex,
-      String symbol) {
+      String symbol, List<MarketDataUnsubscription> subscriptions) {
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("type", "unsubscribeFromMarketData");
     request.put("symbol", symbol);
+    request.set("subscriptions", jsonMapper.valueToTree(subscriptions));
     request.put("instanceIndex", instanceIndex);
     return rpcRequest(accountId, request).thenApply((response) -> null);
   }
   
   /**
    * Retrieves specification for a symbol (see
-   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/getSymbolSpecification/).
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readSymbolSpecification/).
    * @param accountId id of the MetaTrader account to retrieve symbol specification for
    * @param symbol symbol to retrieve specification for
    * @return completable future resolving with specification retrieved
    */
   public CompletableFuture<MetatraderSymbolSpecification> getSymbolSpecification(String accountId, String symbol) {
-    CompletableFuture<MetatraderSymbolSpecification> result = new CompletableFuture<>();
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("application", "RPC");
     request.put("type", "getSymbolSpecification");
     request.put("symbol", symbol);
-    rpcRequest(accountId, request).handle((response, error) -> {
-      if (error != null) return result.completeExceptionally(error);
+    return rpcRequest(accountId, request).thenApply(response -> {
       try {
-        return result.complete(jsonMapper.treeToValue(
-          response.get("specification"), MetatraderSymbolSpecification.class
-        ));
+        return jsonMapper.treeToValue(response.get("specification"), MetatraderSymbolSpecification.class);
       } catch (JsonProcessingException e) {
-        return result.completeExceptionally(e);
+        throw new CompletionException(e);
       }
     });
-    return result;
   }
   
   /**
    * Retrieves price for a symbol (see
-   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/getSymbolPrice/).
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readSymbolPrice/).
    * @param accountId id of the MetaTrader account to retrieve symbol price for
    * @param symbol symbol to retrieve price for
    * @return completable future which resolves when price is retrieved
    */
   public CompletableFuture<MetatraderSymbolPrice> getSymbolPrice(String accountId, String symbol) {
-    CompletableFuture<MetatraderSymbolPrice> result = new CompletableFuture<>();
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("application", "RPC");
     request.put("type", "getSymbolPrice");
     request.put("symbol", symbol);
-    rpcRequest(accountId, request).handle((response, error) -> {
-      if (error != null) return result.completeExceptionally(error);
+    return rpcRequest(accountId, request).thenApply(response -> {
       try {
-        return result.complete(jsonMapper.treeToValue(
-          response.get("price"), MetatraderSymbolPrice.class
-        ));
+        return jsonMapper.treeToValue(response.get("price"), MetatraderSymbolPrice.class);
       } catch (JsonProcessingException e) {
-        return result.completeExceptionally(e);
+        throw new CompletionException(e);
       }
     });
-    return result;
+  }
+  
+  /**
+   * Retrieves price for a symbol (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readCandle/).
+   * @param accountId id of the MetaTrader account to retrieve candle for
+   * @param symbol symbol to retrieve candle for
+   * @param timeframe defines the timeframe according to which the candle must be generated. Allowed values for
+   * MT5 are 1m, 2m, 3m, 4m, 5m, 6m, 10m, 12m, 15m, 20m, 30m, 1h, 2h, 3h, 4h, 6h, 8h, 12h, 1d, 1w, 1mn. Allowed values
+   * for MT4 are 1m, 5m, 15m 30m, 1h, 4h, 1d, 1w, 1mn
+   * @return completable future which resolves when candle is retrieved
+   */
+  public CompletableFuture<MetatraderCandle> getCandle(String accountId, String symbol, String timeframe) {
+    ObjectNode request = jsonMapper.createObjectNode();
+    request.put("application", "RPC");
+    request.put("type", "getCandle");
+    request.put("symbol", symbol);
+    request.put("timeframe", timeframe);
+    return rpcRequest(accountId, request).thenApply(response -> {
+      try {
+        return jsonMapper.treeToValue(response.get("candle"), MetatraderCandle.class);
+      } catch (JsonProcessingException e) {
+        throw new CompletionException(e);
+      }
+    });
+  }
+  
+  /**
+   * Retrieves latest tick for a symbol (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readTick/).
+   * @param accountId id of the MetaTrader account to retrieve symbol tick for
+   * @param symbol symbol to retrieve tick for
+   * @return completable future which resolves when tick is retrieved
+   */
+  public CompletableFuture<MetatraderTick> getTick(String accountId, String symbol) {
+    ObjectNode request = jsonMapper.createObjectNode();
+    request.put("application", "RPC");
+    request.put("type", "getTick");
+    request.put("symbol", symbol);
+    return rpcRequest(accountId, request).thenApply(response -> {
+      try {
+        return jsonMapper.treeToValue(response.get("tick"), MetatraderTick.class);
+      } catch (JsonProcessingException e) {
+        throw new CompletionException(e);
+      }
+    });
+  }
+  
+  /**
+   * Retrieves latest order book for a symbol (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readBook/).
+   * @param accountId id of the MetaTrader account to retrieve symbol order book for
+   * @param symbol symbol to retrieve order book for
+   * @return promise which resolves when order book is retrieved
+   */
+  public CompletableFuture<MetatraderBook> getBook(String accountId, String symbol) {
+    ObjectNode request = jsonMapper.createObjectNode();
+    request.put("application", "RPC");
+    request.put("type", "getBook");
+    request.put("symbol", symbol);
+    return rpcRequest(accountId, request).thenApply(response -> {
+      try {
+        return jsonMapper.treeToValue(response.get("book"), MetatraderBook.class);
+      } catch (JsonProcessingException e) {
+        throw new CompletionException(e);
+      }
+    });
   }
   
   /**
@@ -1118,10 +1194,42 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           String host = data.has("host") ? data.get("host").asText() : "undefined";
           int instanceIndex = data.has("instanceIndex") ? data.get("instanceIndex").asInt() : 0;
           String instanceId = accountId + ":" + instanceIndex;
-          List<SynchronizationListener> listeners = synchronizationListeners.get(accountId);
-          if (listeners == null) listeners = new ArrayList<>();
+          List<SynchronizationListener> listeners = synchronizationListeners.containsKey(accountId)
+            ? synchronizationListeners.get(accountId) : new ArrayList<>();
+          
+          Supplier<CompletableFuture<Void>> onDisconnected = () -> {
+            return CompletableFuture.runAsync(() -> {
+              if (connectedHosts.containsKey(instanceId) && connectedHosts.get(instanceId).equals(host)) {
+                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                for (SynchronizationListener listener : listeners) {
+                  completableFutures.add(listener.onDisconnected(instanceIndex).exceptionally(e -> {
+                    logger.error("Failed to notify listener about disconnected event", e);
+                    return null;
+                  }));
+                }
+                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).join();
+                connectedHosts.remove(instanceId);
+              }
+            });
+          };
+          
+          Runnable resetDisconnectTimer = () -> {
+            if (statusTimers.containsKey(instanceId)) {
+              statusTimers.get(instanceId).cancel();
+            }
+            Timer timer = new Timer();
+            statusTimers.put(instanceId, timer);
+            timer.schedule(new TimerTask() {
+              @Override
+              public void run() {
+                onDisconnected.get();
+              }
+            }, resetDisconnectTimerTimeout);
+          };
+          
           String type = data.get("type").asText();
           if (type.equals("authenticated")) {
+            resetDisconnectTimer.run();
             if (!data.has("sessionId") || data.get("sessionId").asText().equals(sessionId)) {
               connectedHosts.put(instanceId, host);
               List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
@@ -1135,17 +1243,10 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
             }
           } else if (type.equals("disconnected")) {
-            if (connectedHosts.get(instanceId).equals(host)) {
-              List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
-              for (SynchronizationListener listener : listeners) {
-                completableFutures.add(listener.onDisconnected(instanceIndex).exceptionally(e -> {
-                  logger.error("Failed to notify listener about " + type + " event", e);
-                  return null;
-                }));
-              }
-              CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
-              connectedHosts.remove(instanceId);
+            if (statusTimers.containsKey(instanceId)) {
+              statusTimers.get(instanceId).cancel();
             }
+            onDisconnected.get().get();
           } else if (type.equals("synchronizationStarted")) {
             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
@@ -1363,24 +1464,18 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             }
             CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
           } else if (type.equals("status")) {
+            resetDisconnectTimer.run();
             if (!connectedHosts.containsKey(instanceId)) {
-              if (!resubscriptionTriggerTimes.containsKey(instanceId)) {
-                resubscriptionTriggerTimes.put(instanceId, Date.from(Instant.now()));
-              } else if (resubscriptionTriggerTimes.get(instanceId).getTime() + 2 * 60
-                  * 1000 < Date.from(Instant.now()).getTime()) {
-                resubscriptionTriggerTimes.remove(instanceId);
-                logger.info("It seems like we are not connected to a running API server yet, "
-                    + "retrying subscription for account " + instanceId);
-                subscribe(accountId, instanceIndex).exceptionally(err -> {
-                  if (!(err instanceof TimeoutException)) {
-                    logger.error("MetaApi websocket client failed to receive subscribe response "
-                        + "for account id " + instanceId, err);
-                  }
-                  return null;
-                });
-              }
+              logger.info("It seems like we are not connected to a running API server yet, "
+                + "retrying subscription for account " + instanceId);
+              subscribe(accountId, instanceIndex).exceptionally(err -> {
+                if (!(err instanceof TimeoutException)) {
+                  logger.error("MetaApi websocket client failed to receive subscribe response "
+                    + "for account id " + instanceId, err);
+                }
+                return null;
+              });
             } else if (connectedHosts.get(instanceId).equals(host)) {
-              resubscriptionTriggerTimes.remove(instanceId);
               List<CompletableFuture<Void>> onBrokerConnectionStatusChangedFutures = new ArrayList<>();
               for (SynchronizationListener listener : listeners) {
                 onBrokerConnectionStatusChangedFutures.add(listener
@@ -1422,19 +1517,71 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             }
           } else if (type.equals("prices")) {
             List<MetatraderSymbolPrice> prices = Arrays.asList(data.hasNonNull("prices")
-              ? jsonMapper.treeToValue(data.get(type), MetatraderSymbolPrice[].class)
+              ? jsonMapper.treeToValue(data.get("prices"), MetatraderSymbolPrice[].class)
               : new MetatraderSymbolPrice[0]);
+            List<MetatraderCandle> candles = Arrays.asList(data.hasNonNull("candles")
+              ? jsonMapper.treeToValue(data.get("candles"), MetatraderCandle[].class)
+              : new MetatraderCandle[0]);
+            List<MetatraderTick> ticks = Arrays.asList(data.hasNonNull("ticks")
+              ? jsonMapper.treeToValue(data.get("ticks"), MetatraderTick[].class)
+              : new MetatraderTick[0]);
+            List<MetatraderBook> books = Arrays.asList(data.hasNonNull("books")
+              ? jsonMapper.treeToValue(data.get("books"), MetatraderBook[].class)
+              : new MetatraderBook[0]);
             List<CompletableFuture<Void>> onPricesUpdatedFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
-              onPricesUpdatedFutures.add(listener.onSymbolPricesUpdated(instanceIndex, prices, 
+              if (prices.size() != 0) {
+                onPricesUpdatedFutures.add(listener.onSymbolPricesUpdated(instanceIndex, prices, 
                   data.has("equity") ? data.get("equity").asDouble() : null,
                   data.has("margin") ? data.get("margin").asDouble() : null, 
                   data.has("freeMargin") ? data.get("freeMargin").asDouble() : null,
-                  data.has("marginLevel") ? data.get("marginLevel").asDouble() : null)
-                  .exceptionally(e -> {
-                logger.error("Failed to notify listener about prices event", e);
-                return null;
-              }));
+                  data.has("marginLevel") ? data.get("marginLevel").asDouble() : null,
+                  data.has("accountCurrencyExchangeRate")
+                    ? data.get("accountCurrencyExchangeRate").asDouble() : null
+                  ).exceptionally(e -> {
+                  logger.error("Failed to notify listener about prices event", e);
+                  return null;
+                }));
+              }
+              if (candles.size() != 0) {
+                onPricesUpdatedFutures.add(listener.onCandlesUpdated(instanceIndex, candles, 
+                  data.has("equity") ? data.get("equity").asDouble() : null,
+                  data.has("margin") ? data.get("margin").asDouble() : null, 
+                  data.has("freeMargin") ? data.get("freeMargin").asDouble() : null,
+                  data.has("marginLevel") ? data.get("marginLevel").asDouble() : null,
+                  data.has("accountCurrencyExchangeRate")
+                    ? data.get("accountCurrencyExchangeRate").asDouble() : null
+                  ).exceptionally(e -> {
+                  logger.error("Failed to notify listener about candles event", e);
+                  return null;
+                }));
+              }
+              if (ticks.size() != 0) {
+                onPricesUpdatedFutures.add(listener.onTicksUpdated(instanceIndex, ticks, 
+                  data.has("equity") ? data.get("equity").asDouble() : null,
+                  data.has("margin") ? data.get("margin").asDouble() : null, 
+                  data.has("freeMargin") ? data.get("freeMargin").asDouble() : null,
+                  data.has("marginLevel") ? data.get("marginLevel").asDouble() : null,
+                  data.has("accountCurrencyExchangeRate")
+                    ? data.get("accountCurrencyExchangeRate").asDouble() : null
+                  ).exceptionally(e -> {
+                  logger.error("Failed to notify listener about ticks event", e);
+                  return null;
+                }));
+              }
+              if (books.size() != 0) {
+                onPricesUpdatedFutures.add(listener.onBooksUpdated(instanceIndex, books, 
+                  data.has("equity") ? data.get("equity").asDouble() : null,
+                  data.has("margin") ? data.get("margin").asDouble() : null, 
+                  data.has("freeMargin") ? data.get("freeMargin").asDouble() : null,
+                  data.has("marginLevel") ? data.get("marginLevel").asDouble() : null,
+                  data.has("accountCurrencyExchangeRate")
+                    ? data.get("accountCurrencyExchangeRate").asDouble() : null
+                  ).exceptionally(e -> {
+                  logger.error("Failed to notify listener about books event", e);
+                  return null;
+                }));
+              }
             }
             CompletableFuture.allOf(onPricesUpdatedFutures.toArray(new CompletableFuture<?>[0])).get();
             for (MetatraderSymbolPrice price : prices) {

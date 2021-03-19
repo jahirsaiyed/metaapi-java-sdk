@@ -60,7 +60,7 @@ MetaApi api = new MetaApi(token);
 Account access token grants access to a single account. You can retrieve account access token via API:
 ```java
 String accountId = "...";
-MetatraderAccount account = api.getMetatraderAccountApi().getAccount(accountId).get();
+MetatraderAccount account = api.getMetatraderAccountApi().getAccount(accountId).join();
 String accountAccessToken = account.getAccessToken();
 System.out.println(accountAccessToken);
 ```
@@ -85,34 +85,34 @@ ProvisioningProfile provisioningProfile = api.getProvisioningProfileApi()
         version = 5;
         brokerTimezone = "EET";
         brokerDSTSwitchTimezone = "EET";
-    }}).get();
+    }}).join();
 // servers.dat file is required for MT5 profile and can be found inside
 // config directory of your MetaTrader terminal data folder. It contains
 // information about available broker servers
-provisioningProfile.uploadFile("servers.dat", "/path/to/servers.dat").get();
+provisioningProfile.uploadFile("servers.dat", "/path/to/servers.dat").join();
 // for MT4, you should upload an .srv file instead
-provisioningProfile.uploadFile("broker.srv", "/path/to/broker.srv").get();
+provisioningProfile.uploadFile("broker.srv", "/path/to/broker.srv").join();
 ```
 
 ### Retrieving existing provisioning profiles via API
 ```java
 List<ProvisioningProfile> provisioningProfiles = api.getProvisioningProfileApi()
-    .getProvisioningProfiles(null, null).get();
-ProvisioningProfile provisioningProfile = api.getProvisioningProfileApi().getProvisioningProfile("profileId").get();
+    .getProvisioningProfiles(null, null).join();
+ProvisioningProfile provisioningProfile = api.getProvisioningProfileApi().getProvisioningProfile("profileId").join();
 ```
 
 ### Updating a provisioning profile via API
 ```java
-provisioningProfile.update(new ProvisioningProfileUpdateDto() {{ name = "New name" }}).get();
+provisioningProfile.update(new ProvisioningProfileUpdateDto() {{ name = "New name" }}).join();
 // for MT5, you should upload a servers.dat file
-provisioningProfile.uploadFile("servers.dat", "/path/to/servers.dat").get();
+provisioningProfile.uploadFile("servers.dat", "/path/to/servers.dat").join();
 // for MT4, you should upload an .srv file instead
-provisioningProfile.uploadFile("broker.srv", "/path/to/broker.srv").get();
+provisioningProfile.uploadFile("broker.srv", "/path/to/broker.srv").join();
 ```
 
 ### Removing a provisioning profile
 ```java
-provisioningProfile.remove().get();
+provisioningProfile.remove().join();
 ```
 
 ### Managing MetaTrader accounts (API servers) via web UI
@@ -143,11 +143,11 @@ List<MetatraderAccount> accounts = api.getMetatraderAccountApi().getAccounts(new
   offset = 0;
   query = "ICMarketsSC-MT5";
   state = List.of(DeploymentState.DEPLOYED);
-}}).get();
+}}).join();
 // get accounts without filter (returns 1000 accounts max)
-List<MetatraderAccount> accounts = api.getMetatraderAccountApi().getAccounts(null).get();
+List<MetatraderAccount> accounts = api.getMetatraderAccountApi().getAccounts(null).join();
 
-MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").get();
+MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
 ```
 
 ### Updating an existing account via API
@@ -159,19 +159,59 @@ account.update(new MetatraderAccountUpdateDto() {
   password = "qwerty";
   server = "ICMarketsSC-Demo";
   quoteStreamingIntervalInSeconds = 2.5; // set to 0 to receive quote per tick
-}).get();
+}).join();
 ```
 
 ### Removing an account
 ```java
-account.remove().get();
+account.remove().join();
 ```
 
 ### Deploying, undeploying and redeploying an account (API server) via API
 ```java
-account.deploy().get();
-account.undeploy().get();
-account.redeploy().get();
+account.deploy().join();
+account.undeploy().join();
+account.redeploy().join();
+```
+
+### Manage custom experts (EAs)
+Custom expert advisors can only be used for MT4 accounts on g1 infrastructure
+
+### Creating an expert advisor via API
+You can use the code below to create an EA. Please note that preset field is a base64-encoded preset file.
+```java
+ExpertAdvisor expert = account.createExpertAdvisor("expertId", new NewExpertAdvisorDto() {{
+  period = "1h";
+  symbol = "EURUSD";
+  preset = "a2V5MT12YWx1ZTEKa2V5Mj12YWx1ZTIKa2V5Mz12YWx1ZTMKc3VwZXI9dHJ1ZQ";
+}}).join();
+expert.uploadFile("/path/to/custom-ea").join();
+```
+
+### Retrieving existing experts via API
+```java
+List<ExpertAdvisor> experts = account.getExpertAdvisors().join();
+```
+
+### Retrieving existing expert by id via API
+```java
+ExpertAdvisor expert = account.getExpertAdvisor("expertId").join();
+```
+
+### Updating existing expert via API
+You can use the code below to update an EA. Please note that preset field is a base64-encoded preset file.
+```java
+expert.update(new NewExpertAdvisorDto() {{
+  period = "4h";
+  symbol = "EURUSD";
+  preset = "a2V5MT12YWx1ZTEKa2V5Mj12YWx1ZTIKa2V5Mz12YWx1ZTMKc3VwZXI9dHJ1ZQ";
+}}).join();
+expert.uploadFile("/path/to/custom-ea").join();
+```
+
+### Removing expert via API
+```java
+expert.remove().join();
 ```
 
 ## Access MetaTrader account via RPC API
@@ -181,47 +221,47 @@ simple trading apps.
 
 ### Query account information, positions, orders and history via RPC API
 ```java
-MetaApiConnection connection = account.connect().get();
+MetaApiConnection connection = account.connect().join();
 
-connection.waitSynchronized().get();
+connection.waitSynchronized().join();
 
 // retrieve balance and equity
-System.out.println(connection.getAccountInformation().get());
+System.out.println(connection.getAccountInformation().join());
 // retrieve open positions
-System.out.println(connection.getPositions().get());
+System.out.println(connection.getPositions().join());
 // retrieve a position by id
-System.out.println(connection.getPosition("1234567").get());
+System.out.println(connection.getPosition("1234567").join());
 // retrieve pending orders
-System.out.println(connection.getOrders().get());
+System.out.println(connection.getOrders().join());
 // retrieve a pending order by id
-System.out.println(connection.getOrder("1234567").get());
+System.out.println(connection.getOrder("1234567").join());
 // retrieve history orders by ticket
-System.out.println(connection.getHistoryOrdersByTicket("1234567").get());
+System.out.println(connection.getHistoryOrdersByTicket("1234567").join());
 // retrieve history orders by position id
-System.out.println(connection.getHistoryOrdersByPosition("1234567").get());
+System.out.println(connection.getHistoryOrdersByPosition("1234567").join());
 // retrieve history orders by time range
-System.out.println(connection.getHistoryOrdersByTimeRange(startTime, endTime).get());
+System.out.println(connection.getHistoryOrdersByTimeRange(startTime, endTime).join());
 // retrieve history deals by ticket
-System.out.println(connection.getDealsByTicket("1234567").get());
+System.out.println(connection.getDealsByTicket("1234567").join());
 // retrieve history deals by position id
-System.out.println(connection.getDealsByPosition("1234567").get());
+System.out.println(connection.getDealsByPosition("1234567").join());
 // retrieve history deals by time range
-System.out.println(connection.getDealsByTimeRange(startTime, endTime).get());
+System.out.println(connection.getDealsByTimeRange(startTime, endTime).join());
 ```
 
 ### Query contract specifications and quotes via RPC API
 ```java
-MetaApiConnection connection = account.connect().get();
+MetaApiConnection connection = account.connect().join();
 
-connection.waitSynchronized().get();
+connection.waitSynchronized().join();
 
 // first, subscribe to market data
-connection.subscribeToMarketData("GBPUSD").get();
+connection.subscribeToMarketData("GBPUSD").join();
 
 // read constract specification
-System.out.println(connection.getSymbolSpecification("GBPUSD").get());
+System.out.println(connection.getSymbolSpecification("GBPUSD").join());
 // read current price
-System.out.println(connection.getSymbolPrice("GBPUSD").get());
+System.out.println(connection.getSymbolPrice("GBPUSD").join());
 ```
 
 ### Use real-time streaming API
@@ -230,13 +270,13 @@ The API synchronizes the terminal state locally so that you can query local copy
 
 #### Synchronizing and reading teminal state
 ```java
-MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").get();
+MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
 
 // access local copy of terminal state
 TerminalState terminalState = connection.getTerminalState();
 
 // wait until synchronization completed
-connection.waitSynchronized().get();
+connection.waitSynchronized().join();
 
 System.out.println(terminalState.isConnected());
 System.out.println(terminalState.isConnectedToBroker());
@@ -271,13 +311,13 @@ HistoryStorage historyStorage = new MongodbHistoryStorage();
 
 // Note: if you will not specify history storage, then in-memory storage
 // will be used (instance of MemoryHistoryStorage)
-MetaApiConnection connection = account.connect(historyStorage).get();
+MetaApiConnection connection = account.connect(historyStorage).join();
 
 // access history storage
 HistoryStorage historyStorage = connection.getHistoryStorage();
 
 // invoke other methods provided by your history storage implementation
-System.out.println(((MongodbHistoryStorage) historyStorage).yourMethod().get());
+System.out.println(((MongodbHistoryStorage) historyStorage).yourMethod().join());
 ```
 
 #### Receiving synchronization events
@@ -301,45 +341,45 @@ connection.removeSynchronizationListener(listener);
 
 ### Retrieve contract specifications and quotes via streaming API
 ```java
-MetaApiConnection connection = account.connect().get();
-connection.waitSynchronized().get();
+MetaApiConnection connection = account.connect().join();
+connection.waitSynchronized().join();
 // first, subscribe to market data
-connection.subscribeToMarketData("GBPUSD").get();
+connection.subscribeToMarketData("GBPUSD").join();
 // read constract specification
 System.out.println(terminalState.getSpecification("EURUSD"));
 // read current price
 System.out.println(terminalState.getPrice("EURUSD"));
 
 // unsubscribe from market data when no longer needed
-connection.unsubscribeFromMarketData("GBPUSD").get();
+connection.unsubscribeFromMarketData("GBPUSD").join();
 ```
 
 ### Execute trades (both RPC and streaming APIs)
 ```java
-MetaApiConnection connection = account.connect().get();
+MetaApiConnection connection = account.connect().join();
 
-connection.waitSynchronized().get();
+connection.waitSynchronized().join();
 
 // trade
 TradeOptions options = new TradeOptions() {{ comment = "comment"; clientId = "TE_GBPUSD_7hyINWqAl"; }};
-System.out.println(connection.createMarketBuyOrder("GBPUSD", 0.07, 0.9, 2.0, options).get());
-System.out.println(connection.createMarketSellOrder("GBPUSD", 0.07, 2.0, 0.9, options).get());
-System.out.println(connection.createLimitBuyOrder("GBPUSD", 0.07, 1.0, 0.9, 2.0, options).get());
-System.out.println(connection.createLimitSellOrder("GBPUSD", 0.07, 1.5, 2.0, 0.9, options).get());
-System.out.println(connection.createStopBuyOrder("GBPUSD", 0.07, 1.5, 0.9, 2.0, options).get());
-System.out.println(connection.createStopSellOrder("GBPUSD", 0.07, 1.0, 2.0, 0.9, options).get());
-System.out.println(connection.createStopLimitBuyOrder("GBPUSD", 0.07, 1.5, 1.4, 0.9, 2.0, options).get());
-System.out.println(connection.createStopLimitSellOrder("GBPUSD", 0.07, 1.0, 1.1, 2.0, 0.9, options).get());
-System.out.println(connection.modifyPosition("46870472", 2.0, 0.9).get());
-System.out.println(connection.closePositionPartially("46870472", 0.9, null).get());
-System.out.println(connection.closePosition("46870472", null).get());
-System.out.println(connection.closeBy("46870472", "46870482", null).get());
-System.out.println(connection.closePositionsBySymbol("EURUSD", null).get());
-System.out.println(connection.modifyOrder("46870472", 1.0, 2.0, 0.9).get());
-System.out.println(connection.cancelOrder("46870472").get());
+System.out.println(connection.createMarketBuyOrder("GBPUSD", 0.07, 0.9, 2.0, options).join());
+System.out.println(connection.createMarketSellOrder("GBPUSD", 0.07, 2.0, 0.9, options).join());
+System.out.println(connection.createLimitBuyOrder("GBPUSD", 0.07, 1.0, 0.9, 2.0, options).join());
+System.out.println(connection.createLimitSellOrder("GBPUSD", 0.07, 1.5, 2.0, 0.9, options).join());
+System.out.println(connection.createStopBuyOrder("GBPUSD", 0.07, 1.5, 0.9, 2.0, options).join());
+System.out.println(connection.createStopSellOrder("GBPUSD", 0.07, 1.0, 2.0, 0.9, options).join());
+System.out.println(connection.createStopLimitBuyOrder("GBPUSD", 0.07, 1.5, 1.4, 0.9, 2.0, options).join());
+System.out.println(connection.createStopLimitSellOrder("GBPUSD", 0.07, 1.0, 1.1, 2.0, 0.9, options).join());
+System.out.println(connection.modifyPosition("46870472", 2.0, 0.9).join());
+System.out.println(connection.closePositionPartially("46870472", 0.9, null).join());
+System.out.println(connection.closePosition("46870472", null).join());
+System.out.println(connection.closeBy("46870472", "46870482", null).join());
+System.out.println(connection.closePositionsBySymbol("EURUSD", null).join());
+System.out.println(connection.modifyOrder("46870472", 1.0, 2.0, 0.9).join());
+System.out.println(connection.cancelOrder("46870472").join());
 
 // if you need to, check the extra result information in stringCode and numericCode properties of the response
-MetatraderTradeResponse result = connection.createMarketBuyOrder("GBPUSD", 0.07, 0.9, 2.0, options).get();
+MetatraderTradeResponse result = connection.createMarketBuyOrder("GBPUSD", 0.07, 0.9, 2.0, options).join();
 System.out.println("Trade successful, result code is " + result.stringCode);
 ```
 
@@ -382,7 +422,7 @@ MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
   email = "example@example.com";
   leverage = 100;
   serverName = "Exness-Trial4";
-}}).get();
+}}).join();
 ```
 
 ### Create a MetaTrader 5 demo account
@@ -393,193 +433,18 @@ MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
   email = "example@example.com";
   leverage = 100;
   serverName = "ICMarketsSC-Demo";
-}}).get();
+}}).join();
 ```
 
 ## Rate limits & quotas
 
-MetaApi applies rate limits to requests. See [MT account management API](https://metaapi.cloud/docs/provisioning/rateLimiting/) and [MetaApi API](https://metaapi.cloud/docs/client/restApi/rateLimiting/) for details.
-Also, MetaApi applies quotas to limit the number of accounts and provisioning profiles, for more details see the [MT account management API quotas](https://metaapi.cloud/docs/provisioning/userQuota/)
+MetaApi applies rate limits to requests. See [MT account management API](https://metaapi.cloud/docs/provisioning/rateLimiting/) and [MetaApi API](https://metaapi.cloud/docs/client/rateLimiting/) for details.
+
+MetaApi applies quotas to limit the number of accounts and provisioning profiles, for more details see the [MT account management API quotas](https://metaapi.cloud/docs/provisioning/userQuota/)
 
 ## CopyFactory copy trading API
 
 CopyFactory is a powerful trade copying API which makes developing forex
 trade copying applications as easy as writing few lines of code.
 
-At this point we have not yet defined a final price for this feature.
-
-### Why do we offer CopyFactory API
-
-We found that developing reliable and flexible trade copier is a task
-which requires lots of effort, because developers have to solve a series
-of complex technical tasks to create a product.
-
-We decided to share our product as it allows developers to start with a
-powerful solution in almost no time, saving on development and
-infrastructure maintenance costs.
-
-### CopyFactory features
-Features supported:
-
-- low latency trade copying
-- reliable copy trading execution
-- connect arbitrary number of strategy providers and subscribers
-- subscribe accounts to multiple strategies at once
-- select arbitrary copy ratio for each subscription
-- configure symbol mapping between strategy providers and subscribers
-- apply advanced risk filters on strategy provider side
-- override risk filters on subscriber side
-- provide multiple strategies from a single account based on magic or symbol filters
-- reliable trade copying
-- supports manual trading on subscriber accounts while copying trades
-- synchronize subscriber account with strategy providers
-- monitor trading history
-- calculate trade copying commissions for account managers
-- support portfolio strategies as trading signal source, i.e. the strategies which include signals of several other strategies (also known as combos on some platforms)
-
-Please note that trade copying to MT5 netting accounts is not supported in the current API version
-
-### Configuring trade copying
-
-In order to configure trade copying you need to:
-
-- add MetaApi MetaTrader accounts with CopyFactory as application field value (see above)
-- create CopyFactory master and slave accounts and connect them to MetaApi accounts via connectionId field
-- create a strategy being copied
-- subscribe slave CopyFactory accounts to the strategy
-
-```java
-import cloud.metaapi.sdk.metaApi.MetaApi;
-import cloud.metaapi.sdk.copyFactory.CopyFactory;
-
-String token = "...";
-MetaApi metaapi = new MetaApi(token);
-CopyFactory copyFactory = new CopyFactory(token);
-
-// retrieve MetaApi MetaTrader accounts with CopyFactory as application field value
-MetatraderAccount masterMetaapiAccount = metaapi.getMetatraderAccountApi().getAccount("masterMetaapiAccountId").get();
-if (!masterMetaapiAccount.getApplication().equals("CopyFactory")) {
-  throw new Exception("Please specify CopyFactory application field value in your MetaApi account in order to use it in CopyFactory API");
-}
-MetatraderAccount slaveMetaapiAccount = metaapi.getMetatraderAccountApi().getAccount("slaveMetaapiAccountId").get();
-if (!slaveMetaapiAccount.getApplication().equals("CopyFactory")) {
-  throw new Exception("Please specify CopyFactory application field value in your MetaApi account in order to use it in CopyFactory API");
-}
-
-// create CopyFactory master and slave accounts and connect them to MetaApi accounts via connectionId field
-ConfigurationClient configurationApi = copyFactory.getConfigurationApi();
-String masterAccountId = configurationApi.generateAccountId();
-String slaveAccountId = configurationApi.generateAccountId();
-configurationApi.updateAccount(masterAccountId, new CopyFactoryAccountUpdate() {{
-  name = "Demo account";
-  connectionId = masterMetaapiAccount.getId();
-  subscriptions = List.of();
-}}).get();
-
-// create a strategy being copied
-StrategyId strategyId = configurationApi.generateStrategyId().get();
-configurationApi.updateStrategy(strategyId.id, new CopyFactoryStrategyUpdate() {{
-  name = "Test strategy";
-  description = "Some useful description about your strategy";
-  positionLifecycle = "hedging";
-  connectionId = masterMetaapiAccount.getId();
-  maxTradeRisk = 0.1;
-  stopOutRisk = new CopyFactoryStrategyStopOutRisk() {{
-    value = 0.4;
-    startTime = new IsoTime("2020-08-24T00:00:00.000Z");
-  }},
-  timeSettings = new CopyFactoryStrategyTimeSettings() {{
-    lifetimeInHours = 192;
-    openingIntervalInMinutes = 5;
-  }}
-}}).get();
-
-// subscribe slave CopyFactory accounts to the strategy
-configurationApi.updateAccount(slaveAccountId, new CopyFactoryAccountUpdate() {{
-  name = "Demo account";
-  connectionId = slaveMetaapiAccount.getId();
-  subscriptions: List.of(new CopyFactoryStrategySubscription() {{
-    strategyId = strategyId.id;
-    multiplier = 1;
-  }})
-}}).get();
-```
-
-See jsdoc in-code documentation for full definition of possible configuration options.
-
-### Retrieving trade copying history
-
-CopyFactory allows you to monitor transactions conducted on trading accounts in real time.
-
-#### Retrieving trading history on provider side
-```java
-HistoryClient historyApi = copyFactory.getHistoryApi();
-// retrieve list of subscribers
-System.out.println(historyApi.getSubscribers().get());
-// retrieve list of strategies provided
-System.out.println(historyApi.getProvidedStrategies().get());
-// retrieve trading history, please note that this method support pagination and limits number of records
-System.out.println(historyApi.getProvidedStrategiesTransactions(new IsoTime("2020-08-01T00:00:00.000Z"), new IsoTime("2020-09-01T00:00:00.000Z")).get());
-```
-
-#### Retrieving trading history on subscriber side
-```java
-HistoryApi historyApi = copyFactory.getHistoryApi();
-// retrieve list of providers
-System.out.println(historyApi.getProviders().get());
-// retrieve list of strategies subscribed to
-System.out.println(historyApi.getStrategiesSubscribed().get());
-// retrieve trading history, please note that this method support pagination and limits number of records
-System.out.println(historyApi.getStrategiesSubscribedTransactions(new IsoTime("2020-08-01T00:00:00.000Z"), new IsoTime("2020-09-01T00:00:00.000Z")).get());
-```
-
-#### Resynchronizing slave accounts to masters
-There is a configurable time limit during which the trades can be opened. Sometimes trades can not open in time due to broker errors or trading session time discrepancy.
-You can resynchronize a slave account to place such late trades. Please note that positions which were
-closed manually on a slave account will also be reopened during resynchronization.
-
-```java
-String accountId = "..."; // CopyFactory account id
-// resynchronize all strategies
-copyFactory.getTradingApi().resynchronize(accountId).get();
-// resynchronize specific strategy
-copyFactory.tradingApi.resynchronize(accountId, List.of("ABCD")).get();
-```
-
-#### Managing stopouts
-A subscription to a strategy can be stopped if the strategy have exceeded allowed risk limit.
-```java
-TradingClient tradingApi = copyFactory.getTradingApi();
-String accountId = "..."; // CopyFactory account id
-String strategyId = "..."; // CopyFactory strategy id
-
-// retrieve list of strategy stopouts
-System.out.println(tradingApi.getStopouts(accountId).get());
-
-// reset a stopout so that subscription can continue
-tradingApi.resetStopout(accountId, strategyId, "daily-equity").get();
-```
-
-#### Retrieving slave trading logs
-```java
-TradingClient tradingApi = copyFactory.getTradingApi();
-String accountId = "..."; // CopyFactory account id
-// retrieve slave trading log
-System.out.println(tradingApi.getUserLog(accountId).get());
-// retrieve paginated slave trading log by time range
-IsoTime from = new IsoTime(Date.from(Instant.now().minusSeconds(24 * 60 * 60)));
-System.out.println(tradingApi.getUserLog(accountId, from, null, 20, 10).get());
-System.out.println(tradingApi.getUserLog(accountId, from, null, 20, 10).get());
-```
-
-Keywords: MetaTrader API, MetaTrader REST API, MetaTrader websocket API,
-MetaTrader 5 API, MetaTrader 5 REST API, MetaTrader 5 websocket API,
-MetaTrader 4 API, MetaTrader 4 REST API, MetaTrader 4 websocket API,
-MT5 API, MT5 REST API, MT5 websocket API, MT4 API, MT4 REST API,
-MT4 websocket API, MetaTrader SDK, MetaTrader SDK, MT4 SDK, MT5 SDK,
-MetaTrader 5 SDK, MetaTrader 4 SDK, MetaTrader Java SDK, MetaTrader 5
-Java SDK, MetaTrader 4 Java SDK, MT5 Java SDK, MT4 Java SDK,
-FX REST API, Forex REST API, Forex websocket API, FX websocket API, FX
-SDK, Forex SDK, FX Java SDK, Forex Java SDK, Trading API, Forex
-API, FX API, Trading SDK, Trading REST API, Trading websocket API,
-Trading SDK, Trading Java SDK
+You can find CopyFactory Java SDK documentation here: [https://github.com/agiliumtrade-ai/copyfactory-java-sdk](https://github.com/agiliumtrade-ai/copyfactory-java-sdk)
