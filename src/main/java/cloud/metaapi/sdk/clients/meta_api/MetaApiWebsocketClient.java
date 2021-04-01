@@ -836,8 +836,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @param accountId id of the MetaTrader account
    * @param instanceIndex instance index
    * @param symbol symbol (e.g. currency pair or an index)
-   * @param subscriptions array of market data subscription to create or update. Please
-   * note that this feature is not fully implemented on server-side yet
+   * @param subscriptions array of market data subscription to create or update
    * @return completable future which resolves when subscription request was processed
    */
   public CompletableFuture<Void> subscribeToMarketData(String accountId, int instanceIndex,
@@ -1490,8 +1489,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 List<CompletableFuture<Void>> onHealthStatusFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
                   onHealthStatusFutures.add(listener.onHealthStatus(instanceIndex, 
-                      jsonMapper.treeToValue(data.get("healthStatus"),
-                      SynchronizationListener.HealthStatus.class)).exceptionally(e -> {
+                      jsonMapper.treeToValue(data.get("healthStatus"), SynchronizationListener.HealthStatus.class))
+                    .exceptionally(e -> {
                     logger.error("Failed to notify listener about server-side healthStatus event", e);
                     return null;
                   }));
@@ -1499,6 +1498,25 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 CompletableFuture.allOf(onHealthStatusFutures.toArray(new CompletableFuture<?>[0])).get();
               }
             }
+          } else if (type.equals("downgradeSubscription")) {
+            logger.info(accountId + ": Market data subscriptions for symbol " + data.get("symbol") + " were downgraded by "
+              + "the server due to rate limits. Updated subscriptions: " + data.get("updates") + ", removed subscriptions: "
+              + data.get("unsubscriptions") + ". Please read https://metaapi.cloud/docs/client/rateLimiting/ for more details.");
+            List<CompletableFuture<Void>> onSubscriptionDowngradeFutures = new ArrayList<>();
+            for (SynchronizationListener listener : listeners) {
+              onSubscriptionDowngradeFutures.add(listener.onSubscriptionDowngraded(instanceIndex, data.get("symbol").asText(),
+                data.has("updates")
+                  ? Arrays.asList(jsonMapper.treeToValue(data.get("updates"), MarketDataSubscription[].class))
+                  : new ArrayList<>(),
+                data.has("unsubscriptions")
+                  ? Arrays.asList(jsonMapper.treeToValue(data.get("unsubscriptions"), MarketDataUnsubscription[].class))
+                  : new ArrayList<>()
+              ).exceptionally(e -> {
+                logger.error("Failed to notify listener about server-side healthStatus event", e);
+                return null;
+              }));
+            }
+            CompletableFuture.allOf(onSubscriptionDowngradeFutures.toArray(new CompletableFuture<?>[0])).get();
           } else if (type.equals("specifications")) {
             if (data.hasNonNull(type)) {
               MetatraderSymbolSpecification[] specifications = jsonMapper

@@ -865,6 +865,41 @@ class MetaApiConnectionTest {
   }
   
   /**
+   * Tests {@link MetaApiConnection#onSubscriptionDowngraded(int, String, List, List)}
+   */
+  @Test
+  void testUnsubscribesDuringMarketDataSubscriptionDowngrade() {
+    MetaApiConnection api = Mockito.spy(this.api);
+    Mockito.doReturn(CompletableFuture.completedFuture(null)).when(api)
+      .subscribeToMarketData(Mockito.anyString(), Mockito.anyList());
+    Mockito.doReturn(CompletableFuture.completedFuture(null)).when(api)
+      .unsubscribeFromMarketData(Mockito.anyString(), Mockito.anyList());
+    List<MarketDataUnsubscription> unsubscriptions = Arrays.asList(new MarketDataUnsubscription() {{ type = "ticks"; }});
+    api.onSubscriptionDowngraded(1, "EURUSD", new ArrayList<>(), unsubscriptions).join();
+    Mockito.verify(api).unsubscribeFromMarketData("EURUSD", unsubscriptions);
+    Mockito.verify(api, Mockito.never()).subscribeToMarketData(Mockito.anyString(), Mockito.anyList());
+  }
+  
+  /**
+   * Tests {@link MetaApiConnection#onSubscriptionDowngraded(int, String, List, List)}
+   */
+  @Test
+  void testUpdateMarketDataSubscriptionOnDowngrade() {
+    MetaApiConnection api = Mockito.spy(this.api);
+    Mockito.doReturn(CompletableFuture.completedFuture(null)).when(api)
+      .subscribeToMarketData(Mockito.anyString(), Mockito.anyList());
+    Mockito.doReturn(CompletableFuture.completedFuture(null)).when(api)
+      .unsubscribeFromMarketData(Mockito.anyString(), Mockito.anyList());
+    List<MarketDataSubscription> updates = Arrays.asList(new MarketDataSubscription() {{
+      type = "quotes";
+      intervalInMilliseconds = 30000;
+    }});
+    api.onSubscriptionDowngraded(1, "EURUSD", updates, new ArrayList<>()).join();
+    Mockito.verify(api).subscribeToMarketData("EURUSD", updates);
+    Mockito.verify(api, Mockito.never()).unsubscribeFromMarketData(Mockito.anyString(), Mockito.anyList());
+  }
+  
+  /**
    * Tests {@link MetaApiConnection#getSymbolSpecification(String)}
    */
   @Test

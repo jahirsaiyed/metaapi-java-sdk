@@ -280,4 +280,17 @@ public abstract class SynchronizationListener {
     Double marginLevel, Double accountCurrencyExchangeRate) {
     return CompletableFuture.completedFuture(null);
   }
+  
+  /**
+   * Invoked when subscription downgrade has occurred
+   * @param instanceIndex index of an account instance connected
+   * @param symbol symbol to update subscriptions for
+   * @param updates array of market data subscription to update
+   * @param unsubscriptions array of subscriptions to cancel
+   * @return completable future which resolves when the asynchronous event is processed
+   */
+  public CompletableFuture<Void> onSubscriptionDowngraded(int instanceIndex, String symbol,
+    List<MarketDataSubscription> updates, List<MarketDataUnsubscription> unsubscriptions) {
+    return CompletableFuture.completedFuture(null);
+  }
 }

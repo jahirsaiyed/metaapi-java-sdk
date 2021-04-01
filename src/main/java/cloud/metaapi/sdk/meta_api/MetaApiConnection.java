@@ -776,6 +776,36 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     return websocketClient.unsubscribeFromMarketData(account.getId(), instanceIndex, symbol, subscriptions);
   }
   
+  @Override
+  public CompletableFuture<Void> onSubscriptionDowngraded(int instanceIndex, String symbol,
+      List<MarketDataSubscription> updates, List<MarketDataUnsubscription> unsubscriptions) {
+      return CompletableFuture.runAsync(() -> {
+        List<MarketDataSubscription> subscriptions = this.subscriptions.containsKey(symbol)
+            ? this.subscriptions.get(symbol).subscriptions : new ArrayList<>();
+        if (unsubscriptions.size() != 0) {
+          if (subscriptions.size() != 0) {
+            for (MarketDataUnsubscription subscription : unsubscriptions) {
+              subscriptions = subscriptions.stream().filter(s -> s.type.equals(subscription.type))
+                .collect(Collectors.toList());
+            }
+          }
+          unsubscribeFromMarketData(symbol, unsubscriptions);
+        }
+        if (updates.size() != 0) {
+          if (subscriptions.size() != 0) {
+            for (MarketDataSubscription subscription : updates) {
+              subscriptions.stream().filter(s -> s.type.equals(subscription.type))
+                .forEach(s -> s.intervalInMilliseconds = subscription.intervalInMilliseconds);
+            }
+          }
+          subscribeToMarketData(symbol, updates);
+        }
+        if (subscriptions.size() != 0) {
+          this.subscriptions.remove(symbol);
+        }
+      });
+    }
+  
   /**
    * Returns list of the symbols connection is subscribed to
    * @return list of the symbols connection is subscribed to

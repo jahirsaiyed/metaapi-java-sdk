@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketDataSubscription;
+import cloud.metaapi.sdk.clients.meta_api.models.MarketDataUnsubscription;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.ConnectionStatus;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderBook;
@@ -81,6 +82,13 @@ public class StreamQuotesExample {
       }
       return CompletableFuture.completedFuture(null);
     }
+    @Override
+    public CompletableFuture<Void> onSubscriptionDowngraded(int instanceIndex, String symbol,
+      List<MarketDataSubscription> updates, List<MarketDataUnsubscription> unsubscriptions) {
+      System.out.println("Market data subscriptions for " + symbol
+        + " were downgraded by the server due to rate limits");
+      return CompletableFuture.completedFuture(null);
+    }
   }
   
   public static void main(String[] args) {
@@ -110,7 +118,9 @@ public class StreamQuotesExample {
         + "(may take some time depending on your history size)");
       connection.waitSynchronized().get();
       
-      // Add symbol to MarketWatch if not yet added
+      // Add symbol to MarketWatch if not yet added and subscribe to market data
+      // Please note that currently only MT5 G1 instances support extended subscription management
+      // Other instances will only stream quotes in response
       connection.subscribeToMarketData(symbol, Arrays.asList(
         new MarketDataSubscription() {{ type = "quotes"; intervalInMilliseconds = 5000; }},
         new MarketDataSubscription() {{ type = "candles"; timeframe = "1m"; intervalInMilliseconds = 10000; }},
@@ -118,7 +128,7 @@ public class StreamQuotesExample {
         new MarketDataSubscription() {{ type = "marketDepth"; intervalInMilliseconds = 5000; }}
       )).join();
       
-      System.out.println("Streaming " + symbol + " quotes now...");
+      System.out.println("Streaming " + symbol + " market data now...");
       
       while (true) {
         Thread.sleep(1000);
