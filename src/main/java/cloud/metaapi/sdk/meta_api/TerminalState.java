@@ -270,6 +270,16 @@ public class TerminalState extends SynchronizationListener {
     state.specificationsBySymbol.put(specification.symbol, specification);
     return CompletableFuture.completedFuture(null);
   }
+  
+  @Override
+  public CompletableFuture<Void> onSymbolSpecificationsRemoved(int instanceIndex, List<String> symbols) {
+    State state = getState(instanceIndex);
+    state.specifications.removeIf(s -> symbols.contains(s.symbol));
+    for (String symbol : symbols) {
+      state.specificationsBySymbol.remove(symbol);
+    }
+    return CompletableFuture.completedFuture(null);
+  }
 
   @Override
   public CompletableFuture<Void> onSymbolPricesUpdated(int instanceIndex,

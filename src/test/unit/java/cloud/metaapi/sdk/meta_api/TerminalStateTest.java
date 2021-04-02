@@ -120,7 +120,9 @@ class TerminalStateTest {
     assertTrue(state.getSpecifications().isEmpty());
     state.onSymbolSpecificationUpdated(1, new MetatraderSymbolSpecification() {{ symbol = "EURUSD"; tickSize = 0.00001; }});
     state.onSymbolSpecificationUpdated(1, new MetatraderSymbolSpecification() {{ symbol = "GBPUSD"; }});
+    state.onSymbolSpecificationUpdated(1, new MetatraderSymbolSpecification() {{ symbol = "AUDNZD"; }});
     state.onSymbolSpecificationUpdated(1, new MetatraderSymbolSpecification() {{ symbol = "EURUSD"; tickSize = 0.0001; }});
+    state.onSymbolSpecificationsRemoved(1, Lists.list("AUDNZD"));
     assertEquals(2, state.getSpecifications().size());
     assertThat(state.getSpecifications()).usingRecursiveComparison().isEqualTo(Lists.list(
       new MetatraderSymbolSpecification() {{ symbol = "EURUSD"; tickSize = 0.0001; }},

@@ -201,6 +201,16 @@ public abstract class SynchronizationListener {
     MetatraderSymbolSpecification specification) {
     return CompletableFuture.completedFuture(null);
   }
+  
+  /**
+   * Invoked when a symbol specifications was removed
+   * @param instanceIndex index of an account instance connected
+   * @param symbols removed symbols
+   * @return completable future which resolves when the asynchronous event is processed
+   */
+  public CompletableFuture<Void> onSymbolSpecificationsRemoved(int instanceIndex, List<String> symbols) {
+    return CompletableFuture.completedFuture(null);
+  }
 
   /**
    * Invoked when a symbol price was updated

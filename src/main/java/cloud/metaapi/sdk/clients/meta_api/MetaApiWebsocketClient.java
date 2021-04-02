@@ -1512,7 +1512,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   ? Arrays.asList(jsonMapper.treeToValue(data.get("unsubscriptions"), MarketDataUnsubscription[].class))
                   : new ArrayList<>()
               ).exceptionally(e -> {
-                logger.error("Failed to notify listener about server-side healthStatus event", e);
+                logger.error("Failed to notify listener about subscription downgrade event", e);
                 return null;
               }));
             }
@@ -1522,16 +1522,28 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               MetatraderSymbolSpecification[] specifications = jsonMapper
                 .treeToValue(data.get(type), MetatraderSymbolSpecification[].class);
               for (MetatraderSymbolSpecification specification : specifications) {
-                List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+                List<CompletableFuture<Void>> onSymbolSpecificationUpdatedFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
-                  completableFutures.add(listener.onSymbolSpecificationUpdated(instanceIndex,
+                  onSymbolSpecificationUpdatedFutures.add(listener.onSymbolSpecificationUpdated(instanceIndex,
                       specification).exceptionally(e -> {
                     logger.error("Failed to notify listener about " + type + " event", e);
                     return null;
                   }));
                 }
-                CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
+                CompletableFuture.allOf(onSymbolSpecificationUpdatedFutures.toArray(new CompletableFuture<?>[0])).get();
               }
+              List<CompletableFuture<Void>> onSymbolSpecificationRemovedFutures = new ArrayList<>();
+              List<String> removedSymbols = data.has("removedSymbols")
+                ? Arrays.asList(jsonMapper.treeToValue(data.get("removedSymbols"), String[].class))
+                : new ArrayList<>();
+              for (SynchronizationListener listener : listeners) {
+                onSymbolSpecificationRemovedFutures.add(listener.onSymbolSpecificationsRemoved(instanceIndex,
+                    removedSymbols).exceptionally(e -> {
+                  logger.error("Failed to notify listener about specifications removed event", e);
+                  return null;
+                }));
+              }
+              CompletableFuture.allOf(onSymbolSpecificationRemovedFutures.toArray(new CompletableFuture<?>[0])).get();
             }
           } else if (type.equals("prices")) {
             List<MetatraderSymbolPrice> prices = Arrays.asList(data.hasNonNull("prices")
