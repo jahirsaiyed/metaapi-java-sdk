@@ -1532,18 +1532,18 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 }
                 CompletableFuture.allOf(onSymbolSpecificationUpdatedFutures.toArray(new CompletableFuture<?>[0])).get();
               }
-              List<CompletableFuture<Void>> onSymbolSpecificationRemovedFutures = new ArrayList<>();
-              List<String> removedSymbols = data.has("removedSymbols")
-                ? Arrays.asList(jsonMapper.treeToValue(data.get("removedSymbols"), String[].class))
-                : new ArrayList<>();
-              for (SynchronizationListener listener : listeners) {
-                onSymbolSpecificationRemovedFutures.add(listener.onSymbolSpecificationsRemoved(instanceIndex,
-                    removedSymbols).exceptionally(e -> {
-                  logger.error("Failed to notify listener about specifications removed event", e);
-                  return null;
-                }));
+              if (data.has("removedSymbols")) {
+                List<CompletableFuture<Void>> onSymbolSpecificationRemovedFutures = new ArrayList<>();
+                List<String> removedSymbols = Arrays.asList(jsonMapper.treeToValue(data.get("removedSymbols"), String[].class));
+                for (SynchronizationListener listener : listeners) {
+                  onSymbolSpecificationRemovedFutures.add(listener.onSymbolSpecificationsRemoved(instanceIndex,
+                      removedSymbols).exceptionally(e -> {
+                    logger.error("Failed to notify listener about specifications removed event", e);
+                    return null;
+                  }));
+                }
+                CompletableFuture.allOf(onSymbolSpecificationRemovedFutures.toArray(new CompletableFuture<?>[0])).get();
               }
-              CompletableFuture.allOf(onSymbolSpecificationRemovedFutures.toArray(new CompletableFuture<?>[0])).get();
             }
           } else if (type.equals("prices")) {
             List<MetatraderSymbolPrice> prices = Arrays.asList(data.hasNonNull("prices")
