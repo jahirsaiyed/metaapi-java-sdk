@@ -32,6 +32,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.*;
+import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException.TooManyRequestsExceptionMetadata;
 import cloud.metaapi.sdk.clients.meta_api.LatencyListener.ResponseTimestamps;
 import cloud.metaapi.sdk.clients.meta_api.LatencyListener.TradeTimestamps;
 import cloud.metaapi.sdk.clients.meta_api.LatencyListener.UpdateTimestamps;
@@ -1164,7 +1165,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             details = JsonMapper.getInstance().treeToValue(error.details, Object.class);
           }
         } catch (JsonProcessingException e) {
-          logger.error("Failed to parse validation error details: " + error.details.toString());
+          logger.error("Failed to parse validation error details: " + error.details, e);
         }
         return new ValidationException(error.message, details);
       case "NotFoundError": return new NotFoundException(error.message);
@@ -1173,6 +1174,16 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       case "NotAuthenticatedError": return new NotConnectedException(error.message);
       case "TradeError": return new TradeException(error.message, error.numericCode, error.stringCode);
       case "UnauthorizedError": close(); return new UnauthorizedException(error.message);
+      case "TooManyRequestsError":
+        TooManyRequestsExceptionMetadata metadata = null;
+        try {
+          if (error.metadata != null) {
+            metadata = JsonMapper.getInstance().treeToValue(error.metadata, TooManyRequestsExceptionMetadata.class);
+          }
+        } catch (JsonProcessingException e) {
+          logger.error("Failed to parse too many requests error metadata: " + error.metadata, e);
+        }
+        return new TooManyRequestsException(error.message, metadata);
       default: return new InternalException(error.message);
     }
   }
