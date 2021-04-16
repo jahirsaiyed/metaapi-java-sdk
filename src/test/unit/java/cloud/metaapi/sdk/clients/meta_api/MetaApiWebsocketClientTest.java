@@ -997,6 +997,54 @@ class MetaApiWebsocketClientTest {
   }
   
   /**
+   * Tests {@link MetaApiWebsocketClient#unsubscribe(String)}
+   */
+  @Test
+  void testIgnoresNotFoundExceptionOnUnsubscribe() {
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        ObjectNode response = jsonMapper.createObjectNode();
+        response.put("id", 1);
+        response.put("error", "ValidationError");
+        response.put("message", "Validation failed");
+        ObjectNode details = jsonMapper.createObjectNode();
+        details.put("parameter", "volume");
+        details.put("message", "Required value.");
+        response.set("details", jsonMapper.valueToTree(Arrays.asList(details)));
+        response.set("requestId", request.get("requestId"));
+        client.sendEvent("processingError", response.toString());
+      }
+    });
+    try {
+      client.unsubscribe("accountId").join();
+      throw new Exception("ValidationException extected");
+    } catch (Throwable err) {
+      assertTrue(err.getCause().getCause() instanceof ValidationException);
+      Map<String, String> details = new HashMap<>();
+      details.put("parameter", "volume");
+      details.put("message", "Required value.");
+      assertThat(((ValidationException) err.getCause().getCause()).details)
+        .usingRecursiveComparison().isEqualTo(Arrays.asList(details));
+    }
+    server.removeAllListeners("request");
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        ObjectNode response = jsonMapper.createObjectNode();
+        response.put("id", 1);
+        response.put("error", "NotFoundError");
+        response.put("message", "Account not found");
+        response.set("requestId", request.get("requestId"));
+        client.sendEvent("processingError", response.toString());
+      }
+    });
+    client.unsubscribe("accountId").join();
+  }
+  
+  /**
    * Tests {@link MetaApiWebsocketClient#trade(String, MetatraderTrade)}
    */
   @Test

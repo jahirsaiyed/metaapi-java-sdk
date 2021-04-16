@@ -1035,7 +1035,12 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     subscriptionManager.cancelAccount(accountId);
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("type", "unsubscribe");
-    return rpcRequest(accountId, request);
+    return rpcRequest(accountId, request).handle((response, err) -> {
+      if (err != null && !(err.getCause() instanceof NotFoundException)) {
+        throw new CompletionException(err);
+      }
+      return response;
+    });
   }
   
   /**
