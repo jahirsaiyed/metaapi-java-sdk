@@ -41,7 +41,7 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   private long offset;
   private boolean quotesHealthy = false;
   private Timer updateMeasurementsInterval;
-  private Map<Integer, HealthStatus> serverHealthStatus;
+  private Map<Integer, HealthStatus> serverHealthStatus = new HashMap<>();
   
   /**
    * Constructs the listener

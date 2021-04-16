@@ -7,6 +7,9 @@
   - increase socket connection stability
   - added API for advanced market data subscriptions
   - added API to increase account reliability
+  - added subscription manager to handle account subscription process
+  - fixed error on socket reconnect
+  - improved handling of too many requests error
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

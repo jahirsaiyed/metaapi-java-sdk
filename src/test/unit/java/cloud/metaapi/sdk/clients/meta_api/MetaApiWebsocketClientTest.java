@@ -119,7 +119,11 @@ class MetaApiWebsocketClientTest {
       domain = "project-stock.agiliumlabs.cloud";
       requestTimeout = 6000L;
       connectTimeout = 6000L;
-      retryOpts = new RetryOptions() {{ retries = 3; }};
+      retryOpts = new RetryOptions() {{
+        retries = 3;
+        minDelayInSeconds = 1;
+        maxDelayInSeconds = 3;
+      }};
     }});
     client.setUrl("http://localhost:6784");
     initResetDisconnectTimerTimeout = MetaApiWebsocketClient.resetDisconnectTimerTimeout;
@@ -1663,6 +1667,121 @@ class MetaApiWebsocketClientTest {
    * Tests {@link MetaApiWebsocketClient#rpcRequest}
    */
   @Test
+  void testWaitsSpecifiedAmountOfTimeOnTooManyRequestsError() {
+    requestCounter = 0;
+    MetatraderOrder order = new MetatraderOrder() {{
+      id = "46871284";
+      type = MetatraderOrder.OrderType.ORDER_TYPE_BUY_LIMIT;
+      state = MetatraderOrder.OrderState.ORDER_STATE_PLACED;
+      symbol = "AUDNZD";
+      magic = 123456;
+      platform = "mt5";
+      time = new IsoTime("2020-04-20T08:38:58.270Z");
+      openPrice = 1.03;
+      currentPrice = 1.05206;
+      volume = 0.01;
+      currentVolume = 0.01;
+      comment = "COMMENT2";
+    }};
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        ObjectNode response = jsonMapper.createObjectNode();
+        if (requestCounter > 0 && request.get("type").asText().equals("getOrder")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("orderId").asText().equals("46871284")
+           && request.get("application").asText().equals("RPC")) {
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("order", jsonMapper.valueToTree(order));
+          client.sendEvent("response", response.toString());
+        } else {
+          response.put("id", 1);
+          response.put("error", "TooManyRequestsError");
+          response.set("requestId", request.get("requestId"));
+          response.put("message", "The API allows 10000 requests per 60 minutes to avoid overloading our servers.");
+          response.put("status_code", 429);
+          ObjectNode metadata = jsonMapper.createObjectNode();
+          metadata.put("periodInMinutes", 60);
+          metadata.put("maxRequestsForPeriod", 10000);
+          metadata.put("recommendedRetryTime", new IsoTime(Date.from(Instant.now().plusMillis(1000))).toString());
+          response.set("metadata", metadata);
+          client.sendEvent("processingError", response.toString());
+        }
+        requestCounter++;
+      }
+    });
+    long startTime = Date.from(Instant.now()).getTime();
+    MetatraderOrder actual = client.getOrder("accountId", "46871284").join();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(order);
+    long timeDiff = Date.from(Instant.now()).getTime() - startTime;
+    assertTrue((timeDiff >= 1000) && (timeDiff <= 2000));
+  };
+
+  /**
+   * Tests {@link MetaApiWebsocketClient#rpcRequest}
+   */
+  @Test
+  void testReturnsTooManyRequestsExceptionIfRecommendedTimeIsBeyondMaxRequestTime() {
+    requestCounter = 0;
+    MetatraderOrder order = new MetatraderOrder() {{
+      id = "46871284";
+      type = MetatraderOrder.OrderType.ORDER_TYPE_BUY_LIMIT;
+      state = MetatraderOrder.OrderState.ORDER_STATE_PLACED;
+      symbol = "AUDNZD";
+      magic = 123456;
+      platform = "mt5";
+      time = new IsoTime("2020-04-20T08:38:58.270Z");
+      openPrice = 1.03;
+      currentPrice = 1.05206;
+      volume = 0.01;
+      currentVolume = 0.01;
+      comment = "COMMENT2";
+    }};
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        ObjectNode response = jsonMapper.createObjectNode();
+        if (requestCounter > 0 && request.get("type").asText().equals("getOrder")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("orderId").asText().equals("46871284")
+           && request.get("application").asText().equals("RPC")) {
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("order", jsonMapper.valueToTree(order));
+          client.sendEvent("response", response.toString());
+        } else {
+          response.put("id", 1);
+          response.put("error", "TooManyRequestsError");
+          response.set("requestId", request.get("requestId"));
+          response.put("message", "The API allows 10000 requests per 60 minutes to avoid overloading our servers.");
+          response.put("status_code", 429);
+          ObjectNode metadata = jsonMapper.createObjectNode();
+          metadata.put("periodInMinutes", 60);
+          metadata.put("maxRequestsForPeriod", 10000);
+          metadata.put("recommendedRetryTime", new IsoTime(Date.from(Instant.now().plusMillis(60000))).toString());
+          response.set("metadata", metadata);
+          client.sendEvent("processingError", response.toString());
+        }
+        requestCounter++;
+      }
+    });
+    try {
+      client.getOrder("accountId", "46871284").join();
+      throw new CompletionException(new Exception("TooManyRequestsError expected"));
+    } catch (Throwable err) {
+      assertTrue(err.getCause() instanceof TooManyRequestsException);
+    }
+  }
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#rpcRequest}
+   */
+  @Test
   void testDoesNotRetryRequestOnValidationError() {
     requestCounter = 0;
     server.addEventListener("request", Object.class, new DataListener<Object>() {
@@ -1712,10 +1831,15 @@ class MetaApiWebsocketClientTest {
     server.addEventListener("request", Object.class, new DataListener<Object>() {
       @Override
       public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
-        if (requestCounter > 0) {
-          fail();
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (request.get("type").asText().equals("trade")
+          && request.get("accountId").asText().equals("accountId")
+          && request.get("application").asText().equals("application")) {
+          if (requestCounter > 0) {
+            fail();
+          }
+          requestCounter++;
         }
-        requestCounter++;
       }
     });
     try {

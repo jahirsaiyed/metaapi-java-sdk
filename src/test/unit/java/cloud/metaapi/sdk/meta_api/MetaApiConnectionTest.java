@@ -9,8 +9,6 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -25,8 +23,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
@@ -674,57 +670,10 @@ class MetaApiConnectionTest {
    */
   @Test
   void testSubscribesToTerminal() throws Exception {
-    Mockito.when(client.subscribe("accountId")).thenReturn(CompletableFuture.completedFuture(null));
-    Timer timer = new Timer();
-    timer.schedule(new TimerTask() {
-      @Override
-      public void run() {
-        api.onConnected(1, 1);
-      }
-    }, 20);
-    api.subscribe().join();
-    Mockito.verify(client).subscribe("accountId");
-  }
-  
-  /**
-   * Tests {@link MetaApiConnection#subscribe()}
-   */
-  @Test
-  void testDoesNotSubscribeUndeployedAccounts() throws Exception {
-    Mockito.when(client.subscribe("accountId")).thenReturn(CompletableFuture.completedFuture(null));
-    Mockito.when(account.getState()).thenReturn(DeploymentState.UNDEPLOYED);
-    Timer timer = new Timer();
-    timer.schedule(new TimerTask() {
-      @Override
-      public void run() {
-        api.onConnected(1, 1);
-      }
-    }, 20);
-    api.subscribe().join();
-    Mockito.verify(client, Mockito.never()).subscribe("accountId");
-  }
-  
-  /**
-   * Tests {@link MetaApiConnection#subscribe()}
-   */
-  @Test
-  void testRetriesSubscribeToTerminalIfNoResponseReceived() throws InterruptedException {
-    CompletableFuture<Void> rejectedFuture = new CompletableFuture<>();
-    rejectedFuture.completeExceptionally(new Exception("Reject reason"));
-    Mockito.when(client.subscribe("accountId"))
-      .thenReturn(rejectedFuture)
-      .thenReturn(CompletableFuture.completedFuture(null))
+    Mockito.when(client.ensureSubscribe(Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    Timer timer = new Timer();
-    timer.schedule(new TimerTask() {
-      @Override
-      public void run() {
-        api.onConnected(1, 1);
-      }
-    }, 3050);
-    api.subscribe();
-    Thread.sleep(4000);
-    Mockito.verify(client, Mockito.times(2)).subscribe("accountId");
+    api.subscribe().join();
+    Mockito.verify(client).ensureSubscribe("accountId", null);
   }
   
   /**
@@ -732,57 +681,12 @@ class MetaApiConnectionTest {
    */
   @Test
   void testSubscribesAfterReconnect() throws InterruptedException {
-    Mockito.when(client.subscribe("accountId")).thenReturn(CompletableFuture.completedFuture(null));
-    api.subscribe();
-    Thread.sleep(1800);
-    Mockito.verify(client).subscribe("accountId");
-    api.onConnected(1, 1).join();
-    api.onReconnected();
-    Thread.sleep(3300);
-    Mockito.verify(client, Mockito.times(3)).subscribe("accountId");
-    api.onConnected(1, 1).join();
-    Thread.sleep(1800);
-    Mockito.verify(client, Mockito.times(3)).subscribe("accountId");
+    Mockito.when(client.ensureSubscribe(Mockito.any(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    api.onReconnected().join();
+    Mockito.verify(client).ensureSubscribe("accountId", null);
   }
   
-  /**
-   * Tests {@link MetaApiConnection#subscribe()}
-   */
-  @Test
-  void testDoesNotSendMultipleSubscribeRequestsAtTheSameTime() throws InterruptedException {
-    Mockito.when(client.subscribe("accountId")).thenReturn(CompletableFuture.completedFuture(null));
-    api.subscribe();
-    api.subscribe();
-    Thread.sleep(500);
-    api.onConnected(1, 1).join();
-    Thread.sleep(2600);
-    Mockito.verify(client, Mockito.times(1)).subscribe("accountId");
-  }
-  
-  /**
-   * Tests {@link MetaApiConnection#subscribe()}
-   */
-  @Test
-  void testDoesNotRetriesSubscribeToTerminalIfConnectionIsClosed() throws InterruptedException {
-    CompletableFuture<Void> rejectedFuture = new CompletableFuture<>();
-    rejectedFuture.completeExceptionally(new Exception("Reject reason"));
-    CompletableFuture<Void> subscribeCallFuture = new CompletableFuture<>();
-    Mockito.when(client.subscribe("accountId")).thenAnswer(new Answer<CompletableFuture<Void>>() {
-      @Override
-      public CompletableFuture<Void> answer(InvocationOnMock invocation) throws Throwable {
-        subscribeCallFuture.complete(null);
-        return rejectedFuture;
-      }
-    });
-    Mockito.when(client.unsubscribe("accountId")).thenReturn(CompletableFuture.completedFuture(null));
-    api.subscribe();
-    api.close();
-    subscribeCallFuture.join();
-    Thread.sleep(3100);
-    Mockito.verify(client, Mockito.times(1)).subscribe("accountId");
-    Mockito.verify(client).unsubscribe("accountId");
-  }
-
   /**
    * Tests {@link MetaApiConnection#synchronize()}
    */
@@ -1218,20 +1122,6 @@ class MetaApiConnectionTest {
   }
   
   /**
-   * Tests {@link MetaApiConnection#onReconnected()}
-   */
-  @Test
-  void testOverwritesPreviousSubscribeOnReconnect() throws InterruptedException {
-    MetaApiConnection apiSpy = Mockito.spy(api);
-    Mockito.doReturn(CompletableFuture.completedFuture(null)).when(apiSpy).subscribe();
-    apiSpy.subscribe().join();
-    Thread.sleep(50);
-    apiSpy.onReconnected().join();
-    Thread.sleep(75);
-    Mockito.verify(apiSpy, Mockito.times(2)).subscribe();
-  }
-  
-  /**
    * Tests {@link MetaApiConnection#initialize()}
    */
   @Test
@@ -1245,29 +1135,9 @@ class MetaApiConnectionTest {
    * Tests {@link MetaApiConnection#onDisconnected(int)}
    */
   @Test
-  void testResubscribesAccountOnDisconnect() {
-    CompletableFuture<Void> subscribeFuture = new CompletableFuture<>();
-    Mockito.when(client.subscribe(Mockito.anyString())).thenAnswer(new Answer<CompletableFuture<Void>>() {
-      public CompletableFuture<Void> answer(InvocationOnMock invocation) {
-        subscribeFuture.complete(null);
-        return subscribeFuture;
-      }
-    });
-    CompletableFuture<Void> reloadFuture = new CompletableFuture<>();
-    Mockito.when(account.reload()).thenAnswer(new Answer<CompletableFuture<Void>>() {
-      public CompletableFuture<Void> answer(InvocationOnMock invocation) {
-        reloadFuture.complete(null);
-        return reloadFuture;
-      }
-    });
+  void testSetsSynchronizedFalseOnDisconnect() {
     api.onDisconnected(0).join();
     assertFalse(api.isSynchronized());
-    reloadFuture.join();
-    subscribeFuture.join();
-    Mockito.verify(account).reload();
-    Mockito.verify(client).subscribe("accountId");
-    api.onDisconnected(0).join();
-    Mockito.verify(account, Mockito.times(1)).reload();
   }
   
   private static Stream<Arguments> providePosition() {

@@ -84,6 +84,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   private Map<String, String> connectedHosts = new HashMap<>();
   private CompletableFuture<Void> connectFuture = null;
   private SynchronizationThrottler synchronizationThrottler;
+  private SubscriptionManager subscriptionManager;
   private Map<String, Timer> statusTimers = new HashMap<>();
   private PacketOrderer packetOrderer;
   private PacketLogger packetLogger;
@@ -166,6 +167,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     this.maxRetryDelayInSeconds = opts.retryOpts.maxDelayInSeconds;
     this.synchronizationThrottler = new SynchronizationThrottler(this, opts.synchronizationThrottler);
     this.synchronizationThrottler.start();
+    this.subscriptionManager = new SubscriptionManager(this);
     this.packetOrderer = new PacketOrderer(this, opts.packetOrderingTimeout);
     if (opts.packetLogger.enabled) {
       this.packetLogger = new PacketLogger(opts.packetLogger);
@@ -187,13 +189,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     logger.error("MetaApi websocket client received an out of order packet type "
       + packet.get("type").asText() + " for account id " + accountId + ". Expected s/n " 
       + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber);
-    subscribe(accountId, instanceIndex).exceptionally(err -> {
-      if (!(err instanceof TimeoutException)) {
-        logger.error("MetaApi websocket client failed to receive subscribe response for account id "
-          + accountId + ":" + instanceIndex, err);
-      }
-      return null;
-    });
+    ensureSubscribe(accountId, instanceIndex);
   }
   
   /**
@@ -202,6 +198,14 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    */
   public void setUrl(String url) {
     this.url = url;
+  }
+  
+  /**
+   * Returns websocket client connection status
+   * @return websocket client connection status
+   */
+  public boolean isConnected() {
+    return connected;
   }
   
   /**
@@ -294,7 +298,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         socket.on("response", (Object[] args) -> {
           try {
             JsonNode data = jsonMapper.readTree(args[0].toString());
-            RequestResolve requestResolve = requestResolves.remove(data.get("requestId").asText());
+            RequestResolve requestResolve = data.has("requestId")
+              ? requestResolves.remove(data.get("requestId").asText())
+              : null;
             if (requestResolve != null) {
               CompletableFuture.runAsync(() -> {
                 requestResolve.future.complete(data);
@@ -753,6 +759,15 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   /**
+   * Creates a task that ensures the account gets subscribed to the server
+   * @param accountId account id to subscribe
+   * @param instanceIndex instance index, or {@code null}
+   */
+  public CompletableFuture<Void> ensureSubscribe(String accountId, Integer instanceIndex) {
+    return subscriptionManager.subscribe(accountId, instanceIndex);
+  }
+  
+  /**
    * Subscribes to the Metatrader terminal events (see https://metaapi.cloud/docs/client/websocket/api/subscribe/).
    * @param accountId id of the MetaTrader account to subscribe to
    * @return completable future which resolves when subscription started
@@ -998,6 +1013,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @return completable future which resolves when socket unsubscribed
    */
   public CompletableFuture<JsonNode> unsubscribe(String accountId) {
+    subscriptionManager.cancelAccount(accountId);
     ObjectNode request = jsonMapper.createObjectNode();
     request.put("type", "unsubscribe");
     return rpcRequest(accountId, request);
@@ -1082,6 +1098,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         isSocketConnecting = true;
         sessionId = RandomStringUtils.randomAlphanumeric(32);
         clientId = Math.random();
+        socket.close();
         socket.connect();
       }
     } catch (InterruptedException e) {
@@ -1112,7 +1129,24 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           try {
             return makeRequest(accountId, request, timeoutInSeconds);
           } catch (Throwable err) {
-            if (Arrays.asList(NotSynchronizedException.class, TimeoutException.class, NotConnectedException.class,
+            if (err instanceof TooManyRequestsException) {
+              int calcRetryCounter = retryCounter;
+              int calcRequestTime = 0;
+              while (calcRetryCounter < retries) {
+                calcRetryCounter++;
+                calcRequestTime += Math.min(Math.pow(2, calcRetryCounter) * minRetryDelayInSeconds,
+                  maxRetryDelayInSeconds) * 1000;
+              }
+              long retryTime = ((TooManyRequestsException) err).metadata.recommendedRetryTime.getDate().getTime();
+              if (Date.from(Instant.now()).getTime() + calcRequestTime > retryTime && retryCounter < retries) {
+                if (Date.from(Instant.now()).getTime() < retryTime) {
+                  Thread.sleep(retryTime - Date.from(Instant.now()).getTime());
+                }
+                retryCounter++;
+              } else {
+                throw err;
+              }
+            } else if (Arrays.asList(NotSynchronizedException.class, TimeoutException.class, NotConnectedException.class,
               InternalException.class).indexOf(err.getClass()) != -1 && retryCounter < retries) {
               Thread.sleep((long) (Math.min(Math.pow(2, retryCounter) * minRetryDelayInSeconds,
                 maxRetryDelayInSeconds) * 1000));
@@ -1223,16 +1257,21 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             });
           };
           
-          Runnable resetDisconnectTimer = () -> {
+          Runnable cancelDisconnectTimer = () -> {
             if (statusTimers.containsKey(instanceId)) {
               statusTimers.get(instanceId).cancel();
             }
+          };
+          
+          Runnable resetDisconnectTimer = () -> {
+            cancelDisconnectTimer.run();
             Timer timer = new Timer();
             statusTimers.put(instanceId, timer);
             timer.schedule(new TimerTask() {
               @Override
               public void run() {
                 onDisconnected.get();
+                subscriptionManager.onTimeout(accountId, instanceIndex);
               }
             }, resetDisconnectTimerTimeout);
           };
@@ -1250,13 +1289,15 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   return null;
                 }));
               }
+              subscriptionManager.cancelSubscribe(instanceId);
               CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
             }
           } else if (type.equals("disconnected")) {
-            if (statusTimers.containsKey(instanceId)) {
-              statusTimers.get(instanceId).cancel();
-            }
-            onDisconnected.get().get();
+            cancelDisconnectTimer.run();
+            CompletableFuture.allOf(
+              onDisconnected.get(),
+              subscriptionManager.onDisconnected(accountId, instanceIndex)
+            ).get();
           } else if (type.equals("synchronizationStarted")) {
             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
@@ -1474,18 +1515,16 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             }
             CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture<?>[0])).get();
           } else if (type.equals("status")) {
-            resetDisconnectTimer.run();
             if (!connectedHosts.containsKey(instanceId)) {
-              logger.info("It seems like we are not connected to a running API server yet, "
-                + "retrying subscription for account " + instanceId);
-              subscribe(accountId, instanceIndex).exceptionally(err -> {
-                if (!(err instanceof TimeoutException)) {
-                  logger.error("MetaApi websocket client failed to receive subscribe response "
-                    + "for account id " + instanceId, err);
-                }
-                return null;
-              });
+              if (statusTimers.containsKey(instanceId) && data.has("authenticated") && data.get("authenticated").asBoolean()) {
+                subscriptionManager.cancelSubscribe(instanceId);
+                Thread.sleep(10);
+                logger.info("It seems like we are not connected to a running API server yet, "
+                  + "retrying subscription for account " + instanceId);
+                ensureSubscribe(accountId, instanceIndex);
+              }
             } else if (connectedHosts.get(instanceId).equals(host)) {
+              resetDisconnectTimer.run();
               List<CompletableFuture<Void>> onBrokerConnectionStatusChangedFutures = new ArrayList<>();
               for (SynchronizationListener listener : listeners) {
                 onBrokerConnectionStatusChangedFutures.add(listener
@@ -1660,6 +1699,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   
   private CompletableFuture<Void> fireReconnected() {
     return CompletableFuture.runAsync(() -> {
+      subscriptionManager.onReconnected();
       reconnectListeners.forEach((action) -> {});
       for (ReconnectListener listener : reconnectListeners) {
         listener.onReconnected().join();

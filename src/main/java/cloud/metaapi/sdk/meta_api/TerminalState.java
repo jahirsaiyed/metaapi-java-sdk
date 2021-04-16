@@ -49,12 +49,7 @@ public class TerminalState extends SynchronizationListener {
    * @return true if MetaApi have connected to MetaTrader terminal
    */
   public boolean isConnected() {
-    for (State s : stateByInstanceIndex.values()) {
-      if (s.connected) {
-        return true;
-      }
-    }
-    return false;
+    return stateByInstanceIndex.values().stream().filter(state -> state.connected).findFirst().isPresent();
   }
   
   /**
@@ -62,12 +57,7 @@ public class TerminalState extends SynchronizationListener {
    * @return true if MetaApi have connected to MetaTrader terminal and MetaTrader terminal is connected to broker
    */
   public boolean isConnectedToBroker() {
-    for (State s : stateByInstanceIndex.values()) {
-      if (s.connectedToBroker) {
-        return true;
-      }
-    }
-    return false;
+    return stateByInstanceIndex.values().stream().filter(state -> state.connectedToBroker).findFirst().isPresent();
   }
   
   /**

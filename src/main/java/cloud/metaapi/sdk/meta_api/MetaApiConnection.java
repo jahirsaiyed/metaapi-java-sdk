@@ -26,7 +26,6 @@ import cloud.metaapi.sdk.clients.meta_api.TradeException;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketDataSubscription;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketDataUnsubscription;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketTradeOptions;
-import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderBook;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderCandle;
@@ -59,12 +58,6 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   private ConnectionHealthMonitor healthMonitor;
   private Map<String, Subscriptions> subscriptions = new HashMap<>();
   private Map<Integer, State> stateByInstanceIndex = new HashMap<>();
-  private boolean isSynchronized = false;
-  private boolean shouldRetrySubscribe = false;
-  private boolean isSubscribing = false;
-  private Timer subscribeTask = null;
-  private CompletableFuture<Boolean> subscribeFuture = null;
-  private long lastAccountReloadTime = 0;
   private boolean closed = false;
 
   private static class State {
@@ -655,39 +648,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when subscription is initiated
    */
   public CompletableFuture<Void> subscribe() {
-    if (!isSubscribing) {
-      isSubscribing = true;
-      shouldRetrySubscribe = true;
-      return CompletableFuture.runAsync(() -> {
-        int subscribeRetryIntervalInSeconds = 3;
-        while (shouldRetrySubscribe && !closed && account.getState() == DeploymentState.DEPLOYED) {
-          try {
-            websocketClient.subscribe(account.getId()).join();
-          } catch (Throwable error) {
-            //
-          }
-          int retryInterval = subscribeRetryIntervalInSeconds;
-          subscribeRetryIntervalInSeconds = Math.min(subscribeRetryIntervalInSeconds * 2, 300);
-          CompletableFuture<Boolean> subscribeFuture = new CompletableFuture<>();
-          subscribeTask = new Timer();
-          subscribeTask.schedule(new TimerTask() {
-            @Override
-            public void run() {
-              subscribeFuture.complete(true);
-            }
-          }, retryInterval * 1000);
-          this.subscribeFuture = subscribeFuture;
-          boolean result = this.subscribeFuture.join();
-          this.subscribeFuture = null;
-          if (!result) {
-            break;
-          }
-        }
-        isSubscribing = false;
-      });
-    } else {
-      return CompletableFuture.completedFuture(null);
-    }
+    return websocketClient.ensureSubscribe(account.getId(), null);
   }
   
   /**
@@ -924,12 +885,6 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   @Override
   public CompletableFuture<Void> onConnected(int instanceIndex, int replicas) {
     return CompletableFuture.runAsync(() -> {
-      if (subscribeFuture != null) {
-        subscribeFuture.complete(false);
-        subscribeTask.cancel();
-        subscribeTask = null;
-      }
-      shouldRetrySubscribe = false;
       String key = RandomStringUtils.randomAlphanumeric(32);
       State state = getState(instanceIndex);
       state.shouldSynchronize = key;
@@ -952,19 +907,13 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
 
   @Override
   public CompletableFuture<Void> onDisconnected(int instanceIndex) {
-    return CompletableFuture.runAsync(() -> {
-      State state = getState(instanceIndex);
-      state.lastDisconnectedSynchronizationId = state.lastSynchronizationId;
-      state.lastSynchronizationId = null;
-      state.shouldSynchronize = null;
-      state.isSynchronized = false;
-      state.disconnected = true;
-      if ((Instant.now().toEpochMilli() - 10 * 60 * 1000) > lastAccountReloadTime) {
-        account.reload().join();
-        lastAccountReloadTime = Instant.now().toEpochMilli();
-      }
-      subscribe();
-    });
+    State state = getState(instanceIndex);
+    state.lastDisconnectedSynchronizationId = state.lastSynchronizationId;
+    state.lastSynchronizationId = null;
+    state.shouldSynchronize = "";
+    state.isSynchronized = false;
+    state.disconnected = true;
+    return CompletableFuture.completedFuture(null);
   }
   
   @Override
@@ -985,11 +934,6 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   
   @Override
   public CompletableFuture<Void> onReconnected() {
-    if (subscribeFuture != null) {
-      subscribeFuture.complete(false);
-      subscribeTask.cancel();
-      subscribeTask = null;
-    }
     try {
       Thread.sleep(50);
     } catch (InterruptedException e) {
@@ -1000,9 +944,9 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   
   /**
    * Returns flag indicating status of state synchronization with MetaTrader terminal
-   * @param instanceIndex index of an account instance connected
+   * @param instanceIndex index of an account instance connected, or {@code null}
    * @param synchronizationId optional synchronization request id, last synchronization 
-   * request id will be used by default
+   * request id will be used by default, or {@code null}
    * @return completable future resolving with a flag indicating status of state synchronization
    * with MetaTrader terminal
    */
@@ -1068,15 +1012,16 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
           state = stateByInstanceIndex.values().stream()
             .filter(s -> s.instanceIndex == finalInstanceIndex).findFirst().orElse(null);
         }
-        if (!isSynchronized) throw new TimeoutException(
-          "Timed out waiting for account MetApi to synchronize to MetaTrader account " 
-          + account.getId() + ", synchronization id " + (
-            synchronizationId != null ? synchronizationId
-            : (state != null && state.lastSynchronizationId != null ? state.lastSynchronizationId 
-              : (state != null && state.lastDisconnectedSynchronizationId != null
-                ? state.lastDisconnectedSynchronizationId : null))
-          )
-        );
+        if (!isSynchronized) {
+          throw new TimeoutException("Timed out waiting for account MetApi to synchronize to MetaTrader account " 
+            + account.getId() + ", synchronization id " + (
+              synchronizationId != null ? synchronizationId
+              : (state != null && state.lastSynchronizationId != null ? state.lastSynchronizationId 
+                : (state != null && state.lastDisconnectedSynchronizationId != null
+                  ? state.lastDisconnectedSynchronizationId : null))
+            )
+          );
+        }
         websocketClient.waitSynchronized(account.getId(), instanceIndex, applicationPattern,
           (long) timeoutInSeconds).get();
       } catch (Exception e) {
@@ -1109,7 +1054,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return synchronization status
    */
   public boolean isSynchronized() {
-    return isSynchronized;
+    return stateByInstanceIndex.values().stream().filter(state -> state.isSynchronized).findFirst().isPresent();
   }
   
   /**
