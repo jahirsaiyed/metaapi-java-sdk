@@ -86,9 +86,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   private SynchronizationThrottler synchronizationThrottler;
   private SubscriptionManager subscriptionManager;
   private Map<String, Timer> statusTimers = new HashMap<>();
+  private boolean isReconnecting = false;
   private PacketOrderer packetOrderer;
   private PacketLogger packetLogger;
-  private boolean isSocketConnecting = false;
   private boolean connected = false;
   private String sessionId;
   private double clientId;
@@ -230,7 +230,6 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       socketOptions.reconnectionAttempts = Integer.MAX_VALUE;
       socketOptions.timeout = connectTimeout;
       socketOptions.transports = new String[] { WebSocket.NAME };
-      isSocketConnecting = true;
       try {
         socket = IO.socket(url, socketOptions);
         
@@ -247,9 +246,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         });
         
         socket.on(Socket.EVENT_CONNECT, (Object[] args) -> {
-          isSocketConnecting = false;
           CompletableFuture.runAsync(() -> {
             logger.info("MetaApi websocket client connected to the MetaApi server");
+            isReconnecting = false;
             if (!result.isDone()) result.complete(null);
             else fireReconnected().exceptionally((e) -> {
               logger.error("Failed to notify reconnect listeners", e);
@@ -260,6 +259,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         });
         socket.on(Socket.EVENT_RECONNECT, (Object[] args) -> {
           try {
+            isReconnecting = false;
             fireReconnected();
           } catch (Exception e) {
             logger.error("Failed to notify reconnect listeners", e);
@@ -268,10 +268,12 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         socket.on(Socket.EVENT_CONNECT_ERROR, (Object[] args) -> {
           Exception error = (Exception) args[0];
           logger.error("MetaApi websocket client connection error", error);
+          isReconnecting = false;
           if (!result.isDone()) result.completeExceptionally(error);
         });
         socket.on(Socket.EVENT_CONNECT_TIMEOUT, (Object[] args) -> {
           logger.info("MetaApi websocket client connection timeout");
+          isReconnecting = false;
           if (!result.isDone()) result.completeExceptionally(
             new TimeoutException("MetaApi websocket client connection timed out")
           );
@@ -280,6 +282,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           synchronizationThrottler.onDisconnect();
           String reason = (String) args[0];
           logger.info("MetaApi websocket client disconnected from the MetaApi server because of " + reason);
+          isReconnecting = false;
           try {
             reconnect();
           } catch (Exception e) {
@@ -289,6 +292,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         socket.on(Socket.EVENT_ERROR, (Object[] args) -> {
           Exception error = (Exception) args[0];
           logger.error("MetaApi websocket client error", error);
+          isReconnecting = false;
           try {
             reconnect();
           } catch (Exception e) {
@@ -375,10 +379,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    */
   public void close() {
     if (!connected) return;
-    isSocketConnecting = false;
     connected = false;
     socket.close();
-    for (RequestResolve resolve : requestResolves.values()) {
+    for (RequestResolve resolve : new ArrayList<>(requestResolves.values())) {
       resolve.future.completeExceptionally(new Exception("MetaApi connection closed"));
     }
     requestResolves.clear();
@@ -393,22 +396,19 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @return completable future resolving with account information
    */
   public CompletableFuture<MetatraderAccountInformation> getAccountInformation(String accountId) {
-    CompletableFuture<MetatraderAccountInformation> result = new CompletableFuture<>();
     ObjectNode request = JsonMapper.getInstance().createObjectNode();
     request.put("application", "RPC");
     request.put("type", "getAccountInformation");
-    rpcRequest(accountId, request).handle((response, error) -> {
-      if (error != null) return result.completeExceptionally(error);
+    return rpcRequest(accountId, request).thenApply(response -> {
       try {
-        return result.complete(jsonMapper.treeToValue(
+        return jsonMapper.treeToValue(
           response.get("accountInformation"),
           MetatraderAccountInformation.class
-        ));
+        );
       } catch (JsonProcessingException e) {
-        return result.completeExceptionally(e); 
+        throw new CompletionException(e); 
       }
     });
-    return result;
   }
   
   /**
@@ -1085,7 +1085,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   
   private CompletableFuture<Void> reconnect() throws InterruptedException, ExecutionException  {
     return CompletableFuture.runAsync(() -> {
-      while (!socket.connected() && !isSocketConnecting && connected) {
+      while (!socket.connected() && !isReconnecting && connected) {
         tryReconnect();
       }
     });
@@ -1094,11 +1094,11 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   private void tryReconnect() {
     try {
       Thread.sleep(1000);
-      if (!socket.connected() && !isSocketConnecting && connected) {
-        isSocketConnecting = true;
+      if (!socket.connected() && !isReconnecting && connected) {
         sessionId = RandomStringUtils.randomAlphanumeric(32);
         clientId = Math.random();
         socket.close();
+        isReconnecting = true;
         socket.connect();
       }
     } catch (InterruptedException e) {

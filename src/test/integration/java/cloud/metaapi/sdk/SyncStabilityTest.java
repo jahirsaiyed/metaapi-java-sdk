@@ -225,13 +225,7 @@ class SyncStabilityTest {
     };
   }
   
-  FakeServer fakeServer;
-  MetaApiWebsocketClient websocketClient;
-  MetaApiConnection connection;
-  MetaApi api;
-  
-  @BeforeAll
-  static void setUpBeforeClass() {
+  static void startWebsocketServer() {
     Configuration serverConfiguration = new Configuration();
     serverConfiguration.setPort(6785);
     serverConfiguration.setContext("/ws");
@@ -239,9 +233,23 @@ class SyncStabilityTest {
     server.start();
   }
   
+  static void stopWebsocketServer() {
+    server.stop();
+  }
+  
+  FakeServer fakeServer;
+  MetaApiWebsocketClient websocketClient;
+  MetaApiConnection connection;
+  MetaApi api;
+  
+  @BeforeAll
+  static void setUpBeforeClass() {
+    startWebsocketServer();
+  }
+  
   @AfterAll
   static void tearDownAfterClass() {
-    server.stop();
+    stopWebsocketServer();
   }
   
   @BeforeEach
@@ -250,7 +258,7 @@ class SyncStabilityTest {
     api = new MetaApi("token", new MetaApi.Options() {{
       application = "application";
       domain = "project-stock.agiliumlabs.cloud";
-      requestTimeout = 3;
+      requestTimeout = 10;
       retryOpts = new RetryOptions() {{
         retries = 3;
         minDelayInSeconds = 1;
@@ -440,5 +448,22 @@ class SyncStabilityTest {
     assertTrue(connection.isSynchronized());
     assertTrue(connection.getTerminalState().isConnected());
     assertTrue(connection.getTerminalState().isConnectedToBroker());
+  };
+  
+  @Test
+  void testReconnectsAfterServerRestarts() throws InterruptedException {
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    MetaApiConnection connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
+    for (int i = 0; i < 2; i++) {
+      fakeServer.statusTask.cancel();
+      stopWebsocketServer();
+      Thread.sleep(25000);
+      startWebsocketServer();
+      fakeServer.start();
+      Thread.sleep(200);
+    }
+    MetatraderAccountInformation response = connection.getAccountInformation().join();
+    Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
   };
 }
