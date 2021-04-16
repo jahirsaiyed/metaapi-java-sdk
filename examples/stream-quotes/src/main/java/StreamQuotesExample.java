@@ -121,12 +121,12 @@ public class StreamQuotesExample {
       // Add symbol to MarketWatch if not yet added and subscribe to market data
       // Please note that currently only MT5 G1 instances support extended subscription management
       // Other instances will only stream quotes in response
-      connection.subscribeToMarketData(symbol/*, Arrays.asList(
+      connection.subscribeToMarketData(symbol, Arrays.asList(
         new MarketDataSubscription() {{ type = "quotes"; intervalInMilliseconds = 5000; }},
         new MarketDataSubscription() {{ type = "candles"; timeframe = "1m"; intervalInMilliseconds = 10000; }},
         new MarketDataSubscription() {{ type = "ticks"; }},
         new MarketDataSubscription() {{ type = "marketDepth"; intervalInMilliseconds = 5000; }}
-      )*/).join();
+      )).join();
       
       System.out.println("Streaming " + symbol + " market data now...");
       
