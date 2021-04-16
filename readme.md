@@ -258,6 +258,8 @@ connection.waitSynchronized().join();
 // first, subscribe to market data
 connection.subscribeToMarketData("GBPUSD").join();
 
+// read symbols available
+System.out.println(connection.getSymbols().join());
 // read constract specification
 System.out.println(connection.getSymbolSpecification("GBPUSD").join());
 // read current price

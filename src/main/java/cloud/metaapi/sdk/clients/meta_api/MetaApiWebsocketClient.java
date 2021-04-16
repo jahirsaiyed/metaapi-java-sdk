@@ -885,6 +885,25 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   /**
+   * Retrieves symbols available on an account (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readSymbols/).
+   * @param accountId id of the MetaTrader account to retrieve symbols for
+   * @return completable future which resolves when symbols are retrieved
+   */
+  public CompletableFuture<List<String>> getSymbols(String accountId) {
+    ObjectNode request = jsonMapper.createObjectNode();
+    request.put("application", "RPC");
+    request.put("type", "getSymbols");
+    return rpcRequest(accountId, request).thenApply(response -> {
+      try {
+        return Arrays.asList(jsonMapper.treeToValue(response.get("symbols"), String[].class));
+      } catch (JsonProcessingException e) {
+        throw new CompletionException(e);
+      }
+    });
+  }
+  
+  /**
    * Retrieves specification for a symbol (see
    * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readSymbolSpecification/).
    * @param accountId id of the MetaTrader account to retrieve symbol specification for

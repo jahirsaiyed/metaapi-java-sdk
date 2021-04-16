@@ -789,6 +789,15 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   }
   
   /**
+   * Retrieves available symbols for an account (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readSymbols/).
+   * @return completable future which resolves with specification retrieved
+   */
+  public CompletableFuture<List<String>> getSymbols() {
+    return websocketClient.getSymbols(account.getId());
+  }
+  
+  /**
    * Retrieves specification for a symbol (see
    * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readSymbolSpecification/).
    * @param symbol symbol to retrieve specification for

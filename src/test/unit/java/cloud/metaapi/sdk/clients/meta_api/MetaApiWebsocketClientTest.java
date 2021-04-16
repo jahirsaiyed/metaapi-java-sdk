@@ -745,6 +745,33 @@ class MetaApiWebsocketClientTest {
   }
   
   /**
+   * Tests {@link MetaApiWebsocketClient#getSymbols}
+   */
+  @Test
+  void testRetrievesSymbolsFromApi() {
+    List<String> symbols = Arrays.asList("EURUSD");
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (  request.get("type").asText().equals("getSymbols")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("application").asText().equals("RPC")
+        ) {
+          ObjectNode response = jsonMapper.createObjectNode();
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("symbols", jsonMapper.valueToTree(symbols));
+          client.sendEvent("response", response.toString());
+        }
+      }
+    });
+    List<String> actual = client.getSymbols("accountId").join();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(symbols);
+  }
+  
+  /**
    * Tests {@link MetaApiWebsocketClient#getSymbolSpecification(String, String)}
    */
   @ParameterizedTest

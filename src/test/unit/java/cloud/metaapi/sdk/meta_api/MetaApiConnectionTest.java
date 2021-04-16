@@ -804,6 +804,18 @@ class MetaApiConnectionTest {
   }
   
   /**
+   * Tests {@link MetaApiConnection#getSymbols}
+   */
+  @Test
+  void testRetrievesSymbols() {
+    List<String> symbols = Arrays.asList("EURUSD");
+    Mockito.when(client.getSymbols("accountId"))
+      .thenReturn(CompletableFuture.completedFuture(symbols));
+    List<String> actual = api.getSymbols().join();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(symbols);
+  }
+  
+  /**
    * Tests {@link MetaApiConnection#getSymbolSpecification(String)}
    */
   @Test
