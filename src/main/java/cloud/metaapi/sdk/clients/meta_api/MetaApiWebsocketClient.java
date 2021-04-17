@@ -1138,7 +1138,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     return CompletableFuture.supplyAsync(() -> {
       if (!connected) {
         connect().join();
-      } else {
+      } else if (!connected) {
         connectFuture.join();
       }
       try {

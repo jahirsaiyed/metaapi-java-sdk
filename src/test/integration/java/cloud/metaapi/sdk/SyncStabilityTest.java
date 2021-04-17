@@ -61,6 +61,7 @@ class SyncStabilityTest {
     public Timer statusTask;
     public Consumer<SocketIOClient> connectListener = null;
     public Consumer<JsonNode> requestListener = null;
+    private boolean enableStatusTask = true;
     
     public CompletableFuture<Void> authenticate(JsonNode data) {
       return CompletableFuture.runAsync(() -> {
@@ -73,7 +74,7 @@ class SyncStabilityTest {
         socket.sendEvent("synchronization", response.toString());
       });
     }
-
+    
     public CompletableFuture<Void> emitStatus(String accountId) {
       return CompletableFuture.runAsync(() -> {
         ObjectNode response = jsonMapper.createObjectNode();
@@ -169,12 +170,16 @@ class SyncStabilityTest {
             Thread.sleep(200);
             respond(data).join();
             statusTask = new Timer();
-            statusTask.schedule(new TimerTask() {
-              @Override
-              public void run() {
-                emitStatus(data.get("accountId").asText());
-              }
-            }, 100, 100);
+            if (enableStatusTask) {
+              statusTask.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                  if (enableStatusTask) {
+                    emitStatus(data.get("accountId").asText());
+                  }
+                }
+              }, 100, 100);
+            }
             Thread.sleep(50);
             authenticate(data).join();
           } else if (type.equals("synchronize")) {
@@ -196,6 +201,15 @@ class SyncStabilityTest {
       requestListener = (data) -> {
         respond(data);
       };
+    }
+    
+    public void enableStatusTask() {
+      enableStatusTask = true;
+    }
+    
+    public void disableStatusTask() {
+      enableStatusTask = false;
+      statusTask.cancel();
     }
     
     public void start() {
@@ -226,8 +240,12 @@ class SyncStabilityTest {
   }
   
   static void startWebsocketServer() {
+    startWebsocketServer(6785);
+  }
+  
+  static void startWebsocketServer(int port) {
     Configuration serverConfiguration = new Configuration();
-    serverConfiguration.setPort(6785);
+    serverConfiguration.setPort(port);
     serverConfiguration.setContext("/ws");
     server = new SocketIOServer(serverConfiguration);
     server.start();
@@ -291,7 +309,7 @@ class SyncStabilityTest {
   
   @AfterEach
   void tearDown() throws IllegalAccessException, InterruptedException {
-    fakeServer.statusTask.cancel();
+    fakeServer.disableStatusTask();
     fakeServer.requestListener = null;
     fakeServer.connectListener = null;
     SubscriptionManager subscriptionManager = (SubscriptionManager) FieldUtils.readField(
@@ -331,12 +349,12 @@ class SyncStabilityTest {
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
-    fakeServer.statusTask.cancel();
+    fakeServer.disableStatusTask();
     fakeServer.connectListener = (connected) -> {
       connected.disconnect();
     };
     socket.disconnect();
-    Thread.sleep(8500);
+    Thread.sleep(10000);
     assertFalse(connection.isSynchronized());
     assertFalse(connection.getTerminalState().isConnected());
     assertFalse(connection.getTerminalState().isConnectedToBroker());
@@ -465,5 +483,29 @@ class SyncStabilityTest {
     }
     MetatraderAccountInformation response = connection.getAccountInformation().join();
     Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
+  };
+  
+  @Test
+  void testSynchronizesIfConnectingWhileServerIsRebooting() {
+    stopWebsocketServer();
+    startWebsocketServer(9000);
+    fakeServer.start();
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    Timer timer = new Timer();
+    timer.schedule(new TimerTask() {
+      @Override
+      public void run() {
+        stopWebsocketServer();
+        startWebsocketServer();
+        fakeServer.start();
+      }
+    }, 3000);
+    MetaApiConnection connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
+    MetatraderAccountInformation response = connection.getAccountInformation().join();
+    Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
+    assertTrue(connection.isSynchronized());
+    assertTrue(connection.getTerminalState().isConnected());
+    assertTrue(connection.getTerminalState().isConnectedToBroker());
   };
 }

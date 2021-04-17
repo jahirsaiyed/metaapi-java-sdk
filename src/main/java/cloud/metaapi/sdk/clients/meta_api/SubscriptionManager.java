@@ -59,7 +59,7 @@ public class SubscriptionManager {
       return CompletableFuture.runAsync(() -> {
         int subscribeRetryIntervalInSeconds = 3;
         while (subscriptions.get(instanceId).shouldRetry) {
-          CompletableFuture<Boolean> resolveSubscribe = new CompletableFuture<>(); // resolveSubscribe
+          CompletableFuture<Boolean> resolveSubscribe = new CompletableFuture<>();
           subscriptions.get(instanceId).task = new Task() {{ future = resolveSubscribe; }};
           subscribeTask(accountId, instanceIndex, subscribeRetryIntervalInSeconds, resolveSubscribe);
           subscriptions.get(instanceId).task.future.join();
