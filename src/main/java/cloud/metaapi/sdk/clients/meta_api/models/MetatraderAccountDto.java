@@ -102,4 +102,11 @@ public class MetatraderAccountDto {
      * Used to increase the reliability of the account. Allowed values are regular and high. Default is regular
      */
     public String reliability;
+    /**
+     * 3-character ISO currency code of the account base currency. Default value is USD.
+     * The setting is to be used for copy trading accounts which use national currencies
+     * only, such as some Brazilian brokers. You should not alter this setting unless you
+     * understand what you are doing.
+     */
+    public String baseCurrency;
 }

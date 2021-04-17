@@ -11,6 +11,7 @@
   - fixed error on socket reconnect
   - improved handling of too many requests error
   - added getSymbols RPC API
+  - added baseCurrency field to the MetaTraderAccount model
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
