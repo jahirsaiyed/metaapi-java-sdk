@@ -12,6 +12,7 @@
   - improved handling of too many requests error
   - added getSymbols RPC API
   - added baseCurrency field to the MetaTraderAccount model
+  - handle TooManyRequestsError in HTTP client
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
