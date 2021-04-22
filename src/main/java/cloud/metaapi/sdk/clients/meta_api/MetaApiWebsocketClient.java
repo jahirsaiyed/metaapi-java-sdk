@@ -209,6 +209,21 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   /**
+   * Returns the list of subscribed account ids
+   * @return list of subscribed account ids
+   */
+  public List<String> getSubscribedAccountIds() {
+    List<String> connectedIds = new ArrayList<>();
+    for (String instanceId : new ArrayList<>(connectedHosts.keySet())) {
+      String accountId = instanceId.split(":")[0];
+      if (!connectedIds.contains(accountId)) {
+        connectedIds.add(accountId);
+      }
+    }
+    return connectedIds;
+  }
+  
+  /**
    * Connects to MetaApi server via socket.io protocol
    * @return completable future which resolves when connection is established
    */

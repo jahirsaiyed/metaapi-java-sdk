@@ -1,6 +1,8 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -31,9 +33,8 @@ class SynchronizationThrottlerTest {
     websocketClient = Mockito.mock(MetaApiWebsocketClient.class);
     Mockito.when(websocketClient.rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    throttler = new SynchronizationThrottler(websocketClient, new SynchronizationThrottler.Options() {{
-      maxConcurrentSynchronizations = 2;
-    }});
+    Mockito.when(websocketClient.getSubscribedAccountIds()).thenReturn(provideListOfSize(11));
+    throttler = new SynchronizationThrottler(websocketClient, new SynchronizationThrottler.Options());
     throttler.start();
   }
   
@@ -92,6 +93,48 @@ class SynchronizationThrottlerTest {
     Thread.sleep(20);
     Mockito.verify(websocketClient, Mockito.times(3)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
   }
+  
+  /**
+   * Tests {@link SynchronizationThrottler#scheduleSynchronize}
+   */
+  @Test
+  void testIncreasesSlotAmountWithMoreSubscribedAccounts() {
+    Mockito.when(websocketClient.getSubscribedAccountIds()).thenReturn(provideListOfSize(21));
+    ObjectNode request1 = provideRequest("test1");
+    ObjectNode request2 = provideRequest("test2");
+    ObjectNode request3 = provideRequest("test3");
+    throttler.scheduleSynchronize("accountId1", request1).join();
+    throttler.scheduleSynchronize("accountId2", request2).join();
+    throttler.scheduleSynchronize("accountId3", request3).join();
+    Mockito.verify(websocketClient).rpcRequest(Mockito.eq("accountId1"), Mockito.eq(request1), Mockito.any());
+    Mockito.verify(websocketClient).rpcRequest(Mockito.eq("accountId2"), Mockito.eq(request2), Mockito.any());
+    Mockito.verify(websocketClient).rpcRequest(Mockito.eq("accountId3"), Mockito.eq(request3), Mockito.any());
+    Mockito.verify(websocketClient, Mockito.times(3)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+  };
+
+  /**
+   * Tests {@link SynchronizationThrottler#scheduleSynchronize}
+   */
+  @Test
+  void testSetsHardLimitForConcurrentSynchronizationsViaOptions() throws InterruptedException {
+    Mockito.when(websocketClient.getSubscribedAccountIds()).thenReturn(provideListOfSize(21));
+    throttler = new SynchronizationThrottler(websocketClient, new SynchronizationThrottler.Options() {{
+      maxConcurrentSynchronizations = 2;
+    }});
+    ObjectNode request1 = provideRequest("test1");
+    ObjectNode request2 = provideRequest("test2");
+    throttler.scheduleSynchronize("accountId1", request1).join();
+    throttler.scheduleSynchronize("accountId2", request2).join();
+    Mockito.verify(websocketClient).rpcRequest(Mockito.eq("accountId1"), Mockito.eq(request1), Mockito.any());
+    Mockito.verify(websocketClient).rpcRequest(Mockito.eq("accountId2"), Mockito.eq(request2), Mockito.any());
+    ObjectNode request3 = provideRequest("test3");
+    throttler.scheduleSynchronize("accountId3", request3);
+    Thread.sleep(50);
+    Mockito.verify(websocketClient, Mockito.times(2)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+    throttler.removeSynchronizationId("test1");
+    Thread.sleep(50);
+    Mockito.verify(websocketClient, Mockito.times(3)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+  };
   
   /**
    * Tests {@link SynchronizationThrottler#scheduleSynchronize(String, ObjectNode)}
@@ -254,6 +297,14 @@ class SynchronizationThrottlerTest {
     ObjectNode request = provideRequest(requestId);
     request.put("instanceIndex", instanceIndex);
     return request;
+  }
+  
+  private List<String> provideListOfSize(int size) {
+    List<String> result = new ArrayList<>();
+    for (int i = 0; i < size; ++i) {
+      result.add(String.valueOf(i));
+    }
+    return result;
   }
   
   private void tick(long milliseconds) throws InterruptedException {

@@ -39,15 +39,17 @@ public class SynchronizationThrottler {
    */
   public static class Options {
     /**
-     * Amount of maximum allowed concurrent synchronizations
+     * Amount of maximum allowed concurrent synchronizations. If 0, it is calculated
+     * automatically
      */
-    public int maxConcurrentSynchronizations = 10;
+    public int maxConcurrentSynchronizations = 0;
     /**
      * Allowed time for a synchronization in queue
      */
     public int queueTimeoutInSeconds = 300;
     /**
-     * Time after which a synchronization slot is freed to be used by another synchronization
+     * Time after which a synchronization slot is freed to be used by another
+     * synchronization
      */
     public int synchronizationTimeoutInSeconds = 10;
   }
@@ -142,6 +144,16 @@ public class SynchronizationThrottler {
   }
   
   /**
+   * Returns the amount of maximum allowed concurrent synchronizations
+   * @return maximum allowed concurrent synchronizations
+   */
+  public int getMaxConcurrentSynchronizations() {
+    int calculatedMax = Math.max((int) Math.ceil(client.getSubscribedAccountIds().size() / 10.0), 1);
+    return maxConcurrentSynchronizations != 0 ? Math.min(calculatedMax, maxConcurrentSynchronizations) :
+      calculatedMax;
+  }
+  
+  /**
    * Returns flag whether there are free slots for synchronization requests
    * @return Flag whether there are free slots for synchronization requests
    */
@@ -153,7 +165,7 @@ public class SynchronizationThrottler {
         synchronizingAccounts.add(accountData.accountId);
       }
     }
-    return synchronizingAccounts.size() < maxConcurrentSynchronizations;
+    return synchronizingAccounts.size() < getMaxConcurrentSynchronizations();
   }
   
   /**
@@ -208,7 +220,8 @@ public class SynchronizationThrottler {
       if (!isProcessingQueue) {
         isProcessingQueue = true;
         try {
-          while (synchronizationQueue.size() != 0 && synchronizationIds.size() < maxConcurrentSynchronizations) {
+          while (synchronizationQueue.size() != 0
+            && synchronizationIds.size() < getMaxConcurrentSynchronizations()) {
             synchronizationQueue.get(0).future.join();
             synchronizationQueue.remove(0);
           }
