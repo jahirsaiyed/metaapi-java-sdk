@@ -240,7 +240,7 @@ class SyncStabilityTest {
   }
   
   static void startWebsocketServer() {
-    startWebsocketServer(6785);
+    startWebsocketServer(6786);
   }
   
   static void startWebsocketServer(int port) {
@@ -300,7 +300,7 @@ class SyncStabilityTest {
     }})).when(accountClient).getAccount(Mockito.any());
     FieldUtils.writeField(api.getMetatraderAccountApi(), "metatraderAccountClient", accountClient, true);
     websocketClient = (MetaApiWebsocketClient) FieldUtils.readField(api, "metaApiWebsocketClient", true);
-    websocketClient.setUrl("http://localhost:6785");
+    websocketClient.setUrl("http://localhost:6786");
     FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 7500, true);
     fakeServer = new FakeServer();
     fakeServer.start();
