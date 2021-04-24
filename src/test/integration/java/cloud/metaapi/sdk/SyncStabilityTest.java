@@ -10,9 +10,7 @@ import java.util.function.Consumer;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Lists;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -53,6 +51,7 @@ class SyncStabilityTest {
     leverage = 100;
     marginLevel = 3967.58283542;
   }};
+  static int port = 6786;
   static SocketIOServer server;
   static SocketIOClient socket;
   
@@ -240,7 +239,7 @@ class SyncStabilityTest {
   }
   
   static void startWebsocketServer() {
-    startWebsocketServer(6786);
+    startWebsocketServer(port);
   }
   
   static void startWebsocketServer(int port) {
@@ -260,19 +259,10 @@ class SyncStabilityTest {
   MetaApiConnection connection;
   MetaApi api;
   
-  @BeforeAll
-  static void setUpBeforeClass() throws Exception {
-    startWebsocketServer();
-  }
-  
-  @AfterAll
-  static void tearDownAfterClass() {
-    stopWebsocketServer();
-  }
-  
   @BeforeEach
   void setUp() throws Exception {
-    Thread.sleep(5000);
+    port++;
+    startWebsocketServer();
     api = new MetaApi("token", new MetaApi.Options() {{
       application = "application";
       domain = "project-stock.agiliumlabs.cloud";
@@ -300,7 +290,7 @@ class SyncStabilityTest {
     }})).when(accountClient).getAccount(Mockito.any());
     FieldUtils.writeField(api.getMetatraderAccountApi(), "metatraderAccountClient", accountClient, true);
     websocketClient = (MetaApiWebsocketClient) FieldUtils.readField(api, "metaApiWebsocketClient", true);
-    websocketClient.setUrl("http://localhost:6786");
+    websocketClient.setUrl("http://localhost:" + port);
     FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 7500, true);
     fakeServer = new FakeServer();
     fakeServer.start();
@@ -319,6 +309,7 @@ class SyncStabilityTest {
     socket.disconnect();
     server.removeAllListeners("connect");
     server.removeAllListeners("request");
+    stopWebsocketServer();
   }
   
   @Test
