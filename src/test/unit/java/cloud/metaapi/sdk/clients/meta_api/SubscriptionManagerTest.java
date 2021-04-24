@@ -198,11 +198,11 @@ class SubscriptionManagerTest {
       }
     });
     manager.subscribe("accountId", null);
-    Thread.sleep(200);
+    Thread.sleep(250);
     manager.cancelSubscribe("accountId:0");
-    Thread.sleep(200);
+    Thread.sleep(250);
     manager.subscribe("accountId", null);
-    Thread.sleep(200);
+    Thread.sleep(250);
     Mockito.verify(client, Mockito.times(2)).subscribe(Mockito.any(), Mockito.any());
   };
 }
