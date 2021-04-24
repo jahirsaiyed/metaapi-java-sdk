@@ -177,15 +177,16 @@ class SynchronizationThrottlerTest {
     throttler.scheduleSynchronize("accountId1", provideRequest("test1")).join();
     throttler.scheduleSynchronize("accountId2", provideRequest("test2")).join();
     throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
-    Thread.sleep(200);
+    Thread.sleep(50);
     Mockito.verify(websocketClient, Mockito.times(2)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
     tick(11000);
     Mockito.verify(websocketClient, Mockito.times(3)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
     tick(11000);
     throttler.updateSynchronizationId("test1");
     throttler.scheduleSynchronize("accountId4", provideRequest("test4"));
+    Thread.sleep(50);
     throttler.scheduleSynchronize("accountId5", provideRequest("test5"));
-    Thread.sleep(200);
+    Thread.sleep(50);
     Mockito.verify(websocketClient, Mockito.times(4)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
   }
   
@@ -246,11 +247,9 @@ class SynchronizationThrottlerTest {
     throttler.scheduleSynchronize("accountId5", provideRequest("test9"));
     Thread.sleep(20);
     throttler.scheduleSynchronize("accountId3", provideRequest("test10", 0));
-    tick(11000);
-    tick(11000);
-    tick(11000);
-    tick(11000);
-    tick(11000);
+    for (int i = 0; i < 8; ++i) {
+      tick(6625);
+    }
     Mockito.verify(websocketClient, Mockito.times(6)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
     Mockito.verify(websocketClient).rpcRequest("accountId1", provideRequest("test1"), null);
     Mockito.verify(websocketClient).rpcRequest("accountId2", provideRequest("test2"), null);

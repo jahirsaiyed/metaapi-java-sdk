@@ -261,7 +261,7 @@ class SyncStabilityTest {
   MetaApi api;
   
   @BeforeAll
-  static void setUpBeforeClass() {
+  static void setUpBeforeClass() throws Exception {
     startWebsocketServer();
   }
   
@@ -473,14 +473,12 @@ class SyncStabilityTest {
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
-    for (int i = 0; i < 2; i++) {
-      fakeServer.statusTask.cancel();
-      stopWebsocketServer();
-      Thread.sleep(25000);
-      startWebsocketServer();
-      fakeServer.start();
-      Thread.sleep(200);
-    }
+    fakeServer.statusTask.cancel();
+    stopWebsocketServer();
+    Thread.sleep(60000);
+    startWebsocketServer();
+    fakeServer.start();
+    Thread.sleep(200);
     MetatraderAccountInformation response = connection.getAccountInformation().join();
     Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
   };
@@ -496,12 +494,17 @@ class SyncStabilityTest {
       @Override
       public void run() {
         stopWebsocketServer();
+        try {
+          Thread.sleep(60000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
         startWebsocketServer();
         fakeServer.start();
       }
     }, 3000);
     MetaApiConnection connection = account.connect().join();
-    connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
+    connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 120; }}).join();
     MetatraderAccountInformation response = connection.getAccountInformation().join();
     Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
     assertTrue(connection.isSynchronized());

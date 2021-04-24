@@ -1354,6 +1354,15 @@ class MetaApiWebsocketClientTest {
       .thenReturn(CompletableFuture.completedFuture(null));
     Mockito.when(listener.onBrokerConnectionStatusChanged(Mockito.anyInt(), Mockito.anyBoolean()))
       .thenReturn(CompletableFuture.completedFuture(null));
+    CompletableFuture<Void> onHealthStatusFuture = new CompletableFuture<>();
+    Mockito.when(listener.onHealthStatus(Mockito.anyInt(), Mockito.any()))
+      .thenAnswer(new Answer<CompletableFuture<Void>>() {
+        @Override
+        public CompletableFuture<Void> answer(InvocationOnMock invocation) {
+          onHealthStatusFuture.complete(null);
+          return onHealthStatusFuture;
+        }
+      });
     client.addSynchronizationListener("accountId", listener);
     ObjectNode authPacket = jsonMapper.createObjectNode();
     authPacket.put("type", "authenticated");
@@ -1362,6 +1371,7 @@ class MetaApiWebsocketClientTest {
     authPacket.put("host", "ps-mpa-1");
     authPacket.put("instanceIndex", 1);
     socket.sendEvent("synchronization", authPacket.toString());
+    Thread.sleep(200);
     ObjectNode statusPacket = jsonMapper.createObjectNode();
     statusPacket.put("type", "status");
     statusPacket.put("accountId", "accountId");
@@ -1372,6 +1382,7 @@ class MetaApiWebsocketClientTest {
     statusPacket.put("instanceIndex", 1);
     socket.sendEvent("synchronization", statusPacket.toString());
     Thread.sleep(200);
+    onHealthStatusFuture.join();
     Mockito.verify(listener).onHealthStatus(Mockito.eq(1), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(healthStatus);
       return true;
@@ -1410,13 +1421,22 @@ class MetaApiWebsocketClientTest {
     client.addSynchronizationListener("accountId", listener);
     Mockito.when(clientSyncThrottler.getActiveSynchronizationIds())
       .thenReturn(Lists.list("synchronizationId"));
+    CompletableFuture<Void> onAccountInformationUpdatedFuture = new CompletableFuture<>();
+    Mockito.when(listener.onAccountInformationUpdated(Mockito.anyInt(), Mockito.any()))
+      .thenAnswer(new Answer<CompletableFuture<Void>>() {
+      @Override
+      public CompletableFuture<Void> answer(InvocationOnMock invocation) {
+        onAccountInformationUpdatedFuture.complete(null);
+        return onAccountInformationUpdatedFuture;
+      }
+    });
     ObjectNode packet1 = jsonMapper.createObjectNode();
     packet1.put("type", "accountInformation");
     packet1.put("accountId", "accountId");
     packet1.set("accountInformation", jsonMapper.createObjectNode());
     packet1.put("instanceIndex", 1);
     socket.sendEvent("synchronization", packet1.toString());
-    Thread.sleep(200);
+    onAccountInformationUpdatedFuture.join();
     Mockito.verify(listener, Mockito.times(1)).onAccountInformationUpdated(Mockito.anyInt(), Mockito.any());
     ObjectNode packet2 = jsonMapper.createObjectNode();
     packet2.put("type", "accountInformation");
@@ -1427,6 +1447,15 @@ class MetaApiWebsocketClientTest {
     socket.sendEvent("synchronization", packet2.toString());
     Thread.sleep(200);
     Mockito.verify(listener, Mockito.times(1)).onAccountInformationUpdated(Mockito.anyInt(), Mockito.any());
+    CompletableFuture<Void> onAccountInformationUpdatedFuture2 = new CompletableFuture<>();
+    Mockito.when(listener.onAccountInformationUpdated(Mockito.anyInt(), Mockito.any()))
+      .thenAnswer(new Answer<CompletableFuture<Void>>() {
+      @Override
+      public CompletableFuture<Void> answer(InvocationOnMock invocation) {
+        onAccountInformationUpdatedFuture2.complete(null);
+        return onAccountInformationUpdatedFuture2;
+      }
+    });
     ObjectNode packet3 = jsonMapper.createObjectNode();
     packet3.put("type", "accountInformation");
     packet3.put("accountId", "accountId");
@@ -1434,7 +1463,7 @@ class MetaApiWebsocketClientTest {
     packet3.put("instanceIndex", 1);
     packet3.put("synchronizationId", "synchronizationId");
     socket.sendEvent("synchronization", packet3.toString());
-    Thread.sleep(200);
+    onAccountInformationUpdatedFuture2.join();
     Mockito.verify(listener, Mockito.times(2)).onAccountInformationUpdated(Mockito.anyInt(), Mockito.any());
   }
   
@@ -2130,7 +2159,9 @@ class MetaApiWebsocketClientTest {
       @Override
       public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
         JsonNode request = jsonMapper.valueToTree(data);
-        timestamps = jsonMapper.treeToValue(request.get("timestamps"), ResponseTimestamps.class);
+        if (timestamps == null) {
+          timestamps = jsonMapper.treeToValue(request.get("timestamps"), ResponseTimestamps.class);
+        }
         if (  request.get("type").asText().equals("getSymbolPrice")
            && request.get("accountId").asText().equals("accountId")
            && request.get("symbol").asText().equals("AUDNZD")

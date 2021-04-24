@@ -125,15 +125,15 @@ public class HistoryFileManagerTest {
   void testStartsAndStopsJob() throws InterruptedException {
     Mockito.doReturn(CompletableFuture.completedFuture(null)).when(fileManager).updateDiskStorage();
     fileManager.startUpdateJob();
-    Thread.sleep(510);
+    Thread.sleep(610);
     Mockito.verify(fileManager, Mockito.times(1)).updateDiskStorage();
-    Thread.sleep(510);
+    Thread.sleep(610);
     Mockito.verify(fileManager, Mockito.times(2)).updateDiskStorage();
     fileManager.stopUpdateJob();
-    Thread.sleep(510);
+    Thread.sleep(610);
     Mockito.verify(fileManager, Mockito.times(2)).updateDiskStorage();
     fileManager.startUpdateJob();
-    Thread.sleep(510);
+    Thread.sleep(610);
     Mockito.verify(fileManager, Mockito.times(3)).updateDiskStorage();
     fileManager.stopUpdateJob();
   }
