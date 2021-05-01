@@ -318,6 +318,7 @@ public class TerminalState extends SynchronizationListener {
         double profitSum = 0;
         for (MetatraderPosition position : state.positions) profitSum += position.unrealizedProfit;
         state.accountInformation.equity = state.accountInformation.balance + profitSum;
+        state.accountInformation.equity = Math.round(state.accountInformation.equity * 100.0) / 100.0;
       } else {
         state.accountInformation.equity = equity != null ? equity : state.accountInformation.equity;
       }
@@ -331,11 +332,15 @@ public class TerminalState extends SynchronizationListener {
   private void updatePositionProfits(MetatraderPosition position, MetatraderSymbolPrice price) {
     Optional<MetatraderSymbolSpecification> specification = getSpecification(position.symbol);
     if (specification.isPresent()) {
+      if (position.profit != null) {
+        position.profit = Math.round(position.profit * 100.0) / 100.0;
+      }
       if (position.unrealizedProfit == null || position.realizedProfit == null) {
         position.unrealizedProfit = 
           (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
           (position.currentPrice - position.openPrice) * position.currentTickValue *
           position.volume / specification.get().tickSize;
+        position.unrealizedProfit = Math.round(position.unrealizedProfit * 100.0) / 100.0;
         position.realizedProfit = position.profit - position.unrealizedProfit;
       }
       double newPositionPrice = (position.type == PositionType.POSITION_TYPE_BUY ? price.bid : price.ask);
@@ -345,8 +350,10 @@ public class TerminalState extends SynchronizationListener {
       double unrealizedProfit = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
         (newPositionPrice - position.openPrice) * currentTickValue *
         position.volume / specification.get().tickSize;
+      unrealizedProfit = Math.round(unrealizedProfit * 100.0) / 100.0;
       position.unrealizedProfit = unrealizedProfit;
       position.profit = position.unrealizedProfit + position.realizedProfit;
+      position.profit = Math.round(position.profit * 100.0) / 100.0;
       position.currentPrice = newPositionPrice;
       position.currentTickValue = currentTickValue;
     }

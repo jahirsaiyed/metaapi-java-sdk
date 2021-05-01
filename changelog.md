@@ -14,6 +14,7 @@
   - added baseCurrency field to the MetaTraderAccount model
   - handle TooManyRequestsError in HTTP client
   - limit max concurrent synchronizations based on the number of subscribed accounts
+  - implement proper rounding for position profits and account equity
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

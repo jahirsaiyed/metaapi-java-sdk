@@ -80,13 +80,13 @@ class TerminalStateTest {
   @Test
   void testReturnsPositions() {
     assertTrue(state.getPositions().isEmpty());
-    state.onPositionUpdated(1, new MetatraderPosition() {{ id = "1"; profit = 10; }});
+    state.onPositionUpdated(1, new MetatraderPosition() {{ id = "1"; profit = 10.0; }});
     state.onPositionUpdated(1, new MetatraderPosition() {{ id = "2"; }});
-    state.onPositionUpdated(1, new MetatraderPosition() {{ id = "1"; profit = 11; }});
+    state.onPositionUpdated(1, new MetatraderPosition() {{ id = "1"; profit = 11.0; }});
     state.onPositionRemoved(1, "2");
     assertEquals(1, state.getPositions().size());
     assertThat(state.getPositions()).usingRecursiveComparison().isEqualTo(Lists.list(
-      new MetatraderPosition() {{ id = "1"; profit = 11; }}
+      new MetatraderPosition() {{ id = "1"; profit = 11.0; }}
     ));
   }
   
@@ -172,7 +172,7 @@ class TerminalStateTest {
       currentPrice = 9;
       currentTickValue = 0.5;
       openPrice = 8;
-      profit = 100;
+      profit = 100.0;
       volume = 2;
     }}));
     state.onPositionUpdated(1, new MetatraderPosition() {{
@@ -182,7 +182,7 @@ class TerminalStateTest {
       currentPrice = 9;
       currentTickValue = 0.5;
       openPrice = 8;
-      profit = 100;
+      profit = 100.0;
       volume = 2;
     }});
     state.onSymbolSpecificationUpdated(1, new MetatraderSymbolSpecification() {{ 

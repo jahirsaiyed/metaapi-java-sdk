@@ -78,7 +78,7 @@ public class MetatraderPosition {
     /**
      * Position cumulative profit
      */
-    public double profit;
+    public Double profit;
     /**
      * Position comment or {@code null}. The sum of the line lengths of the comment and 
      * the clientId must be less than or equal to 26. For more information see
