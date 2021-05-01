@@ -188,10 +188,12 @@ class TerminalStateTest {
     state.onSymbolSpecificationUpdated(1, new MetatraderSymbolSpecification() {{ 
       symbol = "EURUSD";
       tickSize = 0.01;
+      digits = 5;
     }});
     state.onSymbolSpecificationUpdated(1, new MetatraderSymbolSpecification() {{ 
       symbol = "AUDUSD";
       tickSize = 0.01;
+      digits = 5;
     }});
     state.onSymbolPricesUpdated(1, Arrays.asList(new MetatraderSymbolPrice() {{
       time = new IsoTime();

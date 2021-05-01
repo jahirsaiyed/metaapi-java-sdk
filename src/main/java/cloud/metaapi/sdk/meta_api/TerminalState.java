@@ -316,7 +316,9 @@ public class TerminalState extends SynchronizationListener {
     if (state.accountInformation != null) {
       if (state.positionsInitialized && pricesInitialized) {
         double profitSum = 0;
-        for (MetatraderPosition position : state.positions) profitSum += position.unrealizedProfit;
+        for (MetatraderPosition p : state.positions) {
+          profitSum += Math.round((p.unrealizedProfit != null ? p.unrealizedProfit : 0) * 100.0) / 100.0;
+        }
         state.accountInformation.equity = state.accountInformation.balance + profitSum;
         state.accountInformation.equity = Math.round(state.accountInformation.equity * 100.0) / 100.0;
       } else {
@@ -332,15 +334,16 @@ public class TerminalState extends SynchronizationListener {
   private void updatePositionProfits(MetatraderPosition position, MetatraderSymbolPrice price) {
     Optional<MetatraderSymbolSpecification> specification = getSpecification(position.symbol);
     if (specification.isPresent()) {
+      double multiplier = Math.pow(10, specification.get().digits);
       if (position.profit != null) {
-        position.profit = Math.round(position.profit * 100.0) / 100.0;
+        position.profit = Math.round(position.profit * multiplier) / multiplier;
       }
       if (position.unrealizedProfit == null || position.realizedProfit == null) {
         position.unrealizedProfit = 
           (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
           (position.currentPrice - position.openPrice) * position.currentTickValue *
           position.volume / specification.get().tickSize;
-        position.unrealizedProfit = Math.round(position.unrealizedProfit * 100.0) / 100.0;
+        position.unrealizedProfit = Math.round(position.unrealizedProfit * multiplier) / multiplier;
         position.realizedProfit = position.profit - position.unrealizedProfit;
       }
       double newPositionPrice = (position.type == PositionType.POSITION_TYPE_BUY ? price.bid : price.ask);
@@ -350,10 +353,10 @@ public class TerminalState extends SynchronizationListener {
       double unrealizedProfit = (position.type == PositionType.POSITION_TYPE_BUY ? 1 : -1) *
         (newPositionPrice - position.openPrice) * currentTickValue *
         position.volume / specification.get().tickSize;
-      unrealizedProfit = Math.round(unrealizedProfit * 100.0) / 100.0;
+      unrealizedProfit = Math.round(unrealizedProfit * multiplier) / multiplier;
       position.unrealizedProfit = unrealizedProfit;
       position.profit = position.unrealizedProfit + position.realizedProfit;
-      position.profit = Math.round(position.profit * 100.0) / 100.0;
+      position.profit = Math.round(position.profit * multiplier) / multiplier;
       position.currentPrice = newPositionPrice;
       position.currentTickValue = currentTickValue;
     }
