@@ -316,8 +316,10 @@ public class TerminalState extends SynchronizationListener {
     if (state.accountInformation != null) {
       if (state.positionsInitialized && pricesInitialized) {
         double profitSum = 0;
+        String platform = state.accountInformation.platform;
         for (MetatraderPosition p : state.positions) {
-          profitSum += Math.round((p.unrealizedProfit != null ? p.unrealizedProfit : 0) * 100.0) / 100.0;
+          double profit = (platform != null && platform.equals("mt5")) ? p.unrealizedProfit : p.profit;
+          profitSum += Math.round((p.unrealizedProfit != null ? profit : 0) * 100.0) / 100.0;
         }
         state.accountInformation.equity = state.accountInformation.balance + profitSum;
         state.accountInformation.equity = Math.round(state.accountInformation.equity * 100.0) / 100.0;
