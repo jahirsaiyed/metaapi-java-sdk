@@ -17,6 +17,7 @@
   - implement proper rounding for position profits and account equity
   - breaking change: refactored specifications updated events
   - breaking change: removed expert advisor API
+  - fix equity calculation
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
