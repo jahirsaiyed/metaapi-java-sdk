@@ -51,6 +51,14 @@ public class IsoTime {
     }
     
     /**
+     * Constructs wrapper from {@link Instant} object
+     * @param instant instant object
+     */
+    public IsoTime(Instant instant) {
+        this(Date.from(instant));
+    }
+    
+    /**
      * Sets wrapper time from ISO format time
      * @param isoTime ISO format time
      */

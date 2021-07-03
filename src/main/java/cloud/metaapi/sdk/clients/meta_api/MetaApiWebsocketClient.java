@@ -69,33 +69,36 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   
   private String url;
   private String token;
-  private Socket socket;
   private String application;
   private long requestTimeout;
   private long connectTimeout;
   private int retries;
   private int minRetryDelayInSeconds;
   private int maxRetryDelayInSeconds;
+  private int maxAccountsPerInstance = 100;
+  private long subscribeCooldownInSeconds;
   private ObjectMapper jsonMapper = JsonMapper.getInstance();
-  private Map<String, RequestResolve> requestResolves = new HashMap<>();
   private Map<String, List<SynchronizationListener>> synchronizationListeners = new HashMap<>();
   private List<LatencyListener> latencyListeners = new LinkedList<>();
-  private List<ReconnectListener> reconnectListeners = new LinkedList<>();
+  private List<ReconnectListenerItem> reconnectListeners = new LinkedList<>();
   private Map<String, String> connectedHosts = new HashMap<>();
-  private CompletableFuture<Void> connectFuture = null;
-  private SynchronizationThrottler synchronizationThrottler;
+  protected List<SocketInstance> socketInstances = new ArrayList<>();
+  protected Map<String, Integer> socketInstancesByAccounts = new HashMap<>();
+  private SynchronizationThrottler.Options synchronizationThrottlerOpts;
   private SubscriptionManager subscriptionManager;
   private Map<String, Timer> statusTimers = new HashMap<>();
-  private boolean isReconnecting = false;
+  private SubscribeLock subscribeLock;
   private PacketOrderer packetOrderer;
   private PacketLogger packetLogger;
-  private boolean connected = false;
-  private String sessionId;
-  private double clientId;
   
   private static class RequestResolve {
     public CompletableFuture<JsonNode> future;
     public String type;
+  }
+  
+  private static class ReconnectListenerItem {
+    public String accountId;
+    public ReconnectListener listener;
   }
   
   /**
@@ -165,8 +168,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     this.retries = opts.retryOpts.retries;
     this.minRetryDelayInSeconds = opts.retryOpts.minDelayInSeconds;
     this.maxRetryDelayInSeconds = opts.retryOpts.maxDelayInSeconds;
-    this.synchronizationThrottler = new SynchronizationThrottler(this, opts.synchronizationThrottler);
-    this.synchronizationThrottler.start();
+    this.subscribeCooldownInSeconds = opts.retryOpts.subscribeCooldownInSeconds;
+    this.synchronizationThrottlerOpts = opts.synchronizationThrottler;
     this.subscriptionManager = new SubscriptionManager(this);
     this.packetOrderer = new PacketOrderer(this, opts.packetOrderingTimeout);
     if (opts.packetLogger.enabled) {
@@ -201,11 +204,19 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   /**
-   * Returns websocket client connection status
-   * @return websocket client connection status
+   * Returns the list of socket instance dictionaries
+   * @return list of socket instance dictionaries
    */
-  public boolean isConnected() {
-    return connected;
+  public List<SocketInstance> getSocketInstances() {
+    return socketInstances;
+  }
+  
+  /**
+   * Returns the map of socket instances by account ids
+   * @return map of socket instances by account ids
+   */
+  public Map<String, Integer> getSocketInstancesByAccounts() {
+    return socketInstancesByAccounts;
   }
   
   /**
@@ -213,14 +224,104 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @return list of subscribed account ids
    */
   public List<String> getSubscribedAccountIds() {
+    return getSubscribedAccountIds(null);
+  }
+  
+  /**
+   * Returns the list of subscribed account ids
+   * @param socketInstanceIndex socket instance index
+   * @return list of subscribed account ids
+   */
+  public List<String> getSubscribedAccountIds(Integer socketInstanceIndex) {
     List<String> connectedIds = new ArrayList<>();
     for (String instanceId : new ArrayList<>(connectedHosts.keySet())) {
       String accountId = instanceId.split(":")[0];
-      if (!connectedIds.contains(accountId)) {
+      if (!connectedIds.contains(accountId) && socketInstancesByAccounts.containsKey(accountId)
+          && (socketInstancesByAccounts.get(accountId) == socketInstanceIndex || 
+          socketInstanceIndex == null)) {
         connectedIds.add(accountId);
       }
     }
     return connectedIds;
+  }
+  
+  /**
+   * Returns websocket client connection status
+   * @param socketInstanceIndex socket instance index
+   * @return websocket client connection status
+   */
+  public boolean isConnected(Integer socketInstanceIndex) {
+    SocketInstance instance = (socketInstanceIndex != null && socketInstances.size() > socketInstanceIndex)
+      ? socketInstances.get(socketInstanceIndex) : null;
+    return (instance != null && instance.socket.connected()) || false;
+  }
+  
+  /**
+   * Returns list of accounts assigned to instance
+   * @param socketInstanceIndex socket instance index
+   * @return list of accounts assigned to instance
+   */
+  public List<String> getAssignedAccounts(int socketInstanceIndex) {
+    List<String> accountIds = new ArrayList<>();
+    socketInstancesByAccounts.keySet().stream().forEach(key -> {
+      if (socketInstancesByAccounts.get(key) == socketInstanceIndex) {
+        accountIds.add(key);
+      }
+    });
+    return accountIds;
+  }
+
+  private static class SubscribeLock {
+    public IsoTime recommendedRetryTime;
+    public int lockedAtAccounts;
+    public long lockedAtTime;
+    public String type;
+  }
+  
+  /**
+   * Locks subscription for a socket instance based on TooManyRequestsError metadata
+   * @param socketInstanceIndex socket instance index
+   * @param metadata TooManyRequestsException metadata
+   */
+  public CompletableFuture<Void> lockSocketInstance(int socketInstanceIndex,
+    TooManyRequestsExceptionMetadata metadata) {
+    if (metadata.type.equals("LIMIT_ACCOUNT_SUBSCRIPTIONS_PER_USER")) {
+      subscribeLock = new SubscribeLock() {{
+        recommendedRetryTime = metadata.recommendedRetryTime;
+        lockedAtAccounts = getSubscribedAccountIds().size();
+        lockedAtTime = Date.from(Instant.now()).getTime();
+      }};
+      return CompletableFuture.completedFuture(null);
+    } else {
+      List<String> subscribedAccounts = getSubscribedAccountIds(socketInstanceIndex);
+      if (subscribedAccounts.size() == 0) {
+        SocketInstance socketInstance = socketInstances.get(socketInstanceIndex);
+        socketInstance.socket.close();
+        return reconnect(String.valueOf(socketInstanceIndex));
+      } else {
+        SocketInstance instance = socketInstances.get(socketInstanceIndex);
+        instance.subscribeLock = new SubscribeLock() {{
+          recommendedRetryTime = metadata.recommendedRetryTime;
+          type = metadata.type;
+          lockedAtAccounts = subscribedAccounts.size();
+        }};
+        return CompletableFuture.completedFuture(null);
+      }
+    }
+  }
+  
+  protected static class SocketInstance {
+    public int id;
+    public boolean connected;
+    public Map<String, RequestResolve> requestResolves;
+    public boolean resolved;
+    public CompletableFuture<Void> connectResult;
+    public String sessionId;
+    public boolean isReconnecting;
+    public Socket socket;
+    public SynchronizationThrottler synchronizationThrottler;
+    public SubscribeLock subscribeLock;
+    public double clientId;
   }
   
   /**
@@ -229,14 +330,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    */
   public CompletableFuture<Void> connect() {
     return CompletableFuture.supplyAsync(() -> {
-      if (connected) return null;
-      connected = true;
-      requestResolves.clear();
       CompletableFuture<Void> result = new CompletableFuture<>();
-      connectFuture = result;
-      packetOrderer.start();
-      sessionId = RandomStringUtils.randomAlphanumeric(32);
-      clientId = Math.random();
       IO.Options socketOptions = new IO.Options();
       socketOptions.path = "/ws";
       socketOptions.reconnection = true;
@@ -245,81 +339,106 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       socketOptions.reconnectionAttempts = Integer.MAX_VALUE;
       socketOptions.timeout = connectTimeout;
       socketOptions.transports = new String[] { WebSocket.NAME };
+      int socketInstanceIndex = socketInstances.size();
+      MetaApiWebsocketClient self = this;
       try {
-        socket = IO.socket(url, socketOptions);
-        
+        SocketInstance instance = new SocketInstance() {{
+          id = socketInstanceIndex;
+          connected = false;
+          requestResolves = new HashMap<>();
+          resolved = false;
+          connectResult = result;
+          sessionId = RandomStringUtils.randomAlphanumeric(32);
+          isReconnecting = false;
+          socket = IO.socket(url, socketOptions);
+          synchronizationThrottler = new SynchronizationThrottler(self, socketInstanceIndex,
+            synchronizationThrottlerOpts);
+          subscribeLock = null;
+          clientId = Math.random();
+        }};
+        instance.synchronizationThrottler.start();
+        Socket socketInstance = instance.socket;
+        socketInstances.add(instance);
+        instance.connected = true;
+        if (socketInstances.size() == 1) {
+          packetOrderer.start();
+        }
         // Adding headers and query during every connection
-        socket.io().on(Manager.EVENT_TRANSPORT, (Object[] socketEventArgs) -> {
+        socketInstance.io().on(Manager.EVENT_TRANSPORT, (Object[] socketEventArgs) -> {
           Transport transport = (Transport) socketEventArgs[0];
           transport.query.put("auth-token", token);
-          transport.query.put("clientId", String.valueOf(clientId));
+          transport.query.put("clientId", String.valueOf(instance.clientId));
           transport.on(Transport.EVENT_REQUEST_HEADERS, (Object[] transportEventArgs) -> {
             @SuppressWarnings("unchecked")
             Map<String, List<String>> headers = (Map<String, List<String>>) transportEventArgs[0];
-            headers.put("Client-Id", Arrays.asList(String.valueOf(clientId)));
+            headers.put("Client-Id", Arrays.asList(String.valueOf(instance.clientId)));
           });
         });
         
-        socket.on(Socket.EVENT_CONNECT, (Object[] args) -> {
+        socketInstance.on(Socket.EVENT_CONNECT, (Object[] args) -> {
           CompletableFuture.runAsync(() -> {
             logger.info("MetaApi websocket client connected to the MetaApi server");
-            isReconnecting = false;
-            if (!result.isDone()) result.complete(null);
-            else fireReconnected().exceptionally((e) -> {
+            instance.isReconnecting = false;
+            if (!result.isDone()) {
+              result.complete(null);
+            } else fireReconnected(instance.id).exceptionally((e) -> {
               logger.error("Failed to notify reconnect listeners", e);
               return null;
             }).join();
-            if (!connected) socket.close();
+            if (!instance.connected) {
+              instance.socket.close();
+            }
           });
         });
-        socket.on(Socket.EVENT_RECONNECT, (Object[] args) -> {
+        socketInstance.on(Socket.EVENT_RECONNECT, (Object[] args) -> {
           try {
-            isReconnecting = false;
-            fireReconnected();
+            instance.isReconnecting = false;
+            fireReconnected(instance.id);
           } catch (Exception e) {
             logger.error("Failed to notify reconnect listeners", e);
           }
         });
-        socket.on(Socket.EVENT_CONNECT_ERROR, (Object[] args) -> {
+        socketInstance.on(Socket.EVENT_CONNECT_ERROR, (Object[] args) -> {
           Exception error = (Exception) args[0];
           logger.error("MetaApi websocket client connection error", error);
-          isReconnecting = false;
-          if (!result.isDone()) result.completeExceptionally(error);
+          instance.isReconnecting = false;
+          if (!result.isDone()) {
+            result.completeExceptionally(error);
+          }
         });
-        socket.on(Socket.EVENT_CONNECT_TIMEOUT, (Object[] args) -> {
+        socketInstance.on(Socket.EVENT_CONNECT_TIMEOUT, (Object[] args) -> {
           logger.info("MetaApi websocket client connection timeout");
-          isReconnecting = false;
+          instance.isReconnecting = false;
           if (!result.isDone()) result.completeExceptionally(
             new TimeoutException("MetaApi websocket client connection timed out")
           );
         });
-        socket.on(Socket.EVENT_DISCONNECT, (Object[] args) -> {
-          synchronizationThrottler.onDisconnect();
+        socketInstance.on(Socket.EVENT_DISCONNECT, (Object[] args) -> {
+          instance.synchronizationThrottler.onDisconnect();
           String reason = (String) args[0];
           logger.info("MetaApi websocket client disconnected from the MetaApi server because of " + reason);
-          isReconnecting = false;
+          instance.isReconnecting = false;
           try {
-            reconnect();
+            reconnect(instance.id);
           } catch (Exception e) {
             logger.error("MetaApi websocket reconnect error", e);
           }
         });
-        socket.on(Socket.EVENT_ERROR, (Object[] args) -> {
+        socketInstance.on(Socket.EVENT_ERROR, (Object[] args) -> {
           Exception error = (Exception) args[0];
           logger.error("MetaApi websocket client error", error);
-          isReconnecting = false;
+          instance.isReconnecting = false;
           try {
-            reconnect();
+            reconnect(instance.id);
           } catch (Exception e) {
             logger.error("MetaApi websocket reconnect error ", e);
           }
         });
-        socket.on("response", (Object[] args) -> {
+        socketInstance.on("response", (Object[] args) -> {
           try {
             JsonNode data = jsonMapper.readTree(args[0].toString());
             RequestResolve requestResolve = data.has("requestId")
-              ? requestResolves.remove(data.get("requestId").asText())
-              : null;
+              ? instance.requestResolves.remove(data.get("requestId").asText()) : null;
             if (requestResolve != null) {
               CompletableFuture.runAsync(() -> {
                 requestResolve.future.complete(data);
@@ -356,10 +475,10 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             logger.error("MetaApi websocket parse json response error", e);
           }
         });
-        socket.on("processingError", (Object[] args) -> {
+        socketInstance.on("processingError", (Object[] args) -> {
           try {
             WebsocketError error = jsonMapper.readValue(args[0].toString(), WebsocketError.class);
-            RequestResolve requestResolve = requestResolves.remove(error.requestId);
+            RequestResolve requestResolve = instance.requestResolves.remove(error.requestId);
             if (requestResolve != null) {
               requestResolve.future.completeExceptionally(convertError(error));
             }
@@ -367,13 +486,13 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             logger.error("MetaApi websocket parse processingError data error", e);
           }
         });
-        socket.on("synchronization", (Object[] args) -> {
+        socketInstance.on("synchronization", (Object[] args) -> {
           JsonNode packet;
           try {
             packet = jsonMapper.readTree(args[0].toString());
             String synchronizationId = packet.has("synchronizationId")
               ? packet.get("synchronizationId").asText() : null;
-            if (synchronizationId == null || synchronizationThrottler.getActiveSynchronizationIds()
+            if (synchronizationId == null || instance.synchronizationThrottler.getActiveSynchronizationIds()
               .contains(synchronizationId)) {
               processSynchronizationPacket(packet);
             }
@@ -381,7 +500,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             logger.error("Failed to parse incoming synchronization packet", e);
           }
         });
-        socket.connect();
+        socketInstance.connect();
       } catch (URISyntaxException e) {
         result.completeExceptionally(e);
       }
@@ -393,14 +512,19 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * Closes connection to MetaApi server
    */
   public void close() {
-    if (!connected) return;
-    connected = false;
-    socket.close();
-    for (RequestResolve resolve : new ArrayList<>(requestResolves.values())) {
-      resolve.future.completeExceptionally(new Exception("MetaApi connection closed"));
-    }
-    requestResolves.clear();
+    socketInstances.forEach(instance -> {
+      if (instance.connected) {
+        instance.socket.close();
+        for (RequestResolve resolve : new ArrayList<>(instance.requestResolves.values())) {
+          resolve.future.completeExceptionally(new Exception("MetaApi connection closed"));
+        }
+        instance.requestResolves.clear();
+      }
+    });
     synchronizationListeners.clear();
+    latencyListeners.clear();
+    socketInstancesByAccounts.clear();
+    socketInstances.clear();
     packetOrderer.stop();
   }
   
@@ -839,7 +963,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     if (startingDealTime != null)
       request.put("startingDealTime", startingDealTime.getIsoString());
     request.put("instanceIndex", instanceIndex);
-    return synchronizationThrottler.scheduleSynchronize(accountId, request).thenApply((response) -> null);
+    SynchronizationThrottler syncThrottler = socketInstances.get(socketInstancesByAccounts.get(accountId))
+      .synchronizationThrottler;
+    return syncThrottler.scheduleSynchronize(accountId, request).thenApply((response) -> null);
   }
   
   /**
@@ -1054,6 +1180,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       if (err != null && !(err.getCause() instanceof NotFoundException)) {
         throw new CompletionException(err);
       }
+      socketInstancesByAccounts.remove(accountId);
       return response;
     });
   }
@@ -1101,9 +1228,12 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   /**
    * Adds reconnect listener
    * @param listener reconnect listener to add
+   * @param accountId account id of listener
    */
-  public void addReconnectListener(ReconnectListener listener) {
-    reconnectListeners.add(listener);
+  public void addReconnectListener(ReconnectListener listener, String accountId) {
+    String aid = accountId;
+    ReconnectListener l = listener;
+    reconnectListeners.add(new ReconnectListenerItem() {{ accountId = aid; listener = l; }});
   }
   
   /**
@@ -1111,7 +1241,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @param listener listener to remove
    */
   public void removeReconnectListener(ReconnectListener listener) {
-    reconnectListeners.remove(listener);
+    reconnectListeners.removeIf(item -> item.listener == listener);
   }
   
   /**
@@ -1122,27 +1252,33 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     reconnectListeners.clear();
   }
   
-  private CompletableFuture<Void> reconnect() throws InterruptedException, ExecutionException  {
+  private CompletableFuture<Void> reconnect(int socketInstanceIndex) {
     return CompletableFuture.runAsync(() -> {
-      while (!socket.connected() && !isReconnecting && connected) {
-        tryReconnect();
+      if (socketInstances.size() > socketInstanceIndex) {
+        SocketInstance instance = socketInstances.get(socketInstanceIndex);
+        while (!instance.socket.connected() && !instance.isReconnecting && instance.connected) {
+          tryReconnect(socketInstanceIndex).join();
+        }
       }
     });
   }
   
-  private void tryReconnect() {
-    try {
-      Thread.sleep(1000);
-      if (!socket.connected() && !isReconnecting && connected) {
-        sessionId = RandomStringUtils.randomAlphanumeric(32);
-        clientId = Math.random();
-        socket.close();
-        isReconnecting = true;
-        socket.connect();
+  private CompletableFuture<Void> tryReconnect(int socketInstanceIndex) {
+    SocketInstance instance = socketInstances.get(socketInstanceIndex);
+    return CompletableFuture.runAsync(() -> {
+      try {
+        Thread.sleep(1000);
+        if (!instance.socket.connected() && !instance.isReconnecting && instance.connected) {
+          instance.sessionId = RandomStringUtils.randomAlphanumeric(32);
+          instance.socket.close();
+          instance.clientId = Math.random();
+          instance.isReconnecting = true;
+          instance.socket.connect();
+        }
+      } catch (InterruptedException e) {
+        throw new CompletionException(e);
       }
-    } catch (InterruptedException e) {
-      throw new CompletionException(e);
-    }
+    });
   }
   
   private CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request) {
@@ -1151,14 +1287,51 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   
   protected CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request, Long timeoutInSeconds) {
     return CompletableFuture.supplyAsync(() -> {
-      if (!connected) {
-        connect().join();
-      } else if (!connected) {
-        connectFuture.join();
-      }
-      try {
+      try {  
+        Integer socketInstanceIndex = null;
+        if (socketInstancesByAccounts.containsKey(accountId)) {
+          socketInstanceIndex = socketInstancesByAccounts.get(accountId);
+        } else {
+          while (subscribeLock != null && ((subscribeLock.recommendedRetryTime.getDate().getTime() > Date.from(Instant.now()).getTime()
+            && getSubscribedAccountIds().size() < subscribeLock.lockedAtAccounts) || 
+            (subscribeLock.lockedAtTime + subscribeCooldownInSeconds * 1000 > 
+            Date.from(Instant.now()).getTime() && getSubscribedAccountIds().size() >= subscribeLock.lockedAtAccounts))) {
+            Thread.sleep(1000);
+          }
+          for (int index = 0; index < socketInstances.size(); index++) {
+            int accountCounter = getAssignedAccounts(index).size();
+            SocketInstance instance = socketInstances.get(index);
+            if (instance.subscribeLock != null) {
+              if (instance.subscribeLock.type.equals("LIMIT_ACCOUNT_SUBSCRIPTIONS_PER_USER_PER_SERVER") && 
+              (instance.subscribeLock.recommendedRetryTime.getDate().getTime() > Date.from(Instant.now()).getTime() || 
+              getSubscribedAccountIds(index).size() >= instance.subscribeLock.lockedAtAccounts)) {
+                continue;
+              }
+              if (instance.subscribeLock.type.equals("LIMIT_ACCOUNT_SUBSCRIPTIONS_PER_SERVER") && 
+              instance.subscribeLock.recommendedRetryTime.getDate().getTime() > Date.from(Instant.now()).getTime() &&
+              getSubscribedAccountIds(index).size() >= instance.subscribeLock.lockedAtAccounts) {
+                continue;
+              }
+            }
+            if (accountCounter < maxAccountsPerInstance) {
+              socketInstanceIndex = index;
+              break;
+            }
+          }
+          if (socketInstanceIndex == null) {
+            socketInstanceIndex = socketInstances.size();
+            connect().join();
+          }
+          socketInstancesByAccounts.put(accountId, socketInstanceIndex);
+        }
+        SocketInstance instance = socketInstances.get(socketInstanceIndex);
+        if (!instance.connected) {
+          connect().join();
+        } else if (!isConnected(socketInstanceIndex)) {
+          instance.connectResult.join();
+        }
         if (request.get("type").asText().equals("subscribe")) {
-          request.put("sessionId", sessionId);
+          request.put("sessionId", instance.sessionId);
         }
         if (Arrays.asList("trade", "subscribe").indexOf(request.get("type").asText()) != -1) {
           return makeRequest(accountId, request, timeoutInSeconds);
@@ -1202,6 +1375,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   private JsonNode makeRequest(String accountId, ObjectNode request, Long timeoutInSeconds) throws Throwable {
+    SocketInstance socketInstance = socketInstances.get(socketInstancesByAccounts.get(accountId));
     String requestId = request.has("requestId") ? request.get("requestId").asText() : UUID.randomUUID().toString();
     try {
       ObjectNode timestamps = jsonMapper.createObjectNode();
@@ -1211,13 +1385,20 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         future = new CompletableFuture<>();
         type = request.get("type").asText();
       }};
-      requestResolves.put(requestId, resolve);
+      socketInstance.requestResolves.put(requestId, resolve);
       request.put("accountId", accountId);
-      if (!request.has("application")) request.put("application", application);
-      if (!request.has("requestId")) request.put("requestId", requestId);
-      socket.emit("request", new JSONObject(jsonMapper.writeValueAsString(request)));
-      if (timeoutInSeconds != null) return resolve.future.get(timeoutInSeconds, TimeUnit.SECONDS);
-      else return resolve.future.get(requestTimeout, TimeUnit.MILLISECONDS);
+      if (!request.has("application")) {
+        request.put("application", application);
+      }
+      if (!request.has("requestId")) {
+        request.put("requestId", requestId);
+      }
+      socketInstance.socket.emit("request", new JSONObject(jsonMapper.writeValueAsString(request)));
+      if (timeoutInSeconds != null) {
+        return resolve.future.get(timeoutInSeconds, TimeUnit.SECONDS);
+      } else {
+        return resolve.future.get(requestTimeout, TimeUnit.MILLISECONDS);
+      }
     } catch (java.util.concurrent.TimeoutException e) {
       throw new TimeoutException("MetaApi websocket client request " + requestId 
           + " of type " + request.get("type").asText() + " timed out. Please make sure your account is "
@@ -1269,11 +1450,14 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         }
         List<JsonNode> packets = packetOrderer.restoreOrder(jsonPacket);
         for (JsonNode data : packets) {
-          String synchronizationId = data.has("synchronizationId") ? data.get("synchronizationId").asText() : null;
-          if (synchronizationId != null) {
-            synchronizationThrottler.updateSynchronizationId(synchronizationId);
-          }
           String accountId = data.get("accountId").asText();
+          Integer socketInstanceIndex = socketInstancesByAccounts.get(accountId);
+          SocketInstance socketInstance = (socketInstanceIndex != null && socketInstances.size() > socketInstanceIndex)
+            ? socketInstances.get(socketInstanceIndex) : null;
+          String synchronizationId = data.has("synchronizationId") ? data.get("synchronizationId").asText() : null;
+          if (synchronizationId != null && socketInstance != null) {
+            socketInstance.synchronizationThrottler.updateSynchronizationId(synchronizationId);
+          }
           String host = data.has("host") ? data.get("host").asText() : "undefined";
           int instanceIndex = data.has("instanceIndex") ? data.get("instanceIndex").asInt() : 0;
           String instanceId = accountId + ":" + instanceIndex;
@@ -1318,7 +1502,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           String type = data.get("type").asText();
           if (type.equals("authenticated")) {
             resetDisconnectTimer.run();
-            if (!data.has("sessionId") || data.get("sessionId").asText().equals(sessionId)) {
+            if (!data.has("sessionId") || data.get("sessionId").asText().equals(socketInstance.sessionId)) {
               connectedHosts.put(instanceId, host);
               List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
               for (SynchronizationListener listener : listeners) {
@@ -1535,7 +1719,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           } else if (type.equals("dealSynchronizationFinished")) {
             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
-              synchronizationThrottler.removeSynchronizationId(synchronizationId);
+              if (socketInstance != null) {
+                socketInstance.synchronizationThrottler.removeSynchronizationId(synchronizationId);
+              }
               completableFutures.add(listener.onDealSynchronizationFinished(instanceIndex,
                   data.get("synchronizationId").asText()).exceptionally(e -> {
                 logger.error("Failed to notify listener about " + type + " event", e);
@@ -1736,12 +1922,17 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     });
   }
   
-  private CompletableFuture<Void> fireReconnected() {
+  private CompletableFuture<Void> fireReconnected(int socketInstanceIndex) {
     return CompletableFuture.runAsync(() -> {
-      subscriptionManager.onReconnected();
-      reconnectListeners.forEach((action) -> {});
-      for (ReconnectListener listener : reconnectListeners) {
-        listener.onReconnected().join();
+      subscriptionManager.onReconnected(socketInstanceIndex);
+      for (ReconnectListenerItem listener : reconnectListeners) {
+        if (socketInstancesByAccounts.get(listener.accountId) == socketInstanceIndex) {
+          try {
+            listener.listener.onReconnected().join();
+          } catch (Throwable err) {
+            logger.error("Failed to notify reconnect listener", err);
+          }
+        }
       }
     });
   }

@@ -1,11 +1,15 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 
+import org.assertj.core.util.Maps;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -16,6 +20,7 @@ import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException;
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException.TooManyRequestsExceptionMetadata;
 import cloud.metaapi.sdk.clients.models.IsoTime;
+import io.socket.client.Socket;
 
 /**
  * Tests {@link SubscriptionManager}
@@ -28,7 +33,20 @@ class SubscriptionManagerTest {
   @BeforeEach
   void setUp() throws Exception {
     client = Mockito.mock(MetaApiWebsocketClient.class);
-    Mockito.when(client.isConnected()).thenReturn(true);
+    client.socketInstances = Arrays.asList(
+      new MetaApiWebsocketClient.SocketInstance() {{ socket = Mockito.mock(Socket.class); }},
+      new MetaApiWebsocketClient.SocketInstance() {{ socket = Mockito.mock(Socket.class); }}
+    );
+    Mockito.when(client.socketInstances.get(0).socket.connected()).thenReturn(true);
+    Mockito.when(client.socketInstances.get(1).socket.connected()).thenReturn(false);
+    Mockito.when(client.isConnected(Mockito.anyInt())).thenAnswer(new Answer<Boolean>() {
+      @Override
+      public Boolean answer(InvocationOnMock invocation) throws Throwable {
+        Integer socketInstanceIndex = invocation.getArgument(0, Integer.class);
+        return client.socketInstances.get(socketInstanceIndex).socket.connected();
+      }
+    });
+    Mockito.when(client.getSocketInstancesByAccounts()).thenReturn(Maps.newHashMap("accountId", 0));
     manager = new SubscriptionManager(client);
   }
 
@@ -82,6 +100,7 @@ class SubscriptionManagerTest {
       new TooManyRequestsExceptionMetadata() {{
       periodInMinutes = 60;
       requestsPerPeriodAllowed = 10000;
+      type = "LIMIT_REQUEST_RATE_PER_USER";
       recommendedRetryTime = new IsoTime(Date.from(Instant.now().plusMillis(5000)));
     }}));
     Mockito.when(client.subscribe(Mockito.any(), Mockito.any()))
@@ -102,12 +121,18 @@ class SubscriptionManagerTest {
   void testCancelsAllSubscriptionsOnReconnect() throws InterruptedException {
     Mockito.when(client.subscribe(Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
+    Map<String, Integer> socketInstancesByAccounts = new HashMap<>();
+    socketInstancesByAccounts.put("accountId", 0);
+    socketInstancesByAccounts.put("accountId2", 0);
+    socketInstancesByAccounts.put("accountId3", 1);
+    Mockito.when(client.getSocketInstancesByAccounts()).thenReturn(socketInstancesByAccounts);
     manager.subscribe("accountId", null);
     manager.subscribe("accountId2", null);
+    manager.subscribe("accountId3", null);
     Thread.sleep(1000);
-    manager.onReconnected();
+    manager.onReconnected(0);
     Thread.sleep(5000);
-    Mockito.verify(client, Mockito.times(2)).subscribe(Mockito.any(), Mockito.any());
+    Mockito.verify(client, Mockito.times(4)).subscribe(Mockito.any(), Mockito.any());
   };
 
   /**
@@ -132,16 +157,22 @@ class SubscriptionManagerTest {
   void testShouldResubscribeOnTimeout() throws InterruptedException {
     Mockito.when(client.subscribe(Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
+    Socket socketInstanceSocket = Mockito.spy(client.socketInstances.get(0).socket);
+    Mockito.doReturn(true).when(socketInstanceSocket).connected();
+    client.socketInstances.get(0).socket = socketInstanceSocket;
+    client.getSocketInstancesByAccounts().put("accountId2", 1);
     Timer timer = new Timer();
     timer.schedule(new TimerTask() {
       @Override
       public void run() {
         manager.cancelSubscribe("accountId:0");
+        manager.cancelSubscribe("accountId2:0");
       }
     }, 100);
     manager.onTimeout("accountId", null);
+    manager.onTimeout("accountId2", null);
     Thread.sleep(200);
-    Mockito.verify(client).subscribe("accountId", null);
+    Mockito.verify(client, Mockito.times(1)).subscribe("accountId", null);
   };
 
   /**
@@ -151,7 +182,9 @@ class SubscriptionManagerTest {
   void testDoesNotRetrySubscribeToTerminalIfConnectionIsClosed() throws InterruptedException {
     Mockito.when(client.subscribe(Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    Mockito.when(client.isConnected()).thenReturn(false);
+    Socket socketInstanceSocket = Mockito.spy(client.socketInstances.get(0).socket);
+    Mockito.doReturn(false).when(socketInstanceSocket).connected();
+    client.socketInstances.get(0).socket = socketInstanceSocket;
     Timer timer = new Timer();
     timer.schedule(new TimerTask() {
       @Override

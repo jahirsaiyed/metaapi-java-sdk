@@ -5,13 +5,13 @@ package cloud.metaapi.sdk.clients.error_handler;
  */
 public class ConflictException extends ApiException {
 
-    private static final long serialVersionUID = 1L;
-    
-    /**
-     * Constructs conflict error.
-     * @param message error message
-     */
-    public ConflictException(String message) {
-        super(message, 409);
-    }
+  private static final long serialVersionUID = 1L;
+  
+  /**
+   * Constructs conflict error.
+   * @param message error message
+   */
+  public ConflictException(String message) {
+    super(message, 409);
+  }
 }

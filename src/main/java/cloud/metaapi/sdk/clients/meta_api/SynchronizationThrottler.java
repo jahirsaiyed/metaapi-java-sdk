@@ -27,6 +27,7 @@ public class SynchronizationThrottler {
   private int queueTimeoutInSeconds;
   private int synchronizationTimeoutInSeconds;
   private MetaApiWebsocketClient client;
+  private int socketInstanceIndex;
   protected Map<String, Long> synchronizationIds = new HashMap<>();
   private Map<String, AccountData> accountsBySynchronizationIds = new HashMap<>();
   private List<SynchronizationQueueItem> synchronizationQueue = new ArrayList<>();
@@ -42,7 +43,7 @@ public class SynchronizationThrottler {
      * Amount of maximum allowed concurrent synchronizations. If 0, it is calculated
      * automatically
      */
-    public int maxConcurrentSynchronizations = 0;
+    public int maxConcurrentSynchronizations = 15;
     /**
      * Allowed time for a synchronization in queue
      */
@@ -68,13 +69,15 @@ public class SynchronizationThrottler {
   /**
    * Constructs the synchronization throttler
    * @param client MetaApi websocket client
+   * @param socketInstanceIndex index of socket instance that uses the throttler
    * @param opts Synchronization throttler options
    */
-  public SynchronizationThrottler(MetaApiWebsocketClient client, Options opts) {
+  public SynchronizationThrottler(MetaApiWebsocketClient client, int socketInstanceIndex, Options opts) {
     this.maxConcurrentSynchronizations = opts.maxConcurrentSynchronizations;
     this.queueTimeoutInSeconds = opts.queueTimeoutInSeconds;
     this.synchronizationTimeoutInSeconds = opts.synchronizationTimeoutInSeconds;
     this.client = client;
+    this.socketInstanceIndex = socketInstanceIndex;
   }
   
   /**
@@ -136,6 +139,20 @@ public class SynchronizationThrottler {
   }
   
   /**
+   * Returns the list of currently synchronizing account ids
+   */
+  public List<String> getSynchronizingAccounts() {
+    List<String> synchronizingAccounts = new ArrayList<>();
+    synchronizationIds.keySet().forEach(key -> {
+      AccountData accountData = accountsBySynchronizationIds.get(key);
+      if(accountData != null && synchronizingAccounts.indexOf(accountData.accountId) == -1) {
+        synchronizingAccounts.add(accountData.accountId);
+      }
+    });
+    return synchronizingAccounts;
+  }
+  
+  /**
    * Returns the list of currenly active synchronization ids
    * @return Synchronization ids
    */
@@ -148,9 +165,9 @@ public class SynchronizationThrottler {
    * @return maximum allowed concurrent synchronizations
    */
   public int getMaxConcurrentSynchronizations() {
-    int calculatedMax = Math.max((int) Math.ceil(client.getSubscribedAccountIds().size() / 10.0), 1);
-    return maxConcurrentSynchronizations != 0 ? Math.min(calculatedMax, maxConcurrentSynchronizations) :
-      calculatedMax;
+    int calculatedMax = Math.max((int) Math.ceil(
+      client.getSubscribedAccountIds(socketInstanceIndex).size() / 10.0), 1);
+    return Math.min(calculatedMax, maxConcurrentSynchronizations);
   }
   
   /**
@@ -158,14 +175,14 @@ public class SynchronizationThrottler {
    * @return Flag whether there are free slots for synchronization requests
    */
   public boolean isSynchronizationAvailable() {
-    List<String> synchronizingAccounts = new ArrayList<>();
-    for (String synchronizationId : synchronizationIds.keySet()) {
-      AccountData accountData = accountsBySynchronizationIds.get(synchronizationId);
-      if (accountData != null && synchronizingAccounts.indexOf(accountData.accountId) == -1) {
-        synchronizingAccounts.add(accountData.accountId);
-      }
+    int synchronizingAccountsCount = 0;
+    for (MetaApiWebsocketClient.SocketInstance socketInstance : client.getSocketInstances()) {
+      synchronizingAccountsCount += socketInstance.synchronizationThrottler.getSynchronizingAccounts().size();
     }
-    return synchronizingAccounts.size() < getMaxConcurrentSynchronizations();
+    if (synchronizingAccountsCount >= maxConcurrentSynchronizations) {
+      return false;
+    }
+    return getSynchronizingAccounts().size() < getMaxConcurrentSynchronizations();
   }
   
   /**
@@ -180,7 +197,7 @@ public class SynchronizationThrottler {
         if (accountsBySynchronizationIds.get(key).accountId.equals(accountId) &&
             instanceIndex == accountsBySynchronizationIds.get(key).instanceIndex) {
           removeFromQueue(key);
-          accountsBySynchronizationIds.remove(key);
+          accountsBySynchronizationIds.remove(key);;
         }
       }
     }

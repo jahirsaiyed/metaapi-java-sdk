@@ -1,6 +1,7 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
@@ -98,12 +99,23 @@ public class SubscriptionManager {
         websocketClient.subscribe(accountId, instanceIndex).join();
       } catch (CompletionException err) {
         if (err.getCause() instanceof TooManyRequestsException) {
-          long retryTime = ((TooManyRequestsException) err.getCause()).metadata.recommendedRetryTime.getDate().getTime();
-          if (new IsoTime().getDate().getTime() + subscribeRetryIntervalInSeconds * 1000 < retryTime) {
-            try {
-              Thread.sleep(retryTime - new IsoTime().getDate().getTime() - subscribeRetryIntervalInSeconds * 1000);
-            } catch (InterruptedException e) {
-              logger.error(e);
+          TooManyRequestsException tooManyRequestsErr = (TooManyRequestsException) err.getCause();
+          int socketInstanceIndex = websocketClient.getSocketInstancesByAccounts().get(accountId);
+          if (tooManyRequestsErr.metadata.type.equals("LIMIT_ACCOUNT_SUBSCRIPTIONS_PER_USER")) {
+            logger.info(err);
+          }
+          if (Arrays.asList("LIMIT_ACCOUNT_SUBSCRIPTIONS_PER_USER", "LIMIT_ACCOUNT_SUBSCRIPTIONS_PER_SERVER", 
+            "LIMIT_ACCOUNT_SUBSCRIPTIONS_PER_USER_PER_SERVER").indexOf(tooManyRequestsErr.metadata.type) != -1) {
+            websocketClient.getSocketInstancesByAccounts().remove(accountId);
+            websocketClient.lockSocketInstance(socketInstanceIndex, tooManyRequestsErr.metadata);
+          } else {
+            long retryTime = ((TooManyRequestsException) err.getCause()).metadata.recommendedRetryTime.getDate().getTime();
+            if (new IsoTime().getDate().getTime() + subscribeRetryIntervalInSeconds * 1000 < retryTime) {
+              try {
+                Thread.sleep(retryTime - new IsoTime().getDate().getTime() - subscribeRetryIntervalInSeconds * 1000);
+              } catch (InterruptedException e) { 
+                logger.error(e);
+              }
             }
           }
         }
@@ -147,7 +159,7 @@ public class SubscriptionManager {
    * @param instanceIndex instance index
    */
   public void onTimeout(String accountId, Integer instanceIndex) {
-    if (websocketClient.isConnected()) {
+    if (websocketClient.isConnected(websocketClient.getSocketInstancesByAccounts().getOrDefault(accountId, null))) {
       subscribe(accountId, instanceIndex);
     }
   }
@@ -170,10 +182,15 @@ public class SubscriptionManager {
 
   /**
    * Invoked when connection to MetaApi websocket API restored after a disconnect.
+   * @param socketInstanceIndex socket instance index
    */
-  public void onReconnected() {
+  public void onReconnected(int socketInstanceIndex) {
+    Map<String, Integer> socketInstancesByAccounts = websocketClient.getSocketInstancesByAccounts();
     for (String instanceId : new ArrayList<>(subscriptions.keySet())) {
-      cancelSubscribe(instanceId);
+      String accountId = instanceId.split(":")[0];
+      if (socketInstancesByAccounts.get(accountId) == socketInstanceIndex) {
+        cancelSubscribe(instanceId);
+      }
     }
   }
 }

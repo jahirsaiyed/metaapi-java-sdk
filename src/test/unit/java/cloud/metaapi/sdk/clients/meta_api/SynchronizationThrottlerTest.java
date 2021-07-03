@@ -1,6 +1,7 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +34,13 @@ class SynchronizationThrottlerTest {
     websocketClient = Mockito.mock(MetaApiWebsocketClient.class);
     Mockito.when(websocketClient.rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    Mockito.when(websocketClient.getSubscribedAccountIds()).thenReturn(provideListOfSize(11));
-    throttler = new SynchronizationThrottler(websocketClient, new SynchronizationThrottler.Options());
+    Mockito.when(websocketClient.getSubscribedAccountIds(Mockito.anyInt())).thenReturn(provideListOfSize(11));
+    SynchronizationThrottler socketInstanceSyncThrottler = Mockito.mock(SynchronizationThrottler.class);
+    Mockito.when(socketInstanceSyncThrottler.getSynchronizingAccounts()).thenReturn(Arrays.asList());
+    Mockito.when(websocketClient.getSocketInstances()).thenReturn(Arrays.asList(
+      new MetaApiWebsocketClient.SocketInstance() {{ synchronizationThrottler = socketInstanceSyncThrottler; }}
+    ));
+    throttler = new SynchronizationThrottler(websocketClient, 0, new SynchronizationThrottler.Options());
     throttler.start();
   }
   
@@ -99,7 +105,7 @@ class SynchronizationThrottlerTest {
    */
   @Test
   void testIncreasesSlotAmountWithMoreSubscribedAccounts() {
-    Mockito.when(websocketClient.getSubscribedAccountIds()).thenReturn(provideListOfSize(21));
+    Mockito.when(websocketClient.getSubscribedAccountIds(Mockito.anyInt())).thenReturn(provideListOfSize(21));
     ObjectNode request1 = provideRequest("test1");
     ObjectNode request2 = provideRequest("test2");
     ObjectNode request3 = provideRequest("test3");
@@ -117,18 +123,20 @@ class SynchronizationThrottlerTest {
    */
   @Test
   void testSetsHardLimitForConcurrentSynchronizationsViaOptions() throws InterruptedException {
-    Mockito.when(websocketClient.getSubscribedAccountIds()).thenReturn(provideListOfSize(21));
-    throttler = new SynchronizationThrottler(websocketClient, new SynchronizationThrottler.Options() {{
-      maxConcurrentSynchronizations = 2;
+    Mockito.when(websocketClient.getSubscribedAccountIds(Mockito.anyInt())).thenReturn(provideListOfSize(21));
+    throttler = new SynchronizationThrottler(websocketClient, 0, new SynchronizationThrottler.Options() {{
+      maxConcurrentSynchronizations = 3;
     }});
-    ObjectNode request1 = provideRequest("test1");
-    ObjectNode request2 = provideRequest("test2");
-    throttler.scheduleSynchronize("accountId1", request1).join();
-    throttler.scheduleSynchronize("accountId2", request2).join();
-    Mockito.verify(websocketClient).rpcRequest(Mockito.eq("accountId1"), Mockito.eq(request1), Mockito.any());
-    Mockito.verify(websocketClient).rpcRequest(Mockito.eq("accountId2"), Mockito.eq(request2), Mockito.any());
-    ObjectNode request3 = provideRequest("test3");
-    throttler.scheduleSynchronize("accountId3", request3);
+    SynchronizationThrottler socketInstanceSyncThrottler = Mockito.mock(SynchronizationThrottler.class);
+    Mockito.when(socketInstanceSyncThrottler.getSynchronizingAccounts()).thenReturn(Arrays.asList("accountId4"));
+    Mockito.when(websocketClient.getSocketInstances()).thenReturn(Arrays.asList(
+      new MetaApiWebsocketClient.SocketInstance() {{ synchronizationThrottler = throttler; }},
+      new MetaApiWebsocketClient.SocketInstance() {{ synchronizationThrottler = socketInstanceSyncThrottler; }}
+    ));
+    throttler.scheduleSynchronize("accountId1", provideRequest("test1")).join();
+    throttler.scheduleSynchronize("accountId2", provideRequest("test2")).join();
+    throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
+    throttler.scheduleSynchronize("accountId4", provideRequest("test4"));
     Thread.sleep(50);
     Mockito.verify(websocketClient, Mockito.times(2)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
     throttler.removeSynchronizationId("test1");

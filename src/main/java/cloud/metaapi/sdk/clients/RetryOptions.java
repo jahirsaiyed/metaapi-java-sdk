@@ -16,4 +16,8 @@ public class RetryOptions {
    * Maximum delay in deconds
    */
   public int maxDelayInSeconds = 30;
+   /**
+    * Time to disable new subscriptions for
+    */
+   public long subscribeCooldownInSeconds = 600;
 }

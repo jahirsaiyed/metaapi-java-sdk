@@ -121,7 +121,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     websocketClient.addSynchronizationListener(account.getId(), this.terminalState);
     websocketClient.addSynchronizationListener(account.getId(), this.historyStorage);
     websocketClient.addSynchronizationListener(account.getId(), this.healthMonitor);
-    websocketClient.addReconnectListener(this);
+    websocketClient.addReconnectListener(this, account.getId());
   }
   
   /**
@@ -648,7 +648,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when subscription is initiated
    */
   public CompletableFuture<Void> subscribe() {
-    return websocketClient.ensureSubscribe(account.getId(), null);
+    websocketClient.ensureSubscribe(account.getId(), null);
+    return CompletableFuture.completedFuture(null);
   }
   
   /**
