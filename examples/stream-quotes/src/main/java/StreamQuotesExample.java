@@ -13,6 +13,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderBook;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderCandle;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolPrice;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
+import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.meta_api.MetaApi;
 import cloud.metaapi.sdk.meta_api.MetaApiConnection;
 import cloud.metaapi.sdk.meta_api.MetatraderAccount;
@@ -114,8 +115,9 @@ public class StreamQuotesExample {
       SynchronizationListener quoteListener = new QuoteListener();
       connection.addSynchronizationListener(quoteListener);
       
-      System.out.println("Waiting for SDK to synchronize to terminal state "
-        + "(may take some time depending on your history size)");
+      // wait until terminal state synchronized to the local state
+      System.out.println("[" + new IsoTime().toString() + "] Waiting for SDK to synchronize "
+        + "to terminal state (may take some time depending on your history size)");
       connection.waitSynchronized().get();
       
       // Add symbol to MarketWatch if not yet added and subscribe to market data
@@ -128,7 +130,8 @@ public class StreamQuotesExample {
         new MarketDataSubscription() {{ type = "marketDepth"; intervalInMilliseconds = 5000; }}
       )).join();
       
-      System.out.println("Streaming " + symbol + " market data now...");
+      System.out.println("[" + new IsoTime().toString() + "] Synchronized successfully, streaming "
+        + symbol + " market data now...");
       
       while (true) {
         Thread.sleep(1000);
