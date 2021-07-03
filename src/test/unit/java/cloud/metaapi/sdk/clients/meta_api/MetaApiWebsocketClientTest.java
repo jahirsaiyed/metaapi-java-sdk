@@ -2087,9 +2087,11 @@ class MetaApiWebsocketClientTest {
  @MethodSource("provideSymbolSpecification")
  void testSynchronizesSymbolSpecifications(MetatraderSymbolSpecification expected) throws Exception {
    SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
+   Mockito.when(listener.onSymbolSpecificationsUpdated(Mockito.anyInt(), Mockito.anyList(), Mockito.anyList()))
+     .thenReturn(CompletableFuture.completedFuture(null));
    Mockito.when(listener.onSymbolSpecificationUpdated(Mockito.anyInt(), Mockito.any()))
      .thenReturn(CompletableFuture.completedFuture(null));
-   Mockito.when(listener.onSymbolSpecificationsRemoved(Mockito.anyInt(), Mockito.anyList()))
+   Mockito.when(listener.onSymbolSpecificationRemoved(Mockito.anyInt(), Mockito.any()))
      .thenReturn(CompletableFuture.completedFuture(null));
    client.addSynchronizationListener("accountId", listener);
    ObjectNode packet = jsonMapper.createObjectNode();
@@ -2100,10 +2102,14 @@ class MetaApiWebsocketClientTest {
    packet.set("removedSymbols", jsonMapper.valueToTree(Lists.list("AUDNZD")));
    socket.sendEvent("synchronization", packet.toString());
    Thread.sleep(200);
-   Mockito.verify(listener).onSymbolSpecificationsRemoved(Mockito.eq(1), Mockito.argThat(arg -> {
-     assertThat(arg).usingRecursiveComparison().isEqualTo(Lists.list("AUDNZD"));
+   Mockito.verify(listener).onSymbolSpecificationsUpdated(Mockito.eq(1), Mockito.argThat(arg -> {
+     assertThat(arg).usingRecursiveComparison().isEqualTo(Arrays.asList(expected));
+     return true;
+   }), Mockito.argThat(arg -> {
+     assertThat(arg).usingRecursiveComparison().isEqualTo(Arrays.asList("AUDNZD"));
      return true;
    }));
+   Mockito.verify(listener).onSymbolSpecificationRemoved(Mockito.eq(1), Mockito.eq("AUDNZD"));
  }
  
  /**

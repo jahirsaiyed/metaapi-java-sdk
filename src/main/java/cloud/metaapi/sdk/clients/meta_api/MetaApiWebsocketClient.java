@@ -1793,32 +1793,43 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             }
             CompletableFuture.allOf(onSubscriptionDowngradeFutures.toArray(new CompletableFuture<?>[0])).get();
           } else if (type.equals("specifications")) {
-            if (data.hasNonNull(type)) {
-              MetatraderSymbolSpecification[] specifications = jsonMapper
-                .treeToValue(data.get(type), MetatraderSymbolSpecification[].class);
-              for (MetatraderSymbolSpecification specification : specifications) {
-                List<CompletableFuture<Void>> onSymbolSpecificationUpdatedFutures = new ArrayList<>();
-                for (SynchronizationListener listener : listeners) {
-                  onSymbolSpecificationUpdatedFutures.add(listener.onSymbolSpecificationUpdated(instanceIndex,
-                      specification).exceptionally(e -> {
-                    logger.error("Failed to notify listener about " + type + " event", e);
-                    return null;
-                  }));
-                }
-                CompletableFuture.allOf(onSymbolSpecificationUpdatedFutures.toArray(new CompletableFuture<?>[0])).get();
+            List<CompletableFuture<Void>> onSymbolSpecificationsUpdatedFutures = new ArrayList<>();
+            List<MetatraderSymbolSpecification> specifications = data.hasNonNull("specifications")
+              ? Arrays.asList(jsonMapper.treeToValue(data.get("specifications"), MetatraderSymbolSpecification[].class))
+              : new ArrayList<>();
+            List<String> removedSymbols = data.hasNonNull("removedSymbols")
+              ? Arrays.asList(jsonMapper.treeToValue(data.get("removedSymbols"), String[].class))
+              : new ArrayList<>();
+            for (SynchronizationListener listener : listeners) {
+              onSymbolSpecificationsUpdatedFutures.add(
+                listener.onSymbolSpecificationsUpdated(instanceIndex, specifications, removedSymbols)
+                    .exceptionally(e -> {
+                  logger.error(accountId + "Failed to notify listener about specifications updated event", e);
+                  return null;
+                }));
+            }
+            CompletableFuture.allOf(onSymbolSpecificationsUpdatedFutures.toArray(new CompletableFuture<?>[0])).get();
+            for (MetatraderSymbolSpecification specification : specifications) {
+              List<CompletableFuture<Void>> onSymbolSpecificationUpdatedFutures = new ArrayList<>();
+              for (SynchronizationListener listener : listeners) {
+                onSymbolSpecificationUpdatedFutures.add(listener.onSymbolSpecificationUpdated(instanceIndex,
+                    specification).exceptionally(e -> {
+                  logger.error("Failed to notify listener about specification updated event", e);
+                  return null;
+                }));
               }
-              if (data.has("removedSymbols")) {
-                List<CompletableFuture<Void>> onSymbolSpecificationRemovedFutures = new ArrayList<>();
-                List<String> removedSymbols = Arrays.asList(jsonMapper.treeToValue(data.get("removedSymbols"), String[].class));
-                for (SynchronizationListener listener : listeners) {
-                  onSymbolSpecificationRemovedFutures.add(listener.onSymbolSpecificationsRemoved(instanceIndex,
-                      removedSymbols).exceptionally(e -> {
-                    logger.error("Failed to notify listener about specifications removed event", e);
-                    return null;
-                  }));
-                }
-                CompletableFuture.allOf(onSymbolSpecificationRemovedFutures.toArray(new CompletableFuture<?>[0])).get();
+              CompletableFuture.allOf(onSymbolSpecificationUpdatedFutures.toArray(new CompletableFuture<?>[0])).get();
+            }
+            for (String removedSymbol : removedSymbols) {
+              List<CompletableFuture<Void>> onSymbolSpecificationRemovedFutures = new ArrayList<>();
+              for (SynchronizationListener listener : listeners) {
+                onSymbolSpecificationRemovedFutures.add(listener.onSymbolSpecificationRemoved(instanceIndex,
+                    removedSymbol).exceptionally(e -> {
+                  logger.error("Failed to notify listener about specifications removed event", e);
+                  return null;
+                }));
               }
+              CompletableFuture.allOf(onSymbolSpecificationRemovedFutures.toArray(new CompletableFuture<?>[0])).get();
             }
           } else if (type.equals("prices")) {
             List<MetatraderSymbolPrice> prices = Arrays.asList(data.hasNonNull("prices")

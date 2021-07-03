@@ -1,4 +1,4 @@
-12.5.0
+13.0.0
   - added clientId to query websocket url
   - added equity curve filter to CopyFactory
   - fixed health state tracking for multiple replicas
@@ -15,6 +15,7 @@
   - handle TooManyRequestsError in HTTP client
   - limit max concurrent synchronizations based on the number of subscribed accounts
   - implement proper rounding for position profits and account equity
+  - breaking change: refactored specifications updated events
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

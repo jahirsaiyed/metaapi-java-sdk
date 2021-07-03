@@ -245,32 +245,32 @@ public class TerminalState extends SynchronizationListener {
   }
 
   @Override
-  public CompletableFuture<Void> onSymbolSpecificationUpdated(int instanceIndex,
-    MetatraderSymbolSpecification specification) {
+  public CompletableFuture<Void> onSymbolSpecificationsUpdated(int instanceIndex,
+    List<MetatraderSymbolSpecification> specifications, List<String> removedSymbols) {
     State state = getState(instanceIndex);
-    int index = -1;
-    for (int i = 0; i < state.specifications.size(); ++i) {
-      if (state.specifications.get(i).symbol.equals(specification.symbol)) {
-        index = i;
-        break;
+    for (MetatraderSymbolSpecification specification : specifications) {
+      int index = -1;
+      for (int i = 0; i < state.specifications.size(); ++i) {
+        if (state.specifications.get(i).symbol.equals(specification.symbol)) {
+          index = i;
+          break;
+        }
       }
+      if (index != -1) {
+        state.specifications.set(index, specification);
+      } else {
+        state.specifications.add(specification);
+      }
+      state.specificationsBySymbol.put(specification.symbol, specification);
     }
-    if (index != -1) state.specifications.set(index, specification);
-    else state.specifications.add(specification);
-    state.specificationsBySymbol.put(specification.symbol, specification);
-    return CompletableFuture.completedFuture(null);
-  }
-  
-  @Override
-  public CompletableFuture<Void> onSymbolSpecificationsRemoved(int instanceIndex, List<String> symbols) {
-    State state = getState(instanceIndex);
-    state.specifications.removeIf(s -> symbols.contains(s.symbol));
-    for (String symbol : symbols) {
+    state.specifications = state.specifications.stream()
+      .filter(s -> !removedSymbols.contains(s.symbol)).collect(Collectors.toList());
+    for (String symbol : removedSymbols) {
       state.specificationsBySymbol.remove(symbol);
     }
     return CompletableFuture.completedFuture(null);
   }
-
+  
   @Override
   public CompletableFuture<Void> onSymbolPricesUpdated(int instanceIndex,
     List<MetatraderSymbolPrice> prices, Double equity, Double margin, Double freeMargin,
