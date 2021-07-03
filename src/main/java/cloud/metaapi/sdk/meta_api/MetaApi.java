@@ -7,7 +7,6 @@ import org.apache.log4j.Logger;
 import cloud.metaapi.sdk.clients.HttpClient;
 import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.error_handler.ValidationException;
-import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderDemoAccountClient;
@@ -156,7 +155,7 @@ public class MetaApi {
     provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, opts.domain));
     connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, opts.application);
     metatraderAccountApi = new MetatraderAccountApi(new MetatraderAccountClient(httpClient, token, opts.domain),
-      metaApiWebsocketClient, connectionRegistry, new ExpertAdvisorClient(httpClient, token, opts.domain));
+      metaApiWebsocketClient, connectionRegistry);
     metatraderDemoAccountApi = new MetatraderDemoAccountApi(
       new MetatraderDemoAccountClient(httpClient, token, opts.domain));
     if (opts.enableLatencyMonitor) {

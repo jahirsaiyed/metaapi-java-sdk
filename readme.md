@@ -174,46 +174,6 @@ account.undeploy().join();
 account.redeploy().join();
 ```
 
-### Manage custom experts (EAs)
-Custom expert advisors can only be used for MT4 accounts on g1 infrastructure
-
-### Creating an expert advisor via API
-You can use the code below to create an EA. Please note that preset field is a base64-encoded preset file.
-```java
-ExpertAdvisor expert = account.createExpertAdvisor("expertId", new NewExpertAdvisorDto() {{
-  period = "1h";
-  symbol = "EURUSD";
-  preset = "a2V5MT12YWx1ZTEKa2V5Mj12YWx1ZTIKa2V5Mz12YWx1ZTMKc3VwZXI9dHJ1ZQ";
-}}).join();
-expert.uploadFile("/path/to/custom-ea").join();
-```
-
-### Retrieving existing experts via API
-```java
-List<ExpertAdvisor> experts = account.getExpertAdvisors().join();
-```
-
-### Retrieving existing expert by id via API
-```java
-ExpertAdvisor expert = account.getExpertAdvisor("expertId").join();
-```
-
-### Updating existing expert via API
-You can use the code below to update an EA. Please note that preset field is a base64-encoded preset file.
-```java
-expert.update(new NewExpertAdvisorDto() {{
-  period = "4h";
-  symbol = "EURUSD";
-  preset = "a2V5MT12YWx1ZTEKa2V5Mj12YWx1ZTIKa2V5Mz12YWx1ZTMKc3VwZXI9dHJ1ZQ";
-}}).join();
-expert.uploadFile("/path/to/custom-ea").join();
-```
-
-### Removing expert via API
-```java
-expert.remove().join();
-```
-
 ## Access MetaTrader account via RPC API
 RPC API let you query the trading terminal state. You should use
 RPC API if you develop trading monitoring apps like myfxbook or other

@@ -26,9 +26,6 @@ import org.mockito.Mockito;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.NotFoundException;
 import cloud.metaapi.sdk.clients.error_handler.ValidationException;
-import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient;
-import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient.ExpertAdvisorDto;
-import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient.NewExpertAdvisorDto;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.models.AccountsFilter;
@@ -48,17 +45,15 @@ public class MetatraderAccountApiTest {
   
   private MetatraderAccountApi api;
   private MetatraderAccountClient client;
-  private ExpertAdvisorClient eaClient;
   private MetaApiWebsocketClient metaApiWebsocketClient;
   private ConnectionRegistry connectionRegistry;
 
   @BeforeEach
   void setUp() throws Exception {
     client = Mockito.mock(MetatraderAccountClient.class);
-    eaClient = Mockito.mock(ExpertAdvisorClient.class);
     metaApiWebsocketClient = Mockito.mock(MetaApiWebsocketClient.class);
     connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
-    api = new MetatraderAccountApi(client, metaApiWebsocketClient, connectionRegistry, eaClient);
+    api = new MetatraderAccountApi(client, metaApiWebsocketClient, connectionRegistry);
   }
   
   @AfterEach
@@ -75,7 +70,7 @@ public class MetatraderAccountApiTest {
     AccountsFilter filter = new AccountsFilter() {{ provisioningProfileId = "profileId"; }};
     Mockito.when(client.getAccounts(filter)).thenReturn(CompletableFuture.completedFuture(Lists.list(accountDto)));
     List<MetatraderAccount> expectedAccounts = Lists.list(new MetatraderAccount(accountDto,
-      client, metaApiWebsocketClient, connectionRegistry, eaClient));
+      client, metaApiWebsocketClient, connectionRegistry));
     List<MetatraderAccount> actualAccounts = api.getAccounts(filter).get();
     assertThat(actualAccounts).usingRecursiveComparison().isEqualTo(expectedAccounts);
   }
@@ -88,7 +83,7 @@ public class MetatraderAccountApiTest {
   void testRetrievesMtAccountById(MetatraderAccountDto accountDto) throws Exception {
     Mockito.when(client.getAccount("id")).thenReturn(CompletableFuture.completedFuture(accountDto));
     MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient,
-      connectionRegistry, eaClient);
+      connectionRegistry);
     MetatraderAccount actualAccount = api.getAccount("id").get();
     assertThat(actualAccount).usingRecursiveComparison().isEqualTo(expectedAccount);
   }
@@ -101,7 +96,7 @@ public class MetatraderAccountApiTest {
   void testRetrievesMtAccountByToken(MetatraderAccountDto accountDto) throws Exception {
     Mockito.when(client.getAccountByToken()).thenReturn(CompletableFuture.completedFuture(accountDto));
     MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient,
-      connectionRegistry, eaClient);
+      connectionRegistry);
     MetatraderAccount actualAccount = api.getAccountByToken().get();
     assertThat(actualAccount).usingRecursiveComparison().isEqualTo(expectedAccount);
   }
@@ -126,7 +121,7 @@ public class MetatraderAccountApiTest {
     Mockito.when(client.createAccount(newAccountDto)).thenReturn(CompletableFuture.completedFuture(accountIdDto));
     Mockito.when(client.getAccount("id")).thenReturn(CompletableFuture.completedFuture(accountDto));
     MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient,
-      connectionRegistry, eaClient);
+      connectionRegistry);
     MetatraderAccount actualAccount = api.createAccount(newAccountDto).get();
     assertThat(actualAccount).usingRecursiveComparison().isEqualTo(expectedAccount);
   }
@@ -505,237 +500,6 @@ public class MetatraderAccountApiTest {
     assertEquals(editedAccount.name, account.getName());
     assertEquals(editedAccount.server, account.getServer());
     Mockito.verify(client, Mockito.times(2)).getAccount("id");
-  }
-  
-  /**
-   * Tests {@link MetatraderAccount#getExpertAdvisors()}
-   */
-  @Test
-  void testRetrievesExpertAdvisors() {
-    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }};
-    ExpertAdvisorDto advisorDto = new ExpertAdvisorDto() {{ expertId = "ea"; }};
-    Mockito.when(client.getAccount(Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(accountDto));
-    Mockito.when(eaClient.getExpertAdvisors(Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(Arrays.asList(advisorDto)));
-    MetatraderAccount account = api.getAccount("id").join();
-    List<ExpertAdvisor> experts = account.getExpertAdvisors().join();
-    assertThat(experts.stream().map(e -> e.getExpertId()).collect(Collectors.toList()))
-      .usingRecursiveComparison().isEqualTo(Arrays.asList("ea"));
-    Mockito.verify(eaClient).getExpertAdvisors("id");
-  }
-  
-  /**
-   * Tests {@link MetatraderAccount#getExpertAdvisor(String)}
-   */
-  @Test
-  void testRetrievesExpertAdvisorByExpertId() {
-    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }};
-    ExpertAdvisorDto advisorDto = new ExpertAdvisorDto() {{
-      expertId = "ea";
-      period = "1H";
-      symbol = "EURUSD";
-      fileUploaded = false;
-    }};
-    Mockito.when(client.getAccount(Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(accountDto));
-    Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(advisorDto));
-    MetatraderAccount account = api.getAccount("id").join();
-    ExpertAdvisor expert = account.getExpertAdvisor("ea").join();
-    assertEquals("ea", expert.getExpertId());
-    assertEquals("1H", expert.getPeriod());
-    assertEquals("EURUSD", expert.getSymbol());
-    assertFalse(expert.isFileUploaded());
-    Mockito.verify(eaClient).getExpertAdvisor("id", "ea");
-  }
-  
-  /**
-   * Tests {@link MetatraderAccount#getExpertAdvisor(String)}
-   */
-  @Test
-  void testValidatesAccountType() {
-    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g2"; }};
-    ExpertAdvisorDto advisorDto = new ExpertAdvisorDto() {{
-      expertId = "ea";
-      period = "1H";
-      symbol = "EURUSD";
-      fileUploaded = false;
-    }};
-    Mockito.when(client.getAccount(Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(accountDto));
-    Mockito.when(eaClient.getExpertAdvisors(Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(Arrays.asList(advisorDto)));
-    Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(advisorDto));
-    NewExpertAdvisorDto newExpertAdvisor = new NewExpertAdvisorDto() {{
-      period = "1H";
-      symbol = "EURUSD";
-      preset = "preset";
-    }};
-    MetatraderAccount account = api.getAccount("id").join();
-    try {
-      account.getExpertAdvisors().join();
-      throw new Exception("ValidationException expected");
-    } catch (Throwable err) {
-      assertTrue(err.getCause() instanceof ValidationException);
-    }
-    try {
-      account.getExpertAdvisor("ea").join();
-      throw new Exception("ValidationException expected");
-    } catch (Throwable err) {
-      assertTrue(err.getCause() instanceof ValidationException);
-    }
-    try {
-      account.createExpertAdvisor("ea", newExpertAdvisor).join();
-      throw new Exception("ValidationException expected");
-    } catch (Throwable err) {
-      assertTrue(err.getCause() instanceof ValidationException);
-    }
-  }
-  
-  /**
-   * Tests {@link MetatraderAccount#createExpertAdvisor(String, NewExpertAdvisorDto)}
-   */
-  @Test
-  void testCreatesExpertAdvisor() {
-    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }};
-    ExpertAdvisorDto advisorDto = new ExpertAdvisorDto() {{
-      expertId = "ea";
-      period = "1H";
-      symbol = "EURUSD";
-      fileUploaded = false;
-    }};
-    Mockito.when(client.getAccount(Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(accountDto));
-    Mockito.when(eaClient.updateExpertAdvisor(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
-      .thenReturn(CompletableFuture.completedFuture(null));
-    Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(advisorDto));
-    NewExpertAdvisorDto newExpertAdvisor = new NewExpertAdvisorDto() {{
-      period = "1H";
-      symbol = "EURUSD";
-      preset = "preset";
-    }};
-    MetatraderAccount account = api.getAccount("id").join();
-    ExpertAdvisor expert = account.createExpertAdvisor("ea", newExpertAdvisor).join();
-    assertEquals("ea", expert.getExpertId());
-    assertEquals("1H", expert.getPeriod());
-    assertEquals("EURUSD", expert.getSymbol());
-    assertFalse(expert.isFileUploaded());
-    Mockito.verify(eaClient).updateExpertAdvisor("id", "ea", newExpertAdvisor);
-    Mockito.verify(eaClient).getExpertAdvisor("id", "ea");
-  }
-  
-  /**
-   * Tests {@link ExpertAdvisor#reload()}
-   */
-  @Test
-  void testReloadsExpertAdvisor() {
-    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(
-      CompletableFuture.completedFuture(new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }}));
-    Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
-        expertId = "ea";
-        period = "1H";
-        symbol = "EURUSD";
-        fileUploaded = false;
-      }})).thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
-        expertId = "ea";
-        period = "4H";
-        symbol = "EURUSD";
-        fileUploaded = false;
-      }}));
-    MetatraderAccount account = api.getAccount("id").join();
-    ExpertAdvisor expert = account.getExpertAdvisor("ea").join();
-    expert.reload().join();
-    assertEquals("4H", expert.getPeriod());
-    Mockito.verify(eaClient, Mockito.times(2)).getExpertAdvisor("id", "ea");
-  }
-  
-  /**
-   * Tests {@link ExpertAdvisor#update(NewExpertAdvisorDto)}
-   */
-  @Test
-  void testUpdatesExpertAdvisor() {
-    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(
-      CompletableFuture.completedFuture(new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }}));
-    Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
-        expertId = "ea";
-        period = "1H";
-        symbol = "EURUSD";
-        fileUploaded = false;
-      }})).thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
-        expertId = "ea";
-        period = "4H";
-        symbol = "EURUSD";
-        fileUploaded = false;
-      }}));
-    NewExpertAdvisorDto newExpertAdvisor = new NewExpertAdvisorDto() {{
-      period = "4H";
-      symbol = "EURUSD";
-      preset = "preset";
-    }};
-    Mockito.when(eaClient.updateExpertAdvisor(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
-      .thenReturn(CompletableFuture.completedFuture(null));
-    MetatraderAccount account = api.getAccount("id").join();
-    ExpertAdvisor expert = account.getExpertAdvisor("ea").join();
-    expert.update(newExpertAdvisor).join();
-    assertEquals("4H", expert.getPeriod());
-    Mockito.verify(eaClient).updateExpertAdvisor("id", "ea", newExpertAdvisor);
-    Mockito.verify(eaClient, Mockito.times(2)).getExpertAdvisor("id", "ea");
-  }
-  
-  /**
-   * Tests {@link ExpertAdvisor#uploadFile(String)}
-   */
-  @Test
-  void testUploadsExpertAdvisorFile() {
-    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(
-      CompletableFuture.completedFuture(new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }}));
-    Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
-        expertId = "ea";
-        period = "1H";
-        symbol = "EURUSD";
-        fileUploaded = false;
-      }})).thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
-        expertId = "ea";
-        period = "4H";
-        symbol = "EURUSD";
-        fileUploaded = true;
-      }}));
-    Mockito.when(eaClient.uploadExpertAdvisorFile(Mockito.anyString(), Mockito.anyString(),
-      Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
-    MetatraderAccount account = api.getAccount("id").join();
-    ExpertAdvisor expert = account.getExpertAdvisor("ea").join();
-    expert.uploadFile("/path/to/file").join();
-    assertTrue(expert.isFileUploaded());
-    Mockito.verify(eaClient).uploadExpertAdvisorFile("id", "ea", "/path/to/file");
-    Mockito.verify(eaClient, Mockito.times(2)).getExpertAdvisor("id", "ea");
-  }
-  
-  /**
-   * Tests {@link ExpertAdvisor#remove()}
-   */
-  @Test
-  void testRemovesExpertAdvisor() {
-    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(
-      CompletableFuture.completedFuture(new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }}));
-    Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
-        expertId = "ea";
-        period = "1H";
-        symbol = "EURUSD";
-        fileUploaded = false;
-      }}));
-    Mockito.when(eaClient.deleteExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
-      .thenReturn(CompletableFuture.completedFuture(null));
-    MetatraderAccount account = api.getAccount("id").join();
-    ExpertAdvisor expert = account.getExpertAdvisor("ea").join();
-    expert.remove().join();
-    Mockito.verify(eaClient).deleteExpertAdvisor("id", "ea");
   }
   
   private static Stream<Arguments> provideAccountDto() {
