@@ -1164,7 +1164,7 @@ class MetaApiConnectionTest {
     position.currentPrice = 1.24883;
     position.currentTickValue = 1;
     position.volume = 0.07;
-    position.swap = 0;
+    position.swap = 0.0;
     position.profit = -85.25999999999966;
     position.commission = -0.25;
     position.clientId = "TE_GBPUSD_7hyINWqAlE";

@@ -74,7 +74,7 @@ public class MetatraderPosition {
     /**
      * Position cumulative swap
      */
-    public double swap;
+    public Double swap;
     /**
      * Position cumulative profit
      */
