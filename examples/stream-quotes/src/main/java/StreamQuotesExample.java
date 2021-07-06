@@ -1,7 +1,5 @@
 import java.util.Arrays;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -35,11 +33,11 @@ public class StreamQuotesExample {
     @Override
     public CompletableFuture<Void> onSymbolPriceUpdated(int instanceIndex, MetatraderSymbolPrice price) {
       if (price.symbol.equals(symbol)) {
-//        try {
-//          System.out.println(symbol + " price updated " + asJson(price));
-//        } catch (JsonProcessingException e) {
-//          e.printStackTrace();
-//        }
+        try {
+          System.out.println(symbol + " price updated " + asJson(price));
+        } catch (JsonProcessingException e) {
+          e.printStackTrace();
+        }
       }
       return CompletableFuture.completedFuture(null);
     }
@@ -48,11 +46,11 @@ public class StreamQuotesExample {
       Double equity, Double margin, Double freeMargin, Double marginLevel, Double accountCurrencyExchangeRate) {
       for (MetatraderCandle candle : candles) {
         if (candle.symbol.equals(symbol)) {
-//          try {
-//            System.out.println(symbol + " candle updated " + asJson(candle));
-//          } catch (JsonProcessingException e) {
-//            e.printStackTrace();
-//          }
+          try {
+            System.out.println(symbol + " candle updated " + asJson(candle));
+          } catch (JsonProcessingException e) {
+            e.printStackTrace();
+          }
         }
       }
       return CompletableFuture.completedFuture(null);
@@ -62,11 +60,11 @@ public class StreamQuotesExample {
       Double equity, Double margin, Double freeMargin, Double marginLevel, Double accountCurrencyExchangeRate) {
       for (MetatraderTick tick : ticks) {
         if (tick.symbol.equals(symbol)) {
-//          try {
-//            System.out.println(symbol + " tick updated " + asJson(tick));
-//          } catch (JsonProcessingException e) {
-//            e.printStackTrace();
-//          }
+          try {
+            System.out.println(symbol + " tick updated " + asJson(tick));
+          } catch (JsonProcessingException e) {
+            e.printStackTrace();
+          }
         }
       }
       return CompletableFuture.completedFuture(null);
@@ -134,14 +132,6 @@ public class StreamQuotesExample {
       
       System.out.println("[" + new IsoTime().toString() + "] Synchronized successfully, streaming "
         + symbol + " market data now...");
-      
-      Timer timer = new Timer();
-      timer.schedule(new TimerTask() {
-        @Override
-        public void run() {
-          System.out.print("!");
-        }
-      }, 2500, 2500);
       
       while (true) {
         Thread.sleep(1000);

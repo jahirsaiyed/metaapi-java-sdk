@@ -18,6 +18,7 @@
   - breaking change: refactored specifications updated events
   - breaking change: removed expert advisor API
   - fix equity calculation
+  - implemented API to retrieve historical market data
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

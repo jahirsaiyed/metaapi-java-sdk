@@ -1444,7 +1444,7 @@ class MetaApiWebsocketClientTest {
    disconnectPacket.put("host", "ps-mpa-1");
    disconnectPacket.put("instanceIndex", 1);
    socket.sendEvent("synchronization", disconnectPacket.toString());
-   Thread.sleep(200);
+   Thread.sleep(400);
    Mockito.verify(listener).onDisconnected(1);
  }
  

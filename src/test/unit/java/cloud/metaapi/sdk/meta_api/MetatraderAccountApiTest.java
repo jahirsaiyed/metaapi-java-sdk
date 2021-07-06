@@ -21,6 +21,7 @@ import org.mockito.Mockito;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.NotFoundException;
+import cloud.metaapi.sdk.clients.meta_api.HistoricalMarketDataClient;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.models.AccountsFilter;
@@ -42,13 +43,16 @@ public class MetatraderAccountApiTest {
   private MetatraderAccountClient client;
   private MetaApiWebsocketClient metaApiWebsocketClient;
   private ConnectionRegistry connectionRegistry;
+  private HistoricalMarketDataClient historicalMarketDataClient;
 
   @BeforeEach
   void setUp() throws Exception {
     client = Mockito.mock(MetatraderAccountClient.class);
     metaApiWebsocketClient = Mockito.mock(MetaApiWebsocketClient.class);
     connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
-    api = new MetatraderAccountApi(client, metaApiWebsocketClient, connectionRegistry);
+    historicalMarketDataClient = Mockito.mock(HistoricalMarketDataClient.class);
+    api = new MetatraderAccountApi(client, metaApiWebsocketClient, connectionRegistry,
+      historicalMarketDataClient);
   }
   
   @AfterEach
@@ -65,7 +69,7 @@ public class MetatraderAccountApiTest {
     AccountsFilter filter = new AccountsFilter() {{ provisioningProfileId = "profileId"; }};
     Mockito.when(client.getAccounts(filter)).thenReturn(CompletableFuture.completedFuture(Lists.list(accountDto)));
     List<MetatraderAccount> expectedAccounts = Lists.list(new MetatraderAccount(accountDto,
-      client, metaApiWebsocketClient, connectionRegistry));
+      client, metaApiWebsocketClient, connectionRegistry, historicalMarketDataClient));
     List<MetatraderAccount> actualAccounts = api.getAccounts(filter).get();
     assertThat(actualAccounts).usingRecursiveComparison().isEqualTo(expectedAccounts);
   }
@@ -78,7 +82,7 @@ public class MetatraderAccountApiTest {
   void testRetrievesMtAccountById(MetatraderAccountDto accountDto) throws Exception {
     Mockito.when(client.getAccount("id")).thenReturn(CompletableFuture.completedFuture(accountDto));
     MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient,
-      connectionRegistry);
+      connectionRegistry, historicalMarketDataClient);
     MetatraderAccount actualAccount = api.getAccount("id").get();
     assertThat(actualAccount).usingRecursiveComparison().isEqualTo(expectedAccount);
   }
@@ -91,7 +95,7 @@ public class MetatraderAccountApiTest {
   void testRetrievesMtAccountByToken(MetatraderAccountDto accountDto) throws Exception {
     Mockito.when(client.getAccountByToken()).thenReturn(CompletableFuture.completedFuture(accountDto));
     MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient,
-      connectionRegistry);
+      connectionRegistry, historicalMarketDataClient);
     MetatraderAccount actualAccount = api.getAccountByToken().get();
     assertThat(actualAccount).usingRecursiveComparison().isEqualTo(expectedAccount);
   }
@@ -116,7 +120,7 @@ public class MetatraderAccountApiTest {
     Mockito.when(client.createAccount(newAccountDto)).thenReturn(CompletableFuture.completedFuture(accountIdDto));
     Mockito.when(client.getAccount("id")).thenReturn(CompletableFuture.completedFuture(accountDto));
     MetatraderAccount expectedAccount = new MetatraderAccount(accountDto, client, metaApiWebsocketClient,
-      connectionRegistry);
+      connectionRegistry, historicalMarketDataClient);
     MetatraderAccount actualAccount = api.createAccount(newAccountDto).get();
     assertThat(actualAccount).usingRecursiveComparison().isEqualTo(expectedAccount);
   }

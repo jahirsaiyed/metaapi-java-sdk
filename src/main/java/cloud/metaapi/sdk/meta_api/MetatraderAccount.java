@@ -9,10 +9,13 @@ import java.util.concurrent.ExecutionException;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.NotFoundException;
+import cloud.metaapi.sdk.clients.meta_api.HistoricalMarketDataClient;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountUpdateDto;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderCandle;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.ConnectionStatus;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
@@ -27,6 +30,7 @@ public class MetatraderAccount {
   private MetatraderAccountDto data;
   private MetatraderAccountClient metatraderAccountClient;
   private ConnectionRegistry connectionRegistry;
+  private HistoricalMarketDataClient historicalMarketDataClient;
   
   /**
    * Constructs a MetaTrader account entity
@@ -34,12 +38,15 @@ public class MetatraderAccount {
    * @param metatraderAccountClient MetaTrader account REST API client
    * @param metaApiWebsocketClient MetaApi websocket client
    * @param connectionRegistry metatrader account connection registry
+   * @param historicalMarketDataClient historical market data HTTP API client
    */
   public MetatraderAccount(MetatraderAccountDto data, MetatraderAccountClient metatraderAccountClient,
-    MetaApiWebsocketClient metaApiWebsocketClient, ConnectionRegistry connectionRegistry) {
+    MetaApiWebsocketClient metaApiWebsocketClient, ConnectionRegistry connectionRegistry,
+    HistoricalMarketDataClient historicalMarketDataClient) {
     this.data = data;
     this.metatraderAccountClient = metatraderAccountClient;
     this.connectionRegistry = connectionRegistry;
+    this.historicalMarketDataClient = historicalMarketDataClient;
   }
   
   /**
@@ -420,5 +427,89 @@ public class MetatraderAccount {
       metatraderAccountClient.updateAccount(getId(), account).join();
       reload().join();
     });
+  }
+  
+  /**
+   * Returns historical candles for a specific symbol and timeframe from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalCandles/
+   * @param symbol symbol to retrieve candles for (e.g. a currency pair or an index)
+   * @param timeframe defines the timeframe according to which the candles must be generated.
+   * Allowed values for MT5 are 1m, 2m, 3m, 4m, 5m, 6m, 10m, 12m, 15m, 20m, 30m, 1h, 2h, 3h, 4h,
+   * 6h, 8h, 12h, 1d, 1w, 1mn. Allowed values for MT4 are 1m, 5m, 15m 30m, 1h, 4h, 1d, 1w, 1mn
+   * @return completable future promise resolving with historical candles downloaded
+   */
+  public CompletableFuture<List<MetatraderCandle>> getHistoricalCandles(String symbol, String timeframe) {
+    return historicalMarketDataClient.getHistoricalCandles(getId(), symbol, timeframe, null, null);
+  }
+  
+  /**
+   * Returns historical candles for a specific symbol and timeframe from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalCandles/
+   * @param symbol symbol to retrieve candles for (e.g. a currency pair or an index)
+   * @param timeframe defines the timeframe according to which the candles must be generated.
+   * Allowed values for MT5 are 1m, 2m, 3m, 4m, 5m, 6m, 10m, 12m, 15m, 20m, 30m, 1h, 2h, 3h, 4h,
+   * 6h, 8h, 12h, 1d, 1w, 1mn. Allowed values for MT4 are 1m, 5m, 15m 30m, 1h, 4h, 1d, 1w, 1mn
+   * @param startTime time to start loading candles from. Note that candles are loaded in backwards
+   * direction, so this should be the latest time. Leave {@code null} to request latest candles.
+   * @return completable future promise resolving with historical candles downloaded
+   */
+  public CompletableFuture<List<MetatraderCandle>> getHistoricalCandles(String symbol,
+    String timeframe, IsoTime startTime) {
+    return historicalMarketDataClient.getHistoricalCandles(getId(), symbol, timeframe, startTime, null);
+  }
+  
+  /**
+   * Returns historical candles for a specific symbol and timeframe from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalCandles/
+   * @param symbol symbol to retrieve candles for (e.g. a currency pair or an index)
+   * @param timeframe defines the timeframe according to which the candles must be generated.
+   * Allowed values for MT5 are 1m, 2m, 3m, 4m, 5m, 6m, 10m, 12m, 15m, 20m, 30m, 1h, 2h, 3h, 4h,
+   * 6h, 8h, 12h, 1d, 1w, 1mn. Allowed values for MT4 are 1m, 5m, 15m 30m, 1h, 4h, 1d, 1w, 1mn
+   * @param startTime time to start loading candles from. Note that candles are loaded in backwards
+   * direction, so this should be the latest time. Leave {@code null} to request latest candles.
+   * @param limit maximum number of candles to retrieve, or {@code null}. Must be less or equal to 1000
+   * @return completable future resolving with historical candles downloaded
+   */
+  public CompletableFuture<List<MetatraderCandle>> getHistoricalCandles(String symbol,
+    String timeframe, IsoTime startTime, Integer limit) {
+    return historicalMarketDataClient.getHistoricalCandles(getId(), symbol, timeframe, startTime, limit);
+  }
+
+  /**
+   * Returns historical ticks for a specific symbol from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalTicks/
+   * @param symbol symbol to retrieve ticks for (e.g. a currency pair or an index)
+   * @return completable future resolving with historical ticks downloaded
+   */
+  public CompletableFuture<List<MetatraderTick>> getHistoricalTicks(String symbol) {
+    return historicalMarketDataClient.getHistoricalTicks(getId(), symbol, null, null, null);
+  }
+  
+  /**
+   * Returns historical ticks for a specific symbol from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalTicks/
+   * @param symbol symbol to retrieve ticks for (e.g. a currency pair or an index)
+   * @param startTime time to start loading candles from. Note that candles are loaded in backwards
+   * direction, so this should be the latest time. Leave {@code null} to request latest candles.
+   * @return completable future resolving with historical ticks downloaded
+   */
+  public CompletableFuture<List<MetatraderTick>> getHistoricalTicks(String symbol, IsoTime startTime) {
+    return historicalMarketDataClient.getHistoricalTicks(getId(), symbol, startTime, null, null);
+  }
+  
+  /**
+   * Returns historical ticks for a specific symbol from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalTicks/
+   * @param symbol symbol to retrieve ticks for (e.g. a currency pair or an index)
+   * @param startTime time to start loading candles from. Note that candles are loaded in backwards
+   * direction, so this should be the latest time. Leave {@code null} to request latest candles.
+   * @param offset number of ticks to skip, or {@code null} (you can use it to avoid requesting
+   * ticks from previous request twice)
+   * @param limit maximum number of ticks to retrieve, or {@code null}. Must be less or equal to 1000
+   * @return completable future resolving with historical ticks downloaded
+   */
+  public CompletableFuture<List<MetatraderTick>> getHistoricalTicks(String symbol,
+    IsoTime startTime, Integer offset, Integer limit) {
+    return historicalMarketDataClient.getHistoricalTicks(getId(), symbol, startTime, offset, limit);
   }
 }
