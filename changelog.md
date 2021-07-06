@@ -19,6 +19,7 @@
   - breaking change: removed expert advisor API
   - fix equity calculation
   - implemented API to retrieve historical market data
+  - do not query specification fields until it is received in TerminalState
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
