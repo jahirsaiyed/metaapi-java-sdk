@@ -55,7 +55,7 @@ class HistoricalMarketDataClientTest {
       try {
         HttpRequestOptions expectedOptions = new HttpRequestOptions(
           marketDataClientApiUrl + "/users/current/accounts/accountId/historical-market-data/"
-            + "symbols/AUDNZD/timeframes/15m", Method.GET);
+            + "symbols/AUDNZD/timeframes/15m/candles", Method.GET);
         expectedOptions.getQueryParameters().put("startTime", new IsoTime("2020-04-07T03:45:00.000Z"));
         expectedOptions.getQueryParameters().put("limit", 1);
         expectedOptions.getHeaders().put("auth-token", "header.payload.sign");

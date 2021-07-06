@@ -489,8 +489,8 @@ public class MetatraderAccount {
    * Returns historical ticks for a specific symbol from the MetaTrader account.
    * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalTicks/
    * @param symbol symbol to retrieve ticks for (e.g. a currency pair or an index)
-   * @param startTime time to start loading candles from. Note that candles are loaded in backwards
-   * direction, so this should be the latest time. Leave {@code null} to request latest candles.
+   * @param startTime time to start loading ticks from. Note that ticks are loaded in forward
+   * direction, so this should be the earliest time. Leave {@code null} to request latest candles.
    * @return completable future resolving with historical ticks downloaded
    */
   public CompletableFuture<List<MetatraderTick>> getHistoricalTicks(String symbol, IsoTime startTime) {
@@ -501,8 +501,8 @@ public class MetatraderAccount {
    * Returns historical ticks for a specific symbol from the MetaTrader account.
    * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalTicks/
    * @param symbol symbol to retrieve ticks for (e.g. a currency pair or an index)
-   * @param startTime time to start loading candles from. Note that candles are loaded in backwards
-   * direction, so this should be the latest time. Leave {@code null} to request latest candles.
+   * @param startTime time to start loading ticks from. Note that ticks are loaded in forward
+   * direction, so this should be the earliest time. Leave {@code null} to request latest candles.
    * @param offset number of ticks to skip, or {@code null} (you can use it to avoid requesting
    * ticks from previous request twice)
    * @param limit maximum number of ticks to retrieve, or {@code null}. Must be less or equal to 1000
