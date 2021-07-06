@@ -29,13 +29,13 @@ public class RetrieveHistoricalCandles {
       // wait until account is deployed and connected to broker
       System.out.println("Deploying account");
       if (account.getState() != DeploymentState.DEPLOYED) {
-         // account.deploy().join();
+        account.deploy().join();
       } else {
         System.out.println("Account already deployed");
       }
       System.out.println("Waiting for API server to connect to broker (may take couple of minutes)");
       if (account.getConnectionStatus() != ConnectionStatus.CONNECTED) {
-        // account.waitConnected().join();
+        account.waitConnected().join();
       }
 
       // retrieve last 10K 1m candles
@@ -45,6 +45,7 @@ public class RetrieveHistoricalCandles {
       IsoTime startTime = null;
       List<MetatraderCandle> candles = new ArrayList<>();
       for (int i = 0; i < pages; i++) {
+        // the API to retrieve historical market data is currently available for G1 only
         candles = account.getHistoricalCandles(symbol, "1m", startTime).join();
         System.out.println("Downloaded " + candles.size() + " historical candles for " + symbol);
         if (!candles.isEmpty()) {
