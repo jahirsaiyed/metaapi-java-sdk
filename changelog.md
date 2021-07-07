@@ -20,6 +20,7 @@
   - fix equity calculation
   - implemented API to retrieve historical market data
   - do not query specification fields until it is received in TerminalState
+  - upgraded CopyFactory API to 2.1.1
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

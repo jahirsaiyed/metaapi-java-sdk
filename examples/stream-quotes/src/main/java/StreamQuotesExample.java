@@ -116,8 +116,8 @@ public class StreamQuotesExample {
       connection.addSynchronizationListener(quoteListener);
       
       // wait until terminal state synchronized to the local state
-      System.out.println("[" + new IsoTime().toString() + "] Waiting for SDK to synchronize "
-        + "to terminal state (may take some time depending on your history size)");
+      System.out.println("Waiting for SDK to synchronize to terminal state (may take some "
+        + "time depending on your history size)");
       connection.waitSynchronized().get();
       
       // Add symbol to MarketWatch if not yet added and subscribe to market data
