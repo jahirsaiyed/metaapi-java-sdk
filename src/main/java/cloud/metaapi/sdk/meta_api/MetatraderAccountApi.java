@@ -6,6 +6,7 @@ import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 import cloud.metaapi.sdk.clients.meta_api.HistoricalMarketDataClient;
+import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.models.AccountsFilter;
@@ -20,6 +21,7 @@ public class MetatraderAccountApi {
   private MetaApiWebsocketClient metaApiWebsocketClient;
   private ConnectionRegistry connectionRegistry;
   private HistoricalMarketDataClient historicalMarketDataClient;
+  private ExpertAdvisorClient expertAdvisorClient;
   
   /**
    * Constructs a MetaTrader account API instance
@@ -30,10 +32,11 @@ public class MetatraderAccountApi {
    */
   public MetatraderAccountApi(MetatraderAccountClient metatraderAccountClient,
     MetaApiWebsocketClient metaApiWebsocketClient, ConnectionRegistry connectionRegistry,
-    HistoricalMarketDataClient historicalMarketDataClient) {
+    ExpertAdvisorClient expertAdvisorClient, HistoricalMarketDataClient historicalMarketDataClient) {
     this.metatraderAccountClient = metatraderAccountClient;
     this.metaApiWebsocketClient = metaApiWebsocketClient;
     this.connectionRegistry = connectionRegistry;
+    this.expertAdvisorClient = expertAdvisorClient;
     this.historicalMarketDataClient = historicalMarketDataClient;
   }
   
@@ -53,7 +56,8 @@ public class MetatraderAccountApi {
   public CompletableFuture<List<MetatraderAccount>> getAccounts(AccountsFilter accountsFilter) {
     return metatraderAccountClient.getAccounts(accountsFilter).thenApply(accounts -> {
       return accounts.stream().map(accountDto -> new MetatraderAccount(accountDto, metatraderAccountClient,
-        metaApiWebsocketClient, connectionRegistry, historicalMarketDataClient)).collect(Collectors.toList());
+        metaApiWebsocketClient, connectionRegistry, expertAdvisorClient, historicalMarketDataClient))
+        .collect(Collectors.toList());
     });
   }
   
@@ -65,7 +69,7 @@ public class MetatraderAccountApi {
   public CompletableFuture<MetatraderAccount> getAccount(String accountId) {
     return metatraderAccountClient.getAccount(accountId).thenApply(accountDto -> {
       return new MetatraderAccount(accountDto, metatraderAccountClient, metaApiWebsocketClient,
-        connectionRegistry, historicalMarketDataClient);
+        connectionRegistry, expertAdvisorClient, historicalMarketDataClient);
     });
   }
   
@@ -76,7 +80,7 @@ public class MetatraderAccountApi {
   public CompletableFuture<MetatraderAccount> getAccountByToken() {
     return metatraderAccountClient.getAccountByToken().thenApply(accountDto -> {
       return new MetatraderAccount(accountDto, metatraderAccountClient, metaApiWebsocketClient,
-        connectionRegistry, historicalMarketDataClient);
+        connectionRegistry, expertAdvisorClient, historicalMarketDataClient);
     });
   }
   

@@ -13,6 +13,9 @@ import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.NotFoundException;
 import cloud.metaapi.sdk.clients.meta_api.HistoricalMarketDataClient;
 import cloud.metaapi.sdk.clients.error_handler.ValidationException;
+import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient;
+import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient.ExpertAdvisorDto;
+import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient.NewExpertAdvisorDto;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto;
@@ -34,6 +37,7 @@ public class MetatraderAccount {
   private MetatraderAccountClient metatraderAccountClient;
   private ConnectionRegistry connectionRegistry;
   private HistoricalMarketDataClient historicalMarketDataClient;
+  private ExpertAdvisorClient expertAdvisorClient;
   
   /**
    * Constructs a MetaTrader account entity
@@ -41,14 +45,15 @@ public class MetatraderAccount {
    * @param metatraderAccountClient MetaTrader account REST API client
    * @param metaApiWebsocketClient MetaApi websocket client
    * @param connectionRegistry metatrader account connection registry
-   * @param historicalMarketDataClient historical market data HTTP API client
+   * @param expertAdvisorClient expert advisor REST API client
    */
   public MetatraderAccount(MetatraderAccountDto data, MetatraderAccountClient metatraderAccountClient,
     MetaApiWebsocketClient metaApiWebsocketClient, ConnectionRegistry connectionRegistry,
-    HistoricalMarketDataClient historicalMarketDataClient) {
+    ExpertAdvisorClient expertAdvisorClient, HistoricalMarketDataClient historicalMarketDataClient) {
     this.data = data;
     this.metatraderAccountClient = metatraderAccountClient;
     this.connectionRegistry = connectionRegistry;
+    this.expertAdvisorClient = expertAdvisorClient;
     this.historicalMarketDataClient = historicalMarketDataClient;
   }
   
@@ -432,6 +437,55 @@ public class MetatraderAccount {
     });
   }
   
+  /**
+   * Retrieves expert advisor of current account
+   * @return completable future resolving with an array of expert advisor entities
+   */
+  public CompletableFuture<List<ExpertAdvisor>> getExpertAdvisors() {
+    return CompletableFuture.supplyAsync(() -> {
+      if (!getType().equals("cloud-g1")) {
+        throw new CompletionException(new ValidationException(
+          "Custom expert advisor is available only for cloud-g1 accounts", new HashMap<>()));
+      }
+      List<ExpertAdvisorDto> advisors = expertAdvisorClient.getExpertAdvisors(getId()).join();
+      return advisors.stream().map(e -> new ExpertAdvisor(e, getId(), expertAdvisorClient))
+        .collect(Collectors.toList());
+    });
+  }
+  
+  /**
+   * Retrieves a expert advisor of current account by id
+   * @param expertId expert advisor id
+   * @return completable future resolving with expert advisor entity
+   */
+  public CompletableFuture<ExpertAdvisor> getExpertAdvisor(String expertId) {
+    return CompletableFuture.supplyAsync(() -> {
+      if (!getType().equals("cloud-g1")) {
+        throw new CompletionException(new ValidationException(
+          "Custom expert advisor is available only for cloud-g1 accounts", new HashMap<>()));
+      }
+      ExpertAdvisorDto advisor = expertAdvisorClient.getExpertAdvisor(getId(), expertId).join();
+      return new ExpertAdvisor(advisor, getId(), expertAdvisorClient);
+    });
+  }
+  
+  /**
+   * Creates an expert advisor
+   * @param expertId expert advisor id
+   * @param expert expert advisor data
+   * @return completable future resolving with expert advisor entity
+   */
+  public CompletableFuture<ExpertAdvisor> createExpertAdvisor(String expertId, NewExpertAdvisorDto expert) {
+    return CompletableFuture.supplyAsync(() -> {
+      if (!getType().equals("cloud-g1")) {
+        throw new CompletionException(new ValidationException(
+          "Custom expert advisor is available only for cloud-g1 accounts", new HashMap<>()));
+      }
+      expertAdvisorClient.updateExpertAdvisor(getId(), expertId, expert).join();
+      return getExpertAdvisor(expertId).join();
+    });
+  }
+
   /**
    * Returns historical candles for a specific symbol and timeframe from the MetaTrader account.
    * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalCandles/

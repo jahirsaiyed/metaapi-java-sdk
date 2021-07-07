@@ -16,7 +16,6 @@
   - limit max concurrent synchronizations based on the number of subscribed accounts
   - implement proper rounding for position profits and account equity
   - breaking change: refactored specifications updated events
-  - breaking change: removed expert advisor API
   - fix equity calculation
   - implemented API to retrieve historical market data
   - do not query specification fields until it is received in TerminalState
