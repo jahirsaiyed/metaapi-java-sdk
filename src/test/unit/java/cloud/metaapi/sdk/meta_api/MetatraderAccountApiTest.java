@@ -2,12 +2,16 @@ package cloud.metaapi.sdk.meta_api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.assertj.core.util.Lists;
@@ -22,6 +26,7 @@ import org.mockito.Mockito;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.NotFoundException;
 import cloud.metaapi.sdk.clients.meta_api.HistoricalMarketDataClient;
+import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.models.AccountsFilter;
