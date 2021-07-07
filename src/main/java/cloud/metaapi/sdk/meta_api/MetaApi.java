@@ -72,9 +72,13 @@ public class MetaApi {
      */
     public RetryOptions retryOpts = new RetryOptions();
     /**
-     * Historical market data request timeout in milliseconds
+     * Historical market data request timeout in seconds. By default is {@code 1 minute}
      */
-    public int historicalMarketDataRequestTimeout;
+    public int historicalMarketDataRequestTimeout = 60;
+    /**
+     * Demo account request timeout in seconds. By default is {@code 4 minutes}
+     */
+    public int demoAccountRequestTimeout = 240;
   }
   
   /**
@@ -147,7 +151,9 @@ public class MetaApi {
       throw new ValidationException("Application name must be non-empty string consisting from letters, digits and _ only", null);
     }
     HttpClient httpClient = new HttpClient(opts.requestTimeout * 1000, opts.connectTimeout * 1000, opts.retryOpts);
-    HttpClient historicalMarketDataHttpClient = new HttpClient(opts.historicalMarketDataRequestTimeout,
+    HttpClient historicalMarketDataHttpClient = new HttpClient(opts.historicalMarketDataRequestTimeout * 1000,
+      opts.connectTimeout * 1000, opts.retryOpts);
+    HttpClient demoAccountHttpClient = new HttpClient(opts.demoAccountRequestTimeout * 1000,
       opts.connectTimeout * 1000, opts.retryOpts);
     MetaApiWebsocketClient.ClientOptions websocketOptions = new MetaApiWebsocketClient.ClientOptions();
     websocketOptions.application = opts.application;
@@ -166,7 +172,7 @@ public class MetaApi {
     metatraderAccountApi = new MetatraderAccountApi(new MetatraderAccountClient(httpClient, token, opts.domain),
       metaApiWebsocketClient, connectionRegistry, historicalMarketDataClient);
     metatraderDemoAccountApi = new MetatraderDemoAccountApi(
-      new MetatraderDemoAccountClient(httpClient, token, opts.domain));
+      new MetatraderDemoAccountClient(demoAccountHttpClient, token, opts.domain));
     if (opts.enableLatencyMonitor) {
       latencyMonitor = new LatencyMonitor();
       metaApiWebsocketClient.addLatencyListener(latencyMonitor);
