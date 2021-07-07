@@ -226,6 +226,18 @@ System.out.println(connection.getSymbolSpecification("GBPUSD").join());
 System.out.println(connection.getSymbolPrice("GBPUSD").join());
 ```
 
+### Query historical market data via RPC API
+Currently this API is supported on G1 only.
+
+```java
+// retrieve 1000 candles before the specified time
+List<MetatraderCandle> candles = account.getHistoricalCandles("EURUSD", "1m", new IsoTime("2021-05-01T00:00:00.000Z"), 1000).join();
+// retrieve 1000 ticks after the specified time
+List<MetatraderTick> ticks = account.getHistoricalTicks("EURUSD", new IsoTime("2021-05-01T00:00:00.000Z"), 5, 1000).join();
+// retrieve 1000 latest ticks
+List<MetatraderTick> ticks = account.getHistoricalTicks("EURUSD", null, 0, 1000).join();
+```
+
 ### Use real-time streaming API
 Real-time streaming API is good for developing trading applications like trade copiers or automated trading strategies.
 The API synchronizes the terminal state locally so that you can query local copy of the terminal state really fast.
