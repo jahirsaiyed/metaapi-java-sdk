@@ -15,6 +15,7 @@ import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
 import cloud.metaapi.sdk.clients.meta_api.models.*;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder.OrderType;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderPosition.PositionType;
+import cloud.metaapi.sdk.util.Js;
 
 /**
  * Responsible for storing a local copy of remote terminal state
@@ -315,17 +316,16 @@ public class TerminalState extends SynchronizationListener {
     }
     if (state.accountInformation != null) {
       if (state.positionsInitialized && pricesInitialized) {
-        double profitSum = 0;
         String platform = state.accountInformation.platform;
-        for (MetatraderPosition p : state.positions) {
-          if (platform != null && platform.equals("mt5")) {
-            profitSum += Math.round((p.unrealizedProfit != null ? p.unrealizedProfit : 0) * 100.0) / 100.0
-              + Math.round((p.swap != null ? p.swap : 0) * 100.0) / 100.0;
-          } else {
-            profitSum += Math.round((p.profit != null ? p.profit : 0) * 100.0) / 100.0;
-          }
+        if (platform != null && platform.equals("mt5")) {
+          state.accountInformation.equity = equity != null ? equity : state.accountInformation.balance +
+            Js.reduce(state.positions, (acc, p) -> acc + 
+              Math.round(Js.or(p.unrealizedProfit, 0.0) * 100.0) / 100.0 + Math.round(Js.or(p.swap, 0.0) * 100.0) / 100.0, 0.0);
+        } else {
+          state.accountInformation.equity = equity != null ? equity : state.accountInformation.balance +
+            Js.reduce(state.positions, (acc, p) -> acc + Math.round(Js.or(p.swap, 0.0) * 100) / 100 +
+              Math.round(Js.or(p.commission, 0.0) * 100) / 100 + Math.round(Js.or(p.unrealizedProfit, 0.0) * 100) / 100, 0.0);
         }
-        state.accountInformation.equity = state.accountInformation.balance + profitSum;
         state.accountInformation.equity = Math.round(state.accountInformation.equity * 100.0) / 100.0;
       } else {
         state.accountInformation.equity = equity != null ? equity : state.accountInformation.equity;
