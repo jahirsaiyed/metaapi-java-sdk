@@ -369,6 +369,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           Transport transport = (Transport) socketEventArgs[0];
           transport.query.put("auth-token", token);
           transport.query.put("clientId", String.valueOf(instance.clientId));
+          transport.query.put("protocol", "2");
           transport.on(Transport.EVENT_REQUEST_HEADERS, (Object[] transportEventArgs) -> {
             @SuppressWarnings("unchecked")
             Map<String, List<String>> headers = (Map<String, List<String>>) transportEventArgs[0];
