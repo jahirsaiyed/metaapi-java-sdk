@@ -23,6 +23,7 @@
   - increased default demo account request timeout to 240 seconds
   - swapRollover3Days can take value of NONE for some brokers
   - added MetaStats SDK
+  - fixed deal sorting in memory history store
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
