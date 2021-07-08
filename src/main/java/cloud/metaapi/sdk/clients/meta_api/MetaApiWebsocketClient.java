@@ -437,7 +437,11 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         });
         socketInstance.on("response", (Object[] args) -> {
           try {
-            JsonNode data = jsonMapper.readTree(args[0].toString());
+            JsonNode uncheckedData = jsonMapper.readTree(args[0].toString());
+            if (uncheckedData.isTextual()) {
+              uncheckedData = jsonMapper.readTree(uncheckedData.asText());
+            }
+            final JsonNode data = uncheckedData;
             RequestResolve requestResolve = data.has("requestId")
               ? instance.requestResolves.remove(data.get("requestId").asText()) : null;
             if (requestResolve != null) {
@@ -488,9 +492,11 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           }
         });
         socketInstance.on("synchronization", (Object[] args) -> {
-          JsonNode packet;
           try {
-            packet = jsonMapper.readTree(args[0].toString());
+            JsonNode packet = jsonMapper.readTree(args[0].toString());
+            if (packet.isTextual()) {
+              packet = jsonMapper.readTree(packet.asText());
+            }
             String synchronizationId = packet.has("synchronizationId")
               ? packet.get("synchronizationId").asText() : null;
             if (synchronizationId == null || instance.synchronizationThrottler.getActiveSynchronizationIds()
