@@ -181,20 +181,21 @@ public class MemoryHistoryStorage extends HistoryStorage {
   }
 
   @Override
-  public CompletableFuture<Void> onDealAdded(int instanceIndex, MetatraderDeal newDeal) {
+  public CompletableFuture<Void> onDealAdded(int instanceIndex, MetatraderDeal deal) {
     int insertIndex = 0;
     int replacementIndex = -1;
-    Date newDealTime = newDeal.time.getDate();
+    Date newDealTime = deal.time.getDate();
     if (!lastDealTimeByInstanceIndex.containsKey(instanceIndex)
       || lastDealTimeByInstanceIndex.get(instanceIndex) < newDealTime.getTime()) {
       lastDealTimeByInstanceIndex.put(instanceIndex, newDealTime.getTime());
     }
     for (int i = deals.size() - 1; i >= 0; i--) {
-      MetatraderDeal deal = deals.get(i);
-      Date dealTime = deal.time.getDate();
+      MetatraderDeal d = deals.get(i);
+      Date dealTime = d.time.getDate();
       int timeComparing = dealTime.compareTo(newDealTime);
-      if (timeComparing < 0 || (timeComparing == 0 && deal.id.compareTo(newDeal.id) <= 0)) {
-        if (timeComparing == 0 && deal.id.equals(newDeal.id) && deal.entryType == newDeal.entryType) {
+      if (timeComparing < 0 || (timeComparing == 0 && d.id.compareTo(deal.id) <= 0) ||
+          (timeComparing == 0 && d.id.equals(deal.id) && d.entryType.toString().compareTo(deal.entryType.toString()) <= 0)) {
+        if (timeComparing == 0 && d.id.equals(deal.id) && d.entryType == deal.entryType) {
           replacementIndex = i;
         } else {
           insertIndex = i + 1;
@@ -203,11 +204,11 @@ public class MemoryHistoryStorage extends HistoryStorage {
       }
     }
     if (replacementIndex != -1) {
-      deals.set(replacementIndex, newDeal);
+      deals.set(replacementIndex, deal);
       fileManager.setStartNewDealIndex(replacementIndex);
     }
     else {
-      deals.add(insertIndex, newDeal);
+      deals.add(insertIndex, deal);
       fileManager.setStartNewDealIndex(insertIndex);
     }
     return CompletableFuture.completedFuture(null);
