@@ -677,17 +677,6 @@ class MetaApiConnectionTest {
   }
   
   /**
-   * Tests {@link MetaApiConnection#subscribe()}
-   */
-  @Test
-  void testSubscribesAfterReconnect() throws InterruptedException {
-    Mockito.when(client.ensureSubscribe(Mockito.any(), Mockito.any()))
-      .thenReturn(CompletableFuture.completedFuture(null));
-    api.onReconnected().join();
-    Mockito.verify(client).ensureSubscribe("accountId", null);
-  }
-  
-  /**
    * Tests {@link MetaApiConnection#synchronize()}
    */
   @Test
@@ -1120,17 +1109,6 @@ class MetaApiConnectionTest {
       }
     });
     assertFalse(api.isSynchronized(0, "synchronizationId").join());
-  }
-  
-  /**
-   * Tests {@link MetaApiConnection#onReconnected()}
-   */
-  @Test
-  void testSubscribesToTerminalOnReconnect() throws Throwable {
-    MetaApiConnection apiSpy = Mockito.spy(api);
-    Mockito.doReturn(CompletableFuture.completedFuture(null)).when(apiSpy).subscribe();
-    apiSpy.onReconnected().get();
-    Mockito.verify(apiSpy).subscribe();
   }
   
   /**

@@ -1,7 +1,13 @@
 package cloud.metaapi.sdk.util;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.function.BiFunction;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * JavaScript-like helper functions
@@ -37,5 +43,55 @@ public class Js {
       }
     }
     return null;
+  }
+  
+  /**
+   * Creates a hash map from variadic value pairs
+   * @param <T> Type of the map keys
+   * @param <U> Type of the map values
+   * @param pairs Key-Value pairs
+   * @return Map created from the key-value pairs
+   */
+  @SafeVarargs
+  public static <T, U> Map<T, U> asMap(Pair<T, U>... pairs) {
+    Map<T, U> result = new HashMap<>();
+    for (Pair<T, U> pair : pairs) {
+      result.put(pair.getLeft(), pair.getRight());
+    }
+    return result;
+  }
+  
+  /**
+   * Setups timeout with JavaScript-like syntax
+   * @param callback Callback to run
+   * @param msInterval Timeout in milliseconds
+   * @return Timeout handle
+   */
+  public static Timer setTimeout(Runnable callback, int msInterval) {
+    Timer result = new Timer();
+    result.schedule(new TimerTask() {
+      @Override
+      public void run() {
+        callback.run();
+      }
+    }, msInterval);
+    return result;
+  }
+  
+  /**
+   * Setups interval with JavaScript-like syntax
+   * @param callback Callback to run
+   * @param msInterval Interval in milliseconds
+   * @return Interval handle
+   */
+  public static Timer setInterval(Runnable callback, int msInterval) {
+    Timer result = new Timer();
+    result.schedule(new TimerTask() {
+      @Override
+      public void run() {
+        callback.run();
+      }
+    }, msInterval, msInterval);
+    return result;
   }
 }

@@ -3,7 +3,10 @@ package cloud.metaapi.sdk.clients.meta_api;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
@@ -23,6 +26,7 @@ public class SubscriptionManager {
   private static Logger logger = Logger.getLogger(SubscriptionManager.class);
   private MetaApiWebsocketClient websocketClient;
   private Map<String, Subscription> subscriptions = new HashMap<>();
+  private Set<String> awaitingResubscribe = new HashSet<>();
   
   private static class Subscription {
     public boolean shouldRetry;
@@ -41,6 +45,20 @@ public class SubscriptionManager {
    */
   public SubscriptionManager(MetaApiWebsocketClient websocketClient) {
     this.websocketClient = websocketClient;
+  }
+  
+  /**
+   * Returns whether an account is currently subscribing
+   * @param accountId account id
+   * @return whether an account is currently subscribing
+   */
+  public boolean isAccountSubscribing(String accountId) {
+    for (String key : this.subscriptions.keySet()) {
+      if (key.startsWith(accountId)) {
+        return true;
+      }
+    }
+    return false;
   }
   
   /**
@@ -183,14 +201,35 @@ public class SubscriptionManager {
   /**
    * Invoked when connection to MetaApi websocket API restored after a disconnect.
    * @param socketInstanceIndex socket instance index
+   * @param reconnectAccountIds account ids to reconnect
    */
-  public void onReconnected(int socketInstanceIndex) {
-    Map<String, Integer> socketInstancesByAccounts = websocketClient.getSocketInstancesByAccounts();
-    for (String instanceId : new ArrayList<>(subscriptions.keySet())) {
-      String accountId = instanceId.split(":")[0];
-      if (socketInstancesByAccounts.get(accountId) == socketInstanceIndex) {
-        cancelSubscribe(instanceId);
+  public void onReconnected(int socketInstanceIndex, List<String> reconnectAccountIds) {
+    try {
+      Map<String, Integer> socketInstancesByAccounts = websocketClient.getSocketInstancesByAccounts();
+      for (String instanceId : new ArrayList<>(subscriptions.keySet())) {
+        String accountId = instanceId.split(":")[0];
+        if (socketInstancesByAccounts.getOrDefault(accountId, -1) == socketInstanceIndex) {
+          cancelSubscribe(instanceId);
+        }
       }
+      reconnectAccountIds.forEach(accountId -> {
+        CompletableFuture.runAsync(() -> {
+          try {
+            if (!awaitingResubscribe.contains(accountId)) {
+              awaitingResubscribe.add(accountId);
+              while (isAccountSubscribing(accountId)) {
+                Thread.sleep(1000);
+              }
+              awaitingResubscribe.remove(accountId);
+              subscribe(accountId, null);
+            }
+          } catch (Throwable err) {
+            logger.error("[" + new IsoTime() + "] Account " + accountId + " resubscribe task failed", err);
+          }
+        });
+      });
+    } catch (Throwable err) {
+      logger.error("[" + new IsoTime() + "] Failed to process subscribe manager reconnected event", err);
     }
   }
 }

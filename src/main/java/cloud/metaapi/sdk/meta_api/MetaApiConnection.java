@@ -944,12 +944,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   
   @Override
   public CompletableFuture<Void> onReconnected() {
-    try {
-      Thread.sleep(50);
-    } catch (InterruptedException e) {
-      logger.error("Failed to sleep thread", e);
-    }
-    return subscribe();
+    return CompletableFuture.completedFuture(null);
   }
   
   /**
@@ -1052,6 +1047,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
       websocketClient.removeSynchronizationListener(account.getId(), terminalState);
       websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
       websocketClient.removeSynchronizationListener(account.getId(), healthMonitor);
+      websocketClient.removeReconnectListener(this);
       connectionRegistry.remove(account.getId());
       healthMonitor.stop();
       closed = true;

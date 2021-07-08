@@ -1,6 +1,7 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.assertj.core.util.Maps;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,7 @@ import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException;
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException.TooManyRequestsExceptionMetadata;
 import cloud.metaapi.sdk.clients.models.IsoTime;
+import cloud.metaapi.sdk.util.Js;
 import io.socket.client.Socket;
 
 /**
@@ -130,11 +133,58 @@ class SubscriptionManagerTest {
     manager.subscribe("accountId2", null);
     manager.subscribe("accountId3", null);
     Thread.sleep(1000);
-    manager.onReconnected(0);
+    manager.onReconnected(0, new ArrayList<>());
     Thread.sleep(5000);
     Mockito.verify(client, Mockito.times(4)).subscribe(Mockito.any(), Mockito.any());
   };
 
+  /**
+   * Tests {@link SubscriptionManager#onReconnected}
+   */
+  @Test
+  void testRestartsSubscriptionsOnReconnect() throws InterruptedException {
+    Mockito.when(client.connect()).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(client.subscribe(Mockito.anyString(), Mockito.anyInt())).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(client.getSocketInstancesByAccounts()).thenReturn(Js.asMap(
+      Pair.of("accountId", 0), Pair.of("accountId2", 0), Pair.of("accountId3", 0)
+    ));
+    manager.subscribe("accountId", null);
+    manager.subscribe("accountId2", null);
+    manager.subscribe("accountId3", null);
+    Thread.sleep(1000);
+    manager.onReconnected(0, Arrays.asList("accountId", "accountId2"));
+    Thread.sleep(1000);
+    Mockito.verify(client, Mockito.times(5)).subscribe(Mockito.anyString(), Mockito.nullable(Integer.class));
+  };
+
+  /**
+   * Tests {@link SubscriptionManager#onReconnected}
+   */
+  @Test
+  void testWaitsUntilPreviousSubscriptionEndsOnReconnect() throws InterruptedException {
+    Mockito.when(client.subscribe(Mockito.anyString(), Mockito.anyInt())).thenAnswer(
+      new Answer<CompletableFuture<Void>>() {
+      @Override
+      public CompletableFuture<Void> answer(InvocationOnMock invocation) {
+        return CompletableFuture.runAsync(() -> {
+          try {
+            Thread.sleep(2000);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+        });
+      }
+    });
+
+    Mockito.when(client.connect()).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(client.getSocketInstancesByAccounts()).thenReturn(Js.asMap(Pair.of("accountId", 0)));
+    manager.subscribe("accountId", null);
+    Thread.sleep(1000);
+    manager.onReconnected(0, Arrays.asList("accountId"));
+    Thread.sleep(2000);
+    Mockito.verify(client, Mockito.times(2)).subscribe(Mockito.anyString(), Mockito.nullable(Integer.class));
+  };
+  
   /**
    * Tests {@link SubscriptionManager#subscribe(String, Integer)}
    */

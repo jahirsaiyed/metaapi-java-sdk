@@ -50,6 +50,7 @@ import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.meta_api.MetaApi;
 import cloud.metaapi.sdk.meta_api.MetaApiConnection;
 import cloud.metaapi.sdk.meta_api.MetatraderAccount;
+import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.JsonMapper;
 
 class SyncStabilityTest {
@@ -125,7 +126,7 @@ class SyncStabilityTest {
   
   static class FakeServer {
     
-    public Timer statusTask;
+    public Map<String, Timer> statusTasks = new HashMap<>();
     public Consumer<Socket> connectListener = null;
     private boolean enableStatusTask = true;
     
@@ -139,6 +140,13 @@ class SyncStabilityTest {
         response.put("host", "ps-mpa-0");
         socket.socket.sendEvent("synchronization", response.toString());
       });
+    }
+    
+    public void deleteStatusTask(String accountId) {
+      if (statusTasks.containsKey(accountId)) {
+        statusTasks.get(accountId).cancel();
+        statusTasks.remove(accountId);
+      }
     }
     
     public CompletableFuture<Void> emitStatus(Socket socket, String accountId) {
@@ -246,27 +254,24 @@ class SyncStabilityTest {
           if (type.equals("subscribe")) {
             Thread.sleep(200);
             respond(socket, data).join();
-            statusTask = new Timer();
-            if (enableStatusTask) {
-              statusTask.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                  if (enableStatusTask) {
-                    emitStatus(socket, data.get("accountId").asText());
-                  }
-                }
-              }, 100, 100);
-            }
+            statusTasks.put(data.get("accountId").asText(), Js.setInterval(() -> {
+              if (enableStatusTask) {
+                emitStatus(socket, data.get("accountId").asText());
+              }
+            }, 100));
             Thread.sleep(50);
             authenticate(socket, data).join();
           } else if (type.equals("synchronize")) {
             respond(socket, data).join();
             Thread.sleep(50);
             syncAccount(socket, data).join();
-          } else if (type.equals("waitSynchronized") || type.equals("unsubscribe")) {
+          } else if (type.equals("waitSynchronized")) {
             respond(socket, data).join();
           } else if (type.equals("getAccountInformation")) {
             respondAccountInformation(socket, data).join();
+          } else if (type.equals("unsubscribe")) {
+            deleteStatusTask(data.get("accountId").asText());
+            respond(socket, data).join();
           }
         } catch (Exception err) {
           err.printStackTrace();
@@ -284,13 +289,9 @@ class SyncStabilityTest {
       };
     }
     
-    public void enableStatusTask() {
-      enableStatusTask = true;
-    }
-    
     public void disableStatusTask() {
       enableStatusTask = false;
-      if (statusTask != null) {
+      for (Timer statusTask : statusTasks.values()) {
         statusTask.cancel();
       }
     }
@@ -432,7 +433,7 @@ class SyncStabilityTest {
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
-    fakeServer.disableStatusTask();
+    fakeServer.deleteStatusTask("accountId");
     fakeServer.connectListener = (connected) -> {
       connected.socket.disconnect();
     };
@@ -448,7 +449,7 @@ class SyncStabilityTest {
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
-    fakeServer.statusTask.cancel();
+    fakeServer.deleteStatusTask("accountId");
     Thread.sleep(8500);
     MetatraderAccountInformation response = connection.getAccountInformation().join();
     Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
@@ -465,13 +466,8 @@ class SyncStabilityTest {
           String type = data.get("type").asText();
           if (type.equals("subscribe")) {
             Thread.sleep(200);
-            fakeServer.statusTask = new Timer();
-            fakeServer.statusTask.schedule(new TimerTask() {
-              @Override
-              public void run() {
-                fakeServer.emitStatus(socket, data.get("accountId").asText());
-              }
-            }, 100, 100);
+            fakeServer.statusTasks.put(data.get("accountId").asText(), Js.setInterval(() ->
+              fakeServer.emitStatus(socket, data.get("accountId").asText()), 100));
             fakeServer.authenticate(socket, data).join();
             Thread.sleep(400);
             fakeServer.respond(socket, data).join();
@@ -503,7 +499,7 @@ class SyncStabilityTest {
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
-    fakeServer.statusTask.cancel();
+    fakeServer.deleteStatusTask("accountId");
     fakeServer.disableSync();
     ObjectNode disconnectPacket = jsonMapper.createObjectNode();
     disconnectPacket.put("type", "disconnected");
@@ -532,7 +528,7 @@ class SyncStabilityTest {
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
-    fakeServer.statusTask.cancel();
+    fakeServer.deleteStatusTask("accountId");
     fakeServer.disableSync();
     ObjectNode disconnectPacket = jsonMapper.createObjectNode();
     disconnectPacket.put("type", "disconnected");
@@ -558,7 +554,7 @@ class SyncStabilityTest {
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
-    fakeServer.statusTask.cancel();
+    fakeServer.deleteStatusTask("accountId");
     stopWebsocketServer();
     Thread.sleep(60000);
     startWebsocketServer();
@@ -598,6 +594,38 @@ class SyncStabilityTest {
   };
   
   @Test
+  void testResubscribesOtherAccountsAfterOneOfConnectionsIsClosed() throws InterruptedException {
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 3;}});
+    Thread.sleep(1000);
+    MetatraderAccount account2 = api.getMetatraderAccountApi().getAccount("accountId2").join();
+    MetaApiConnection connection2 = account2.connect().join();
+    connection2.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 3;}});
+    Thread.sleep(1000);
+    MetatraderAccount account3 = api.getMetatraderAccountApi().getAccount("accountId3").join();
+    MetaApiConnection connection3 = account3.connect().join();
+    connection3.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 3;}});
+    Thread.sleep(1000);
+    connection.close().join();
+    fakeServer.deleteStatusTask("accountId2");
+    fakeServer.deleteStatusTask("accountId3");
+    fakeServer.disableSync();
+    server.socket.disconnect();
+    Thread.sleep(2000);
+    Thread.sleep(50);
+    fakeServer.enableSync(server);
+    server.socket.disconnect();
+    Thread.sleep(3000);
+    Thread.sleep(50);
+    assertFalse(connection.isSynchronized());
+    assertTrue(connection2.isSynchronized() && connection2.getTerminalState().isConnected()
+      && connection2.getTerminalState().isConnectedToBroker());
+    assertTrue(connection2.isSynchronized() && connection2.getTerminalState().isConnected()
+      && connection2.getTerminalState().isConnectedToBroker());
+  };
+  
+  @Test
   void testLimitsSubscriptionsDuringPerUser429error() throws InterruptedException {
     Set<String> subscribedAccounts = new HashSet<>();
     fakeServer.enableSyncMethod = (socket) -> {
@@ -609,14 +637,9 @@ class SyncStabilityTest {
               subscribedAccounts.add(data.get("accountId").asText());
               Thread.sleep(200);
               fakeServer.respond(socket, data).join();
-              fakeServer.statusTask = new Timer();
-              fakeServer.statusTask.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                  fakeServer.emitStatus(socket, data.get("accountId").asText());
-                }
-              }, 100, 100);
-              Thread.sleep(050);
+              fakeServer.statusTasks.put(data.get("accountId").asText(), Js.setInterval(() ->
+                fakeServer.emitStatus(socket, data.get("accountId").asText()), 100));
+              Thread.sleep(50);
               fakeServer.authenticate(socket, data).join();
             } else {
               fakeServer.emitError(socket, data, 1, 2).join();
@@ -670,13 +693,8 @@ class SyncStabilityTest {
               subscribedAccounts.add(data.get("accountId").asText());
               Thread.sleep(200);
               fakeServer.respond(socket, data).join();
-              fakeServer.statusTask = new Timer();
-              fakeServer.statusTask.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                  fakeServer.emitStatus(socket, data.get("accountId").asText());
-                }
-              }, 100, 100);
+              fakeServer.statusTasks.put(data.get("accountId").asText(), Js.setInterval(() ->
+                fakeServer.emitStatus(socket, data.get("accountId").asText()), 100));
               Thread.sleep(50);
               fakeServer.authenticate(socket, data).join();
             } else {
@@ -739,13 +757,8 @@ class SyncStabilityTest {
               sidByAccounts.put(data.get("accountId").asText(), sid);
               Thread.sleep(200);
               fakeServer.respond(socket, data).join();
-              fakeServer.statusTask = new Timer();
-              fakeServer.statusTask.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                  fakeServer.emitStatus(socket, data.get("accountId").asText());
-                }
-              }, 100, 100);
+              fakeServer.statusTasks.put(data.get("accountId").asText(), Js.setInterval(() ->
+                fakeServer.emitStatus(socket, data.get("accountId").asText()), 100));
               Thread.sleep(50);
               fakeServer.authenticate(socket, data).join();
             }
@@ -796,13 +809,8 @@ class SyncStabilityTest {
             } else {
               Thread.sleep(200);
               fakeServer.respond(socket, data).join();
-              fakeServer.statusTask = new Timer();
-              fakeServer.statusTask.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                  fakeServer.emitStatus(socket, data.get("accountId").asText());
-                }
-              }, 100, 100);
+              fakeServer.statusTasks.put(data.get("accountId").asText(), Js.setInterval(() ->
+                fakeServer.emitStatus(socket, data.get("accountId").asText()), 100));
               Thread.sleep(50);
               fakeServer.authenticate(socket, data).join();
             }
@@ -841,13 +849,8 @@ class SyncStabilityTest {
               sidByAccounts.put(data.get("accountId").asText(), sid);
               Thread.sleep(200);
               fakeServer.respond(socket, data).join();
-              fakeServer.statusTask = new Timer();
-              fakeServer.statusTask.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                  fakeServer.emitStatus(socket, data.get("accountId").asText());
-                }
-              }, 100, 100);
+              fakeServer.statusTasks.put(data.get("accountId").asText(), Js.setInterval(() ->
+                fakeServer.emitStatus(socket, data.get("accountId").asText()), 100));
               Thread.sleep(50);
               fakeServer.authenticate(socket, data).join();
             }
@@ -904,13 +907,8 @@ class SyncStabilityTest {
               sidByAccounts.put(data.get("accountId").asText(), sid);
               Thread.sleep(200);
               fakeServer.respond(socket, data).join();
-              fakeServer.statusTask = new Timer();
-              fakeServer.statusTask.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                  fakeServer.emitStatus(socket, data.get("accountId").asText());
-                }
-              }, 100, 100);
+              fakeServer.statusTasks.put(data.get("accountId").asText(), Js.setInterval(() ->
+                fakeServer.emitStatus(socket, data.get("accountId").asText()), 100));
               Thread.sleep(50);
               fakeServer.authenticate(socket, data).join();
             }

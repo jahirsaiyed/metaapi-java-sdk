@@ -18,6 +18,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.log4j.Logger;
@@ -1935,15 +1936,24 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   
   private CompletableFuture<Void> fireReconnected(int socketInstanceIndex) {
     return CompletableFuture.runAsync(() -> {
-      subscriptionManager.onReconnected(socketInstanceIndex);
-      for (ReconnectListenerItem listener : reconnectListeners) {
-        if (socketInstancesByAccounts.get(listener.accountId) == socketInstanceIndex) {
+      try {
+        List<ReconnectListenerItem> reconnectListeners = new ArrayList<>();
+        for (ReconnectListenerItem listener : this.reconnectListeners) {
+          if (socketInstancesByAccounts.getOrDefault(listener.accountId, -1) == socketInstanceIndex) {
+            reconnectListeners.add(listener);
+          }
+        }
+        subscriptionManager.onReconnected(socketInstanceIndex, reconnectListeners
+          .stream().map(listener -> listener.accountId).collect(Collectors.toList()));
+        for (ReconnectListenerItem listener : reconnectListeners) {
           try {
             listener.listener.onReconnected().join();
           } catch (Throwable err) {
-            logger.error("Failed to notify reconnect listener", err);
+            logger.error("[" + new IsoTime() + "] Failed to notify reconnect listener", err);
           }
         }
+      } catch (Throwable err) {
+        logger.error("[" + new IsoTime() + "] Failed to process reconnected event", err);
       }
     });
   }
