@@ -461,3 +461,9 @@ CopyFactory is a powerful trade copying API which makes developing forex
 trade copying applications as easy as writing few lines of code.
 
 You can find CopyFactory Java SDK documentation here: [https://github.com/agiliumtrade-ai/copyfactory-java-sdk](https://github.com/agiliumtrade-ai/copyfactory-java-sdk)
+
+## MetaStats trading statistics API
+
+MetaStats is a powerful trade statistics API which makes it possible to add forex trading metrics into forex applications.
+
+You can find MetaStats Java SDK documentation here: [https://github.com/agiliumtrade-ai/metastats-java-sdk](https://github.com/agiliumtrade-ai/metastats-java-sdk)
