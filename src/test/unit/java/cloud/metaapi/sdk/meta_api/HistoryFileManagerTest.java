@@ -91,10 +91,10 @@ public class HistoryFileManagerTest {
       state = OrderState.ORDER_STATE_FILLED; symbol = "AUDNZD"; magic = 1; time = new IsoTime(new Date(100));
       doneTime = new IsoTime(new Date(300)); currentPrice = 1; volume = 0.01; currentVolume = 0;
       positionId = "61206631"; platform = "mt5"; comment = "AS_AUDNZD_5YyM6KS7Fv:"; }};
-    Map<Integer, Long> testLastDealTimeByInstanceIndex = new HashMap<>();
-    testLastDealTimeByInstanceIndex.put(0, 1000000000000L);
-    Map<Integer, Long> testLastHistoryOrderTimeByInstanceIndex = new HashMap<>();
-    testLastHistoryOrderTimeByInstanceIndex.put(0, 1000000000010L);
+    Map<String, Long> testLastDealTimeByInstanceIndex = new HashMap<>();
+    testLastDealTimeByInstanceIndex.put("0", 1000000000000L);
+    Map<String, Long> testLastHistoryOrderTimeByInstanceIndex = new HashMap<>();
+    testLastHistoryOrderTimeByInstanceIndex.put("0", 1000000000010L);
     testConfig = new History() {{
        lastDealTimeByInstanceIndex = testLastDealTimeByInstanceIndex;
        lastHistoryOrderTimeByInstanceIndex = testLastHistoryOrderTimeByInstanceIndex;

@@ -30,19 +30,21 @@ public class Js {
   
   /**
    * Alternative to JavaScript a || b || c ... construction, where the first non-null and
-   * non-zero value is returned
+   * non-zero value is returned, otherwide the last value is returned
    * @param <T> Type of values
    * @param values Values to select from
    * @return <T> Selected value or {@code null} 
    */
   @SafeVarargs
   public static <T> T or(T... values) {
+    T last = null;
     for (T value : values) {
+      last = value;
       if (value != null && !value.equals(0)) {
         return value;
       }
     }
-    return null;
+    return last;
   }
   
   /**
@@ -57,6 +59,21 @@ public class Js {
     Map<T, U> result = new HashMap<>();
     for (Pair<T, U> pair : pairs) {
       result.put(pair.getLeft(), pair.getRight());
+    }
+    return result;
+  }
+  
+  /**
+   * Creates a hash map from variadic value pairs
+   * @param <T> Type of the map keys and values
+   * @param pairs Key-Value pairs
+   * @return Map created from the key-value pairs
+   */
+  @SafeVarargs
+  public static <T> Map<T, T> asMap(T... pairs) {
+    Map<T, T> result = new HashMap<>();
+    for (int i = 0; i < pairs.length; i = i + 2) {
+      result.put(pairs[i], pairs[i + 1]);
     }
     return result;
   }
@@ -93,5 +110,37 @@ public class Js {
       }
     }, msInterval, msInterval);
     return result;
+  }
+  
+  /**
+   * Executes thread sleep with error handling
+   * @param milliseconds Milliseonds to sleep
+   */
+  public static void sleep(int milliseconds) {
+    try {
+      Thread.sleep(milliseconds);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+  
+  public static void log(Object... data) {
+    String out = "";
+    for (Object item : data) {
+      out += item.toString() + " ";
+    }
+    System.out.println(out);
+  }
+  
+  /**
+   * Logs specified data and its stack trace
+   * @param data Data to print
+   */
+  public static void trace(Object data) {
+    System.out.println(data.toString());
+    StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace(); 
+    for (int i = 2; i < stackTrace.length; ++i) {
+      System.out.println("  " + stackTrace[i].toString());
+    }
   }
 }

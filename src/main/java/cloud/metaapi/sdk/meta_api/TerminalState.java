@@ -28,7 +28,7 @@ public class TerminalState extends SynchronizationListener {
    */
   protected int statusTimerTimeoutInMilliseconds = 60000;
   
-  private Map<Integer, State> stateByInstanceIndex = new HashMap<>();
+  private Map<String, State> stateByInstanceIndex = new HashMap<>();
   
   private static class State {
     public boolean connected = false;
@@ -114,13 +114,13 @@ public class TerminalState extends SynchronizationListener {
   }
   
   @Override
-  public CompletableFuture<Void> onConnected(int instanceIndex, int replicas) {
+  public CompletableFuture<Void> onConnected(String instanceIndex, int replicas) {
     getState(instanceIndex).connected = true;
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
-  public CompletableFuture<Void> onDisconnected(int instanceIndex) {
+  public CompletableFuture<Void> onDisconnected(String instanceIndex) {
     State state = getState(instanceIndex);
     state.connected = false;
     state.connectedToBroker = false;
@@ -128,13 +128,13 @@ public class TerminalState extends SynchronizationListener {
   }
   
   @Override
-  public CompletableFuture<Void> onBrokerConnectionStatusChanged(int instanceIndex, boolean connected) {
+  public CompletableFuture<Void> onBrokerConnectionStatusChanged(String instanceIndex, boolean connected) {
     getState(instanceIndex).connectedToBroker = connected;
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
-  public CompletableFuture<Void> onSynchronizationStarted(int instanceIndex) {
+  public CompletableFuture<Void> onSynchronizationStarted(String instanceIndex) {
     State state = getState(instanceIndex);
     state.accountInformation = null;
     state.positions.clear();
@@ -149,14 +149,14 @@ public class TerminalState extends SynchronizationListener {
   }
   
   @Override
-  public CompletableFuture<Void> onAccountInformationUpdated(int instanceIndex,
+  public CompletableFuture<Void> onAccountInformationUpdated(String instanceIndex,
     MetatraderAccountInformation accountInformation) {
     getState(instanceIndex).accountInformation = accountInformation;
     return CompletableFuture.completedFuture(null);
   }
   
   @Override
-  public CompletableFuture<Void> onPositionsReplaced(int instanceIndex,
+  public CompletableFuture<Void> onPositionsReplaced(String instanceIndex,
     List<MetatraderPosition> positions) {
     State state = getState(instanceIndex);
     state.positions = new ArrayList<>(positions);
@@ -166,7 +166,7 @@ public class TerminalState extends SynchronizationListener {
   }
 
   @Override
-  public CompletableFuture<Void> onPositionUpdated(int instanceIndex, MetatraderPosition position) {
+  public CompletableFuture<Void> onPositionUpdated(String instanceIndex, MetatraderPosition position) {
     State state = getState(instanceIndex);
     int index = -1;
     for (int i = 0; i < state.positions.size(); ++i) {
@@ -184,7 +184,7 @@ public class TerminalState extends SynchronizationListener {
   }
 
   @Override
-  public CompletableFuture<Void> onPositionRemoved(int instanceIndex, String positionId) {
+  public CompletableFuture<Void> onPositionRemoved(String instanceIndex, String positionId) {
     State state = getState(instanceIndex);
     Optional<MetatraderPosition> position = state.positions.stream()
       .filter(p -> !p.id.equals(positionId)).findFirst();
@@ -202,7 +202,7 @@ public class TerminalState extends SynchronizationListener {
   }
   
   @Override
-  public CompletableFuture<Void> onOrdersReplaced(int instanceIndex, List<MetatraderOrder> orders) {
+  public CompletableFuture<Void> onOrdersReplaced(String instanceIndex, List<MetatraderOrder> orders) {
     State state = getState(instanceIndex);
     state.orders = orders;
     state.completedOrders.clear();
@@ -210,7 +210,7 @@ public class TerminalState extends SynchronizationListener {
   }
 
   @Override
-  public CompletableFuture<Void> onOrderUpdated(int instanceIndex, MetatraderOrder order) {
+  public CompletableFuture<Void> onOrderUpdated(String instanceIndex, MetatraderOrder order) {
     State state = getState(instanceIndex);
     int index = -1;
     for (int i = 0; i < state.orders.size(); ++i) {
@@ -228,7 +228,7 @@ public class TerminalState extends SynchronizationListener {
   }
 
   @Override
-  public CompletableFuture<Void> onOrderCompleted(int instanceIndex, String orderId) {
+  public CompletableFuture<Void> onOrderCompleted(String instanceIndex, String orderId) {
     State state = getState(instanceIndex);
     Optional<MetatraderOrder> order = state.orders.stream()
       .filter(o -> !o.id.equals(orderId)).findFirst();
@@ -246,7 +246,7 @@ public class TerminalState extends SynchronizationListener {
   }
 
   @Override
-  public CompletableFuture<Void> onSymbolSpecificationsUpdated(int instanceIndex,
+  public CompletableFuture<Void> onSymbolSpecificationsUpdated(String instanceIndex,
     List<MetatraderSymbolSpecification> specifications, List<String> removedSymbols) {
     State state = getState(instanceIndex);
     for (MetatraderSymbolSpecification specification : specifications) {
@@ -273,7 +273,7 @@ public class TerminalState extends SynchronizationListener {
   }
   
   @Override
-  public CompletableFuture<Void> onSymbolPricesUpdated(int instanceIndex,
+  public CompletableFuture<Void> onSymbolPricesUpdated(String instanceIndex,
     List<MetatraderSymbolPrice> prices, Double equity, Double margin, Double freeMargin,
     Double marginLevel, Double accountCurrencyExchangeRate) {
     State state = getState(instanceIndex);
@@ -337,6 +337,12 @@ public class TerminalState extends SynchronizationListener {
     return CompletableFuture.completedFuture(null);
   }
   
+  @Override
+  public CompletableFuture<Void> onStreamClosed(String instanceIndex) {
+    stateByInstanceIndex.remove(instanceIndex);
+    return CompletableFuture.completedFuture(null);
+  }
+  
   private void updatePositionProfits(MetatraderPosition position, MetatraderSymbolPrice price) {
     Optional<MetatraderSymbolSpecification> specification = getSpecification(position.symbol);
     if (specification.isPresent()) {
@@ -368,7 +374,7 @@ public class TerminalState extends SynchronizationListener {
     }
   }
   
-  private State getState(int instanceIndex) {
+  private State getState(String instanceIndex) {
     if (!stateByInstanceIndex.containsKey(instanceIndex)) {
       stateByInstanceIndex.put(instanceIndex, constructTerminalState());
     }

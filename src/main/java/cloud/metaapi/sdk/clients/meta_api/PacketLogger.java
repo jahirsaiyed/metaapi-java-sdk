@@ -302,8 +302,8 @@ public class PacketLogger {
    * Records price packet messages to log files
    * @param accountId account id
    */
-  private void recordPrices(String accountId, int instanceIndex) {
-    PreviousPrice prevPrice = previousPrices.get(accountId).get(instanceIndex);
+  private void recordPrices(String accountId, int instanceNumber) {
+    PreviousPrice prevPrice = previousPrices.get(accountId).get(instanceNumber);
     if (prevPrice == null) {
       prevPrice = new PreviousPrice() {{
         first = JsonMapper.getInstance().createObjectNode();
@@ -311,7 +311,7 @@ public class PacketLogger {
       }};
     }
     List<String> queue = writeQueue.get(accountId).queue;
-    previousPrices.get(accountId).remove(instanceIndex);
+    previousPrices.get(accountId).remove(instanceNumber);
     if (previousPrices.get(accountId).size() == 0) {
       previousPrices.remove(accountId);
     }
@@ -320,7 +320,7 @@ public class PacketLogger {
     if (firstSequenceNumber != lastSequenceNumber) {
       queue.add(prevPrice.last.toString());
       queue.add("Recorded price packets " + firstSequenceNumber + "-" + lastSequenceNumber
-        + ", instanceIndex: " + instanceIndex);
+        + ", instanceIndex: " + instanceNumber);
     }
   }
   

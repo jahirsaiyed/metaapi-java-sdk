@@ -24,6 +24,8 @@
   - swapRollover3Days can take value of NONE for some brokers
   - added MetaStats SDK
   - fixed deal sorting in memory history store
+  - improve stability for connection host migration
+  - disable synchronization after connection is closed
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

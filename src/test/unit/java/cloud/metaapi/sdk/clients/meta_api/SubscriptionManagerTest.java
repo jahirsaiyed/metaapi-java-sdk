@@ -1,5 +1,8 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -67,7 +70,7 @@ class SubscriptionManagerTest {
         manager.cancelSubscribe("accountId:0");
       }
     }, 50);
-    manager.subscribe("accountId", null).join();
+    manager.subscribe("accountId", null, false).join();
     Mockito.verify(client).subscribe("accountId", null);
   };
 
@@ -88,7 +91,7 @@ class SubscriptionManagerTest {
         manager.cancelSubscribe("accountId:0");
       }
     }, 3600);
-    manager.subscribe("accountId", null);
+    manager.subscribe("accountId", null, false);
     Thread.sleep(10000);
     Mockito.verify(client, Mockito.times(2)).subscribe("accountId", null);
   };
@@ -109,7 +112,7 @@ class SubscriptionManagerTest {
     Mockito.when(client.subscribe(Mockito.any(), Mockito.any()))
       .thenReturn(rejectedFuture)
       .thenReturn(CompletableFuture.completedFuture(null));
-    manager.subscribe("accountId", null);
+    manager.subscribe("accountId", null, false);
     Thread.sleep(3600);
     Mockito.verify(client, Mockito.times(1)).subscribe(Mockito.any(), Mockito.any());
     Thread.sleep(2000);
@@ -129,9 +132,9 @@ class SubscriptionManagerTest {
     socketInstancesByAccounts.put("accountId2", 0);
     socketInstancesByAccounts.put("accountId3", 1);
     Mockito.when(client.getSocketInstancesByAccounts()).thenReturn(socketInstancesByAccounts);
-    manager.subscribe("accountId", null);
-    manager.subscribe("accountId2", null);
-    manager.subscribe("accountId3", null);
+    manager.subscribe("accountId", null, false);
+    manager.subscribe("accountId2", null, false);
+    manager.subscribe("accountId3", null, false);
     Thread.sleep(1000);
     manager.onReconnected(0, new ArrayList<>());
     Thread.sleep(5000);
@@ -148,9 +151,9 @@ class SubscriptionManagerTest {
     Mockito.when(client.getSocketInstancesByAccounts()).thenReturn(Js.asMap(
       Pair.of("accountId", 0), Pair.of("accountId2", 0), Pair.of("accountId3", 0)
     ));
-    manager.subscribe("accountId", null);
-    manager.subscribe("accountId2", null);
-    manager.subscribe("accountId3", null);
+    manager.subscribe("accountId", null, false);
+    manager.subscribe("accountId2", null, false);
+    manager.subscribe("accountId3", null, false);
     Thread.sleep(1000);
     manager.onReconnected(0, Arrays.asList("accountId", "accountId2"));
     Thread.sleep(1000);
@@ -178,7 +181,7 @@ class SubscriptionManagerTest {
 
     Mockito.when(client.connect()).thenReturn(CompletableFuture.completedFuture(null));
     Mockito.when(client.getSocketInstancesByAccounts()).thenReturn(Js.asMap(Pair.of("accountId", 0)));
-    manager.subscribe("accountId", null);
+    manager.subscribe("accountId", null, false);
     Thread.sleep(1000);
     manager.onReconnected(0, Arrays.asList("accountId"));
     Thread.sleep(2000);
@@ -192,8 +195,8 @@ class SubscriptionManagerTest {
   void testDoesNotSendMultipleSubscribeRequestsAtTheSameTime() throws InterruptedException {
     Mockito.when(client.subscribe(Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    manager.subscribe("accountId", null);
-    manager.subscribe("accountId", null);
+    manager.subscribe("accountId", null, false);
+    manager.subscribe("accountId", null, false);
     Thread.sleep(1000);
     manager.cancelSubscribe("accountId:0");
     Thread.sleep(2500);
@@ -254,8 +257,8 @@ class SubscriptionManagerTest {
   void testCancelsAllSubscriptionsForAnAccount() throws InterruptedException {
     Mockito.when(client.subscribe(Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    manager.subscribe("accountId", 0);
-    manager.subscribe("accountId", 1);
+    manager.subscribe("accountId", 0, false);
+    manager.subscribe("accountId", 1, false);
     Thread.sleep(100);
     manager.cancelAccount("accountId");
     Thread.sleep(500);
@@ -280,12 +283,24 @@ class SubscriptionManagerTest {
         });
       }
     });
-    manager.subscribe("accountId", null);
+    manager.subscribe("accountId", null, false);
     Thread.sleep(250);
     manager.cancelSubscribe("accountId:0");
     Thread.sleep(250);
-    manager.subscribe("accountId", null);
+    manager.subscribe("accountId", null, false);
     Thread.sleep(250);
     Mockito.verify(client, Mockito.times(2)).subscribe(Mockito.any(), Mockito.any());
+  };
+  
+  /**
+   * Tests {@link SubscriptionManager#cancelSubscribe}
+   */
+  @Test
+  void testChecksIfAccountIsSubscribing() throws InterruptedException {
+    manager.subscribe("accountId", 1, false);
+    Thread.sleep(50);
+    assertTrue(manager.isAccountSubscribing("accountId", null));
+    assertFalse(manager.isAccountSubscribing("accountId", 0));
+    assertTrue(manager.isAccountSubscribing("accountId", 1));
   };
 }

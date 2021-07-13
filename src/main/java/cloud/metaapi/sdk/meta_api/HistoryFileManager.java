@@ -69,11 +69,11 @@ public class HistoryFileManager {
     /**
      * Last deal time by instance index
      */
-    public Map<Integer, Long> lastDealTimeByInstanceIndex = new HashMap<>();
+    public Map<String, Long> lastDealTimeByInstanceIndex = new HashMap<>();
     /**
      * Last history order time by instance index
      */
-    public Map<Integer, Long> lastHistoryOrderTimeByInstanceIndex = new HashMap<>();
+    public Map<String, Long> lastHistoryOrderTimeByInstanceIndex = new HashMap<>();
   }
   
   /**

@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
@@ -131,13 +130,17 @@ class SyncStabilityTest {
     private boolean enableStatusTask = true;
     
     public CompletableFuture<Void> authenticate(Socket socket, JsonNode data) {
+      return authenticate(socket, data, "ps-mpa-0");
+    }
+    
+    public CompletableFuture<Void> authenticate(Socket socket, JsonNode data, String host) {
       return CompletableFuture.runAsync(() -> {
         ObjectNode response = jsonMapper.createObjectNode();
         response.put("type", "authenticated");
         response.set("accountId", data.get("accountId"));
         response.put("instanceIndex", 0);
         response.put("replicas", 1);
-        response.put("host", "ps-mpa-0");
+        response.put("host", host);
         socket.socket.sendEvent("synchronization", response.toString());
       });
     }
@@ -150,6 +153,10 @@ class SyncStabilityTest {
     }
     
     public CompletableFuture<Void> emitStatus(Socket socket, String accountId) {
+      return emitStatus(socket, accountId, "ps-mpa-0");
+    }
+    
+    public CompletableFuture<Void> emitStatus(Socket socket, String accountId, String host) {
       return CompletableFuture.runAsync(() -> {
         ObjectNode response = jsonMapper.createObjectNode();
         response.put("connected", true);
@@ -158,7 +165,7 @@ class SyncStabilityTest {
         response.put("accountId", accountId);
         response.put("instanceIndex", 0);
         response.put("replicas", 1);
-        response.put("host", "ps-mpa-0");
+        response.put("host", host);
         ObjectNode healthStatus = jsonMapper.createObjectNode();
         healthStatus.put("rpcApiHealthy", true);
         response.set("healthStatus", healthStatus);
@@ -179,6 +186,10 @@ class SyncStabilityTest {
     }
 
     public CompletableFuture<Void> syncAccount(Socket socket, JsonNode data) {
+      return syncAccount(socket, data, "ps-mpa-0");
+    }
+    
+    public CompletableFuture<Void> syncAccount(Socket socket, JsonNode data, String host) {
       return CompletableFuture.runAsync(() -> {
         try {
           ObjectNode synchronizationStartedPacket = jsonMapper.createObjectNode();
@@ -186,7 +197,7 @@ class SyncStabilityTest {
           synchronizationStartedPacket.set("accountId", data.get("accountId"));
           synchronizationStartedPacket.put("instanceIndex", 0);
           synchronizationStartedPacket.set("synchronizationId", data.get("requestId"));
-          synchronizationStartedPacket.put("host", "ps-mpa-0");
+          synchronizationStartedPacket.put("host", host);
           socket.socket.sendEvent("synchronization", synchronizationStartedPacket.toString());
           Thread.sleep(50);
           ObjectNode accountInformationPacket = jsonMapper.createObjectNode();
@@ -194,7 +205,7 @@ class SyncStabilityTest {
           accountInformationPacket.set("accountId", data.get("accountId"));
           accountInformationPacket.set("accountInformation", jsonMapper.valueToTree(accountInformation));
           accountInformationPacket.put("instanceIndex", 0);
-          accountInformationPacket.put("host", "ps-mpa-0");
+          accountInformationPacket.put("host", host);
           socket.socket.sendEvent("synchronization", accountInformationPacket.toString());
           Thread.sleep(50);
           ObjectNode specificationsPacket = jsonMapper.createObjectNode();
@@ -202,7 +213,7 @@ class SyncStabilityTest {
           specificationsPacket.set("accountId", data.get("accountId"));
           specificationsPacket.set("specifications", jsonMapper.valueToTree(Lists.emptyList()));
           specificationsPacket.put("instanceIndex", 0);
-          specificationsPacket.put("host", "ps-mpa-0");
+          specificationsPacket.put("host", host);
           socket.socket.sendEvent("synchronization", specificationsPacket.toString());
           Thread.sleep(50);
           ObjectNode orderSynchronizationFinishedPacket = jsonMapper.createObjectNode();
@@ -210,7 +221,7 @@ class SyncStabilityTest {
           orderSynchronizationFinishedPacket.set("accountId", data.get("accountId"));
           orderSynchronizationFinishedPacket.put("instanceIndex", 0);
           orderSynchronizationFinishedPacket.set("synchronizationId", data.get("requestId"));
-          orderSynchronizationFinishedPacket.put("host", "ps-mpa-0");
+          orderSynchronizationFinishedPacket.put("host", host);
           socket.socket.sendEvent("synchronization", orderSynchronizationFinishedPacket.toString());
           Thread.sleep(50);
           ObjectNode dealSynchronizationFinishedPacket = jsonMapper.createObjectNode();
@@ -218,7 +229,7 @@ class SyncStabilityTest {
           dealSynchronizationFinishedPacket.set("accountId", data.get("accountId"));
           dealSynchronizationFinishedPacket.put("instanceIndex", 0);
           dealSynchronizationFinishedPacket.set("synchronizationId", data.get("requestId"));
-          dealSynchronizationFinishedPacket.put("host", "ps-mpa-0");
+          dealSynchronizationFinishedPacket.put("host", host);
           socket.socket.sendEvent("synchronization", dealSynchronizationFinishedPacket.toString());
         } catch (InterruptedException err) {
           err.printStackTrace();
@@ -312,7 +323,7 @@ class SyncStabilityTest {
         public void onData(SocketIOClient client, Object request, AckRequest ackSender) throws Exception {
           Socket socket = Socket.sockets.get(client);
           if (socket.requestListener != null) {
-            socket.requestListener.accept(jsonMapper.valueToTree(request));
+            CompletableFuture.runAsync(() -> socket.requestListener.accept(jsonMapper.valueToTree(request)));
           }
         }
       });
@@ -346,6 +357,9 @@ class SyncStabilityTest {
   MetaApiWebsocketClient websocketClient;
   MetaApiConnection connection;
   MetaApi api;
+  boolean subscribeCalled;
+  int synchronizeCounter;
+  int subscribeCounter;
   
   @BeforeEach
   void setUp() throws Exception {
@@ -570,19 +584,11 @@ class SyncStabilityTest {
     startWebsocketServer(9000);
     fakeServer.start();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
-    Timer timer = new Timer();
-    timer.schedule(new TimerTask() {
-      @Override
-      public void run() {
-        stopWebsocketServer();
-        try {
-          Thread.sleep(60000);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        }
-        startWebsocketServer();
-        fakeServer.start();
-      }
+    Js.setTimeout(() -> {
+      stopWebsocketServer();
+      Js.sleep(60000);
+      startWebsocketServer();
+      fakeServer.start();
     }, 3000);
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 120; }}).join();
@@ -949,5 +955,275 @@ class SyncStabilityTest {
     MetaApiConnection connection5 = account5.connect().join();
     connection5.waitSynchronized(new SynchronizationOptions () {{timeoutInSeconds = 3;}}).join();
     assertEquals(sidByAccounts.get("accountId"), sidByAccounts.get("accountId5"));
+  }
+  
+  @Test
+  void testAttemptsToResubscribeOnDisconnectedPacket() throws Exception {
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 3;}}).join(); 
+    assertTrue(connection.isSynchronized() && connection.getTerminalState().isConnected()
+      && connection.getTerminalState().isConnectedToBroker());
+    fakeServer.deleteStatusTask("accountId");
+    server.socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
+      "accountId", "accountId", "host", "ps-mpa-0", "instanceIndex", 0)));
+    Thread.sleep(50);
+    Thread.sleep(200);
+    Thread.sleep(50);
+    assertFalse(connection.isSynchronized());
+    assertFalse(connection.getTerminalState().isConnected());
+    assertFalse(connection.getTerminalState().isConnectedToBroker());
+    Thread.sleep(5000);
+    assertTrue(connection.isSynchronized() && connection.getTerminalState().isConnected()
+      && connection.getTerminalState().isConnectedToBroker());
+  }
+  
+  @Test
+  void testHandlesMultipleStreamsInOneInstanceNumber() throws Exception {
+    FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 7500, true);
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 10;}}).join(); 
+    subscribeCalled = false;
+
+    fakeServer.enableSyncMethod = (socket) -> {
+      socket.requestListener = (data) -> {
+        String type = data.get("type").asText();
+        if (type.equals("subscribe")) {
+          subscribeCalled = true;
+        } else if (type.equals("synchronize")) {
+          fakeServer.respond(socket, data).join();
+          fakeServer.syncAccount(socket, data, "ps-mpa-1").join();
+        } else if (type.equals("waitSynchronized")) {
+          fakeServer.respond(socket, data).join();
+        } else if (type.equals("getAccountInformation")) {
+          fakeServer.respondAccountInformation(socket, data).join();
+        }
+      };
+    };
+    fakeServer.enableSync(server);
+    Timer statusTask = Js.setInterval(() -> fakeServer.emitStatus(server, "accountId", "ps-mpa-1"), 100);
+    fakeServer.authenticate(server, jsonMapper.valueToTree(Js.asMap("accountId", "accountId")), "ps-mpa-1").join();
+    Thread.sleep(50);
+    Thread.sleep(2500);
+    fakeServer.deleteStatusTask("accountId");
+    server.socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
+      "accountId", "accountId", "host", "ps-mpa-0", "instanceIndex", 0)));
+    Thread.sleep(50);
+    Thread.sleep(1250);
+    assertTrue(connection.isSynchronized() && connection.getTerminalState().isConnected()
+      && connection.getTerminalState().isConnectedToBroker());
+    assertFalse(subscribeCalled);
+    server.socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
+      "accountId", "accountId", "host", "ps-mpa-1", "instanceIndex", 0)));
+    statusTask.cancel();
+    Thread.sleep(50);
+    assertFalse(connection.isSynchronized());
+    assertFalse(connection.getTerminalState().isConnected());
+    assertFalse(connection.getTerminalState().isConnectedToBroker());
+  };
+  
+  @Test
+  void testDoesNotResubscribeIfMultipleStreamsAndOneTimedOut() throws Exception {
+    FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 7500, true);
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 10;}}).join(); 
+    subscribeCalled = false;
+
+    fakeServer.enableSyncMethod = (socket) -> {
+      socket.requestListener = data -> {
+        String type = data.get("type").asText();
+        if (type.equals("subscribe")) {
+          subscribeCalled = true;
+        } else if (type.equals("synchronize")) {
+          fakeServer.respond(socket, data).join();
+          fakeServer.syncAccount(socket, data, "ps-mpa-1").join();
+        } else if (type.equals("waitSynchronized")) {
+          fakeServer.respond(socket, data).join();
+        } else if (type.equals("getAccountInformation")) {
+          fakeServer.respondAccountInformation(socket, data).join();
+        }
+      };
+    };
+    fakeServer.enableSync(server);
+    Timer statusTask = Js.setInterval(() -> fakeServer.emitStatus(server, "accountId", "ps-mpa-1"), 120);
+    fakeServer.authenticate(server, jsonMapper.valueToTree(Js.asMap("accountId", "accountId")), "ps-mpa-1").join();
+    Thread.sleep(50);
+    Thread.sleep(2500);
+    fakeServer.deleteStatusTask("accountId");
+    Thread.sleep(6875);
+    Thread.sleep(50);
+    assertTrue(connection.isSynchronized() && connection.getTerminalState().isConnected()
+      && connection.getTerminalState().isConnectedToBroker());
+    assertFalse(subscribeCalled);
+    statusTask.cancel();
+    Thread.sleep(50);
+    Thread.sleep(8125);
+    assertFalse(connection.isSynchronized());
+    assertFalse(connection.getTerminalState().isConnected());
+    assertFalse(connection.getTerminalState().isConnectedToBroker());
+    assertTrue(subscribeCalled);
+  }
+  
+  @Test
+  void testDoesNotSynchronizeIfConnectionIsClosed() throws Exception {
+    FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 60000, true);
+    synchronizeCounter = 0;
+    fakeServer.enableSyncMethod = socket -> {
+      socket.requestListener = data -> {
+        String type = data.get("type").asText();
+        if (type.equals("subscribe")) {
+          Js.sleep(200);
+          fakeServer.respond(socket, data).join();
+          fakeServer.statusTasks.put(data.get("accountId").asText(), Js.setInterval(() ->
+            fakeServer.emitStatus(socket, data.get("accountId").asText()), 100));
+          fakeServer.authenticate(socket, data).join();
+        } else if (type.equals("synchronize")) {
+          synchronizeCounter++;
+          fakeServer.respond(socket, data).join();
+          fakeServer.syncAccount(socket, data, "ps-mpa-1").join();
+        } else if (type.equals("waitSynchronized")) {
+          fakeServer.respond(socket, data).join();
+        } else if (type.equals("getAccountInformation")) {
+          fakeServer.respondAccountInformation(socket, data).join();
+        } else if (type.equals("unsubscribe")) {
+          fakeServer.deleteStatusTask(data.get("accountId").asText());
+          fakeServer.respond(socket, data).join();
+        }
+      };
+    };
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 10;}}).join(); 
+    assertEquals(1, synchronizeCounter);
+    MetatraderAccount account2 = api.getMetatraderAccountApi().getAccount("accountId2").join();
+    MetaApiConnection connection2 = account2.connect().join();
+    Thread.sleep(50);
+    connection2.close().join();
+    try {
+      connection2.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 3;}}).join(); 
+      throw new CompletionException(new Exception("TimeoutException expected"));
+    } catch (Throwable err) {
+      assertTrue(err.getCause() instanceof TimeoutException);
+    }
+    assertEquals(1, synchronizeCounter);
+  }
+  
+  @Test
+  void testDoesNotResubscribeAfterConnectionIsClosed() throws Exception {
+    FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 3750, true);
+    subscribeCounter = 0;
+
+    fakeServer.enableSyncMethod = socket -> {
+      socket.requestListener = data -> {
+        String type = data.get("type").asText();
+        String accountId = data.get("accountId").asText();
+        if (type.equals("subscribe")) {
+          subscribeCounter++;
+          Js.sleep(100);
+          fakeServer.respond(socket, data).join();
+          fakeServer.deleteStatusTask(accountId);
+          fakeServer.statusTasks.put(accountId, Js.setInterval(() -> fakeServer.emitStatus(socket, accountId), 100));
+          fakeServer.authenticate(socket, data).join();
+        } else if (type.equals("synchronize")) {
+          fakeServer.respond(socket, data).join();
+          fakeServer.syncAccount(socket, data).join();
+        } else if (type.equals("waitSynchronized")) {
+          fakeServer.respond(socket, data).join();
+        } else if (type.equals("getAccountInformation")) {
+          fakeServer.respondAccountInformation(socket, data).join();
+        } else if (type.equals("unsubscribe")) {
+          fakeServer.deleteStatusTask(accountId);
+          fakeServer.respond(socket, data).join();
+        }
+      };
+    };
+
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 10;}}).join(); 
+    assertTrue(connection.isSynchronized() && connection.getTerminalState().isConnected()
+      && connection.getTerminalState().isConnectedToBroker());
+    assertEquals(1, subscribeCounter);
+    server.socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
+      "accountId", "accountId", "host", "ps-mpa-0", "instanceIndex", 0)));
+    Thread.sleep(300);
+    Thread.sleep(6250);
+    Thread.sleep(200);
+    assertTrue(subscribeCounter > 1);
+    int previousSubscribeCounter = subscribeCounter;
+    assertTrue(connection.isSynchronized() && connection.getTerminalState().isConnected()
+      && connection.getTerminalState().isConnectedToBroker());
+    server.socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
+      "accountId", "accountId", "host", "ps-mpa-0", "instanceIndex", 0)));
+    connection.close().join();
+    Thread.sleep(1000);
+    Thread.sleep(6250);
+    Thread.sleep(1000);
+    assertEquals(previousSubscribeCounter, subscribeCounter);
+    assertFalse(connection.isSynchronized());
+    assertFalse(connection.getTerminalState().isConnected());
+    assertFalse(connection.getTerminalState().isConnectedToBroker());
+  }
+  
+  @Test
+  void testDoesNotResubscribeOnTimeoutIfConnectionIsClosed() throws Exception {
+    FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 3750, true);
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 10;}}).join(); 
+    fakeServer.deleteStatusTask("accountId");
+    assertTrue(connection.isSynchronized());
+    connection.close().join();
+    Thread.sleep(100);
+    Thread.sleep(3875);
+    assertFalse(connection.isSynchronized());
+  }
+  
+  @Test
+  void testDoesNotSendMultipleSubscribeRequestsIfStatusArrivesFasterThanSubscribe() throws Exception {
+    FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 3750, true);
+    subscribeCounter = 0;
+    MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
+    connection = account.connect().join();
+    connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 10;}}).join(); 
+    fakeServer.disableSync();
+    fakeServer.deleteStatusTask("accountId");
+    Thread.sleep(100);
+    Thread.sleep(7500); 
+    assertFalse(connection.isSynchronized());
+    assertFalse(connection.getTerminalState().isConnected());
+    assertFalse(connection.getTerminalState().isConnectedToBroker());
+
+    server.requestListener = data -> {
+      String type = data.get("type").asText();
+      String accountId = data.get("accountId").asText();
+      if(type.equals("subscribe")) {
+        subscribeCounter++;
+        Js.sleep(2800);
+        fakeServer.respond(server, data).join();
+        fakeServer.deleteStatusTask(accountId);
+        fakeServer.statusTasks.put("accountId", Js.setInterval(() -> fakeServer.emitStatus(server, accountId), 1000));
+        fakeServer.authenticate(server, data).join();
+      } else if (type.equals("synchronize")) {
+        fakeServer.respond(server, data).join();
+        fakeServer.syncAccount(server, data).join();
+      } else if (type.equals("waitSynchronized")) {
+        fakeServer.respond(server, data).join();
+      } else if (type.equals("getAccountInformation")) {
+        fakeServer.respondAccountInformation(server, data).join();
+      } else if (type.equals("unsubscribe")) {
+        fakeServer.deleteStatusTask(accountId);
+        fakeServer.respond(server, data).join();
+      }
+    };
+    fakeServer.statusTasks.put("accountId", Js.setInterval(() -> fakeServer.emitStatus(server, "accountId"), 1000));
+    Thread.sleep(100);
+    Thread.sleep(12500);
+    Thread.sleep(100); 
+    assertTrue(connection.isSynchronized() && connection.getTerminalState().isConnected()
+      && connection.getTerminalState().isConnectedToBroker());
+    assertEquals(1, subscribeCounter);
   }
 }

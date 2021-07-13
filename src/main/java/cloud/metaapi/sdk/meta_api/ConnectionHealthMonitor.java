@@ -41,7 +41,7 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   private long offset;
   private boolean quotesHealthy = false;
   private Timer updateMeasurementsInterval;
-  private Map<Integer, HealthStatus> serverHealthStatus = new HashMap<>();
+  private Map<String, HealthStatus> serverHealthStatus = new HashMap<>();
   
   /**
    * Constructs the listener
@@ -74,7 +74,7 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   }
   
   @Override
-  public CompletableFuture<Void> onSymbolPriceUpdated(int instanceIndex, MetatraderSymbolPrice price) {
+  public CompletableFuture<Void> onSymbolPriceUpdated(String instanceIndex, MetatraderSymbolPrice price) {
     try {
       SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
       long brokerTimestamp = formatter.parse(price.brokerTime).getTime();
@@ -89,13 +89,13 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   }
   
   @Override
-  public CompletableFuture<Void> onHealthStatus(int instanceIndex, HealthStatus status) {
+  public CompletableFuture<Void> onHealthStatus(String instanceIndex, HealthStatus status) {
     serverHealthStatus.put(instanceIndex, status);
     return CompletableFuture.completedFuture(null);
   }
   
   @Override
-  public CompletableFuture<Void> onDisconnected(int instanceIndex) {
+  public CompletableFuture<Void> onDisconnected(String instanceIndex) {
     serverHealthStatus.remove(instanceIndex);
     return CompletableFuture.completedFuture(null);
   }

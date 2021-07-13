@@ -11,12 +11,34 @@ import cloud.metaapi.sdk.clients.meta_api.models.*;
 public abstract class SynchronizationListener {
 
   /**
+   * Returns instance number of instance index
+   * @param instanceIndex instance index
+   */
+  public Integer getInstanceNumber(String instanceIndex) {
+    if (instanceIndex == null) {
+      return null;
+    }
+    return Integer.parseInt(instanceIndex.split(":")[0]);
+  }
+  
+  /**
+   * Returns host name of instance index
+   * @param instanceIndex instance index
+   */
+  public String getHostName(String instanceIndex) {
+    if (instanceIndex == null) {
+      return null;
+    }
+    return instanceIndex.split(":")[1];
+  }
+  
+  /**
    * Invoked when connection to MetaTrader terminal established
    * @param instanceIndex index of an account instance connected
    * @param replicas number of account replicas launched
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onConnected(int instanceIndex, int replicas) {
+  public CompletableFuture<Void> onConnected(String instanceIndex, int replicas) {
     return CompletableFuture.completedFuture(null);
   }
   
@@ -44,7 +66,7 @@ public abstract class SynchronizationListener {
    * @param status server-side application health status
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onHealthStatus(int instanceIndex, HealthStatus status) {
+  public CompletableFuture<Void> onHealthStatus(String instanceIndex, HealthStatus status) {
     return CompletableFuture.completedFuture(null);
   }
   
@@ -53,7 +75,7 @@ public abstract class SynchronizationListener {
    * @param instanceIndex index of an account instance connected
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onDisconnected(int instanceIndex) {
+  public CompletableFuture<Void> onDisconnected(String instanceIndex) {
     return CompletableFuture.completedFuture(null);
   }
   
@@ -63,7 +85,7 @@ public abstract class SynchronizationListener {
    * @param connected is MetaTrader terminal is connected to broker
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onBrokerConnectionStatusChanged(int instanceIndex,
+  public CompletableFuture<Void> onBrokerConnectionStatusChanged(String instanceIndex,
     boolean connected) {
     return CompletableFuture.completedFuture(null);
   }
@@ -73,7 +95,7 @@ public abstract class SynchronizationListener {
    * @param instanceIndex index of an account instance connected
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onSynchronizationStarted(int instanceIndex) {
+  public CompletableFuture<Void> onSynchronizationStarted(String instanceIndex) {
     return CompletableFuture.completedFuture(null);
   }
   
@@ -83,7 +105,7 @@ public abstract class SynchronizationListener {
    * @param accountInformation updated MetaTrader account information
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onAccountInformationUpdated(int instanceIndex,
+  public CompletableFuture<Void> onAccountInformationUpdated(String instanceIndex,
     MetatraderAccountInformation accountInformation) {
     return CompletableFuture.completedFuture(null);
   }
@@ -94,7 +116,7 @@ public abstract class SynchronizationListener {
    * @param positions updated array of positions
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onPositionsReplaced(int instanceIndex, List<MetatraderPosition> positions) {
+  public CompletableFuture<Void> onPositionsReplaced(String instanceIndex, List<MetatraderPosition> positions) {
     return CompletableFuture.completedFuture(null);
   }
   
@@ -104,7 +126,7 @@ public abstract class SynchronizationListener {
    * @param position updated MetaTrader position
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onPositionUpdated(int instanceIndex, MetatraderPosition position) {
+  public CompletableFuture<Void> onPositionUpdated(String instanceIndex, MetatraderPosition position) {
     return CompletableFuture.completedFuture(null);
   }
   
@@ -114,7 +136,7 @@ public abstract class SynchronizationListener {
    * @param positionId removed MetaTrader position id
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onPositionRemoved(int instanceIndex, String positionId) {
+  public CompletableFuture<Void> onPositionRemoved(String instanceIndex, String positionId) {
     return CompletableFuture.completedFuture(null);
   }
   
@@ -124,7 +146,7 @@ public abstract class SynchronizationListener {
    * @param orders updated array of orders
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onOrdersReplaced(int instanceIndex, List<MetatraderOrder> orders) {
+  public CompletableFuture<Void> onOrdersReplaced(String instanceIndex, List<MetatraderOrder> orders) {
     return CompletableFuture.completedFuture(null);
   }
   
@@ -134,7 +156,7 @@ public abstract class SynchronizationListener {
    * @param order updated MetaTrader order
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onOrderUpdated(int instanceIndex, MetatraderOrder order) {
+  public CompletableFuture<Void> onOrderUpdated(String instanceIndex, MetatraderOrder order) {
     return CompletableFuture.completedFuture(null);
   }
 
@@ -144,7 +166,7 @@ public abstract class SynchronizationListener {
    * @param orderId completed MetaTrader order id
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onOrderCompleted(int instanceIndex, String orderId) {
+  public CompletableFuture<Void> onOrderCompleted(String instanceIndex, String orderId) {
     return CompletableFuture.completedFuture(null);
   }
   
@@ -154,7 +176,7 @@ public abstract class SynchronizationListener {
    * @param historyOrder new MetaTrader history order
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onHistoryOrderAdded(int instanceIndex,
+  public CompletableFuture<Void> onHistoryOrderAdded(String instanceIndex,
     MetatraderOrder historyOrder) {
     return CompletableFuture.completedFuture(null);
   }
@@ -165,7 +187,7 @@ public abstract class SynchronizationListener {
    * @param deal new MetaTrader history deal
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onDealAdded(int instanceIndex, MetatraderDeal deal) {
+  public CompletableFuture<Void> onDealAdded(String instanceIndex, MetatraderDeal deal) {
     return CompletableFuture.completedFuture(null);
   }
 
@@ -175,7 +197,7 @@ public abstract class SynchronizationListener {
    * @param synchronizationId synchronization request id
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onDealSynchronizationFinished(int instanceIndex,
+  public CompletableFuture<Void> onDealSynchronizationFinished(String instanceIndex,
     String synchronizationId) {
     return CompletableFuture.completedFuture(null);
   }
@@ -186,7 +208,7 @@ public abstract class SynchronizationListener {
    * @param synchronizationId synchronization request id
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onOrderSynchronizationFinished(int instanceIndex,
+  public CompletableFuture<Void> onOrderSynchronizationFinished(String instanceIndex,
     String synchronizationId) {
     return CompletableFuture.completedFuture(null);
   }
@@ -197,7 +219,7 @@ public abstract class SynchronizationListener {
    * @param specification updated MetaTrader symbol specification
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onSymbolSpecificationUpdated(int instanceIndex,
+  public CompletableFuture<Void> onSymbolSpecificationUpdated(String instanceIndex,
     MetatraderSymbolSpecification specification) {
     return CompletableFuture.completedFuture(null);
   }
@@ -208,7 +230,7 @@ public abstract class SynchronizationListener {
    * @param symbol removed symbol
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onSymbolSpecificationRemoved(int instanceIndex, String symbol) {
+  public CompletableFuture<Void> onSymbolSpecificationRemoved(String instanceIndex, String symbol) {
     return CompletableFuture.completedFuture(null);
   }
 
@@ -219,7 +241,7 @@ public abstract class SynchronizationListener {
    * @param removedSymbols removed symbols
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onSymbolSpecificationsUpdated(int instanceIndex,
+  public CompletableFuture<Void> onSymbolSpecificationsUpdated(String instanceIndex,
     List<MetatraderSymbolSpecification> specifications, List<String> removedSymbols) {
     return CompletableFuture.completedFuture(null);
   }
@@ -230,7 +252,7 @@ public abstract class SynchronizationListener {
    * @param price updated MetaTrader symbol price
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onSymbolPriceUpdated(int instanceIndex,
+  public CompletableFuture<Void> onSymbolPriceUpdated(String instanceIndex,
     MetatraderSymbolPrice price) {
     return CompletableFuture.completedFuture(null);
   }
@@ -246,7 +268,7 @@ public abstract class SynchronizationListener {
    * @param accountCurrencyExchangeRate current exchange rate of account currency into USD
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onSymbolPricesUpdated(int instanceIndex,
+  public CompletableFuture<Void> onSymbolPricesUpdated(String instanceIndex,
     List<MetatraderSymbolPrice> prices, Double equity, Double margin, Double freeMargin,
     Double marginLevel, Double accountCurrencyExchangeRate) {
     return CompletableFuture.completedFuture(null);
@@ -263,7 +285,7 @@ public abstract class SynchronizationListener {
    * @param accountCurrencyExchangeRate current exchange rate of account currency into USD
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onCandlesUpdated(int instanceIndex,
+  public CompletableFuture<Void> onCandlesUpdated(String instanceIndex,
     List<MetatraderCandle> candles, Double equity, Double margin, Double freeMargin,
     Double marginLevel, Double accountCurrencyExchangeRate) {
     return CompletableFuture.completedFuture(null);
@@ -280,7 +302,7 @@ public abstract class SynchronizationListener {
    * @param accountCurrencyExchangeRate current exchange rate of account currency into USD
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onTicksUpdated(int instanceIndex,
+  public CompletableFuture<Void> onTicksUpdated(String instanceIndex,
     List<MetatraderTick> ticks, Double equity, Double margin, Double freeMargin,
     Double marginLevel, Double accountCurrencyExchangeRate) {
     return CompletableFuture.completedFuture(null);
@@ -297,7 +319,7 @@ public abstract class SynchronizationListener {
    * @param accountCurrencyExchangeRate current exchange rate of account currency into USD
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onBooksUpdated(int instanceIndex,
+  public CompletableFuture<Void> onBooksUpdated(String instanceIndex,
     List<MetatraderBook> books, Double equity, Double margin, Double freeMargin,
     Double marginLevel, Double accountCurrencyExchangeRate) {
     return CompletableFuture.completedFuture(null);
@@ -311,8 +333,17 @@ public abstract class SynchronizationListener {
    * @param unsubscriptions array of subscriptions to cancel
    * @return completable future which resolves when the asynchronous event is processed
    */
-  public CompletableFuture<Void> onSubscriptionDowngraded(int instanceIndex, String symbol,
+  public CompletableFuture<Void> onSubscriptionDowngraded(String instanceIndex, String symbol,
     List<MarketDataSubscription> updates, List<MarketDataUnsubscription> unsubscriptions) {
+    return CompletableFuture.completedFuture(null);
+  }
+  
+  /**
+   * Invoked when a stream for an instance index is closed
+   * @param instanceIndex index of an account instance connected
+   * @return completable future which resolves when the asynchronous event is processed
+   */
+  public CompletableFuture<Void> onStreamClosed(String instanceIndex) {
     return CompletableFuture.completedFuture(null);
   }
 }

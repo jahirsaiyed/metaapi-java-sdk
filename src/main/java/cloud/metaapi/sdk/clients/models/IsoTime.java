@@ -105,6 +105,11 @@ public class IsoTime {
   public String toString() {
     return this.getIsoString();
   }
+  
+  @Override
+  public boolean equals(Object isoTime) {
+    return toString().equals(isoTime.toString());
+  }
 }
 
 /**

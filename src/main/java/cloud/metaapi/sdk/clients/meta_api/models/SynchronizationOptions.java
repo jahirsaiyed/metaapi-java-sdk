@@ -16,7 +16,7 @@ public class SynchronizationOptions {
      * Index of an account instance to ensure synchronization on, or {@code null}. Default
      * is to wait for the first instance to synchronize
      */
-    public Integer instanceIndex;
+    public String instanceIndex;
     /**
      * Wait timeout in seconds, or {@code null}. Default is 5m
      */

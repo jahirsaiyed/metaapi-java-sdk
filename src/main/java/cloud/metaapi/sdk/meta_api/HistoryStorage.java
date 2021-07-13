@@ -16,8 +16,8 @@ import cloud.metaapi.sdk.clients.models.*;
  */
 public abstract class HistoryStorage extends SynchronizationListener {
 
-  private Set<Integer> orderSynchronizationFinished = new HashSet<>();
-  private Set<Integer> dealSynchronizationFinished = new HashSet<>();
+  protected Set<String> orderSynchronizationFinished = new HashSet<>();
+  protected Set<String> dealSynchronizationFinished = new HashSet<>();
   
   /**
    * Initializes the storage and loads required data from a persistent storage
@@ -41,13 +41,13 @@ public abstract class HistoryStorage extends SynchronizationListener {
    * Returns times of last deals by instance indices
    * @return map of last deal times by instance indices
    */
-  public abstract Map<Integer, Long> getLastDealTimeByInstanceIndex();
+  public abstract Map<String, Long> getLastDealTimeByInstanceIndex();
   
   /**
    * Returns times of last history orders by instance indices
    * @return map of last history orders times by instance indices
    */
-  public abstract Map<Integer, Long> getLastHistoryOrderTimeByInstanceIndex();
+  public abstract Map<String, Long> getLastHistoryOrderTimeByInstanceIndex();
   
   /**
    * Loads history data from the file manager
@@ -114,27 +114,30 @@ public abstract class HistoryStorage extends SynchronizationListener {
   public abstract CompletableFuture<IsoTime> getLastDealTime(Integer instanceIndex);
   
   @Override
-  public abstract CompletableFuture<Void> onHistoryOrderAdded(int instanceIndex, MetatraderOrder historyOrder);
+  public abstract CompletableFuture<Void> onHistoryOrderAdded(String instanceIndex, MetatraderOrder historyOrder);
   
   @Override
-  public abstract CompletableFuture<Void> onDealAdded(int instanceIndex, MetatraderDeal deal);
+  public abstract CompletableFuture<Void> onDealAdded(String instanceIndex, MetatraderDeal deal);
   
   @Override
-  public CompletableFuture<Void> onDealSynchronizationFinished(int instanceIndex, String synchronizationId) {
-    dealSynchronizationFinished.add(instanceIndex);
+  public CompletableFuture<Void> onDealSynchronizationFinished(String instanceIndex, String synchronizationId) {
+    Integer instance = getInstanceNumber(instanceIndex);
+    dealSynchronizationFinished.add("" + instance);
     return CompletableFuture.completedFuture(null);
   }
   
   @Override
-  public CompletableFuture<Void> onOrderSynchronizationFinished(int instanceIndex, String synchronizationId) {
-    orderSynchronizationFinished.add(instanceIndex);
+  public CompletableFuture<Void> onOrderSynchronizationFinished(String instanceIndex, String synchronizationId) {
+    Integer instance = getInstanceNumber(instanceIndex);
+    orderSynchronizationFinished.add("" + instance);
     return CompletableFuture.completedFuture(null);
   }
   
   @Override
-  public CompletableFuture<Void> onConnected(int instanceIndex, int replicas) {
-    orderSynchronizationFinished.remove(instanceIndex);
-    dealSynchronizationFinished.remove(instanceIndex);
+  public CompletableFuture<Void> onConnected(String instanceIndex, int replicas) {
+    Integer instance = getInstanceNumber(instanceIndex);
+    orderSynchronizationFinished.remove("" + instance);
+    dealSynchronizationFinished.remove("" + instance);
     return CompletableFuture.completedFuture(null);
   }
 }

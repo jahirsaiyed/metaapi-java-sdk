@@ -35,9 +35,9 @@ class TerminalStateTest {
   @Test
   void testReturnsConnectionState() {
     assertFalse(state.isConnected());
-    state.onConnected(1, 0);
+    state.onConnected("1:ps-mpa-1", 0);
     assertTrue(state.isConnected());
-    state.onDisconnected(1);
+    state.onDisconnected("1:ps-mpa-1");
     assertFalse(state.isConnected());
   }
   
@@ -49,12 +49,12 @@ class TerminalStateTest {
   @Test
   void testReturnsBrokerConnectionState() {
     assertFalse(state.isConnectedToBroker());
-    state.onBrokerConnectionStatusChanged(1, true);
+    state.onBrokerConnectionStatusChanged("1:ps-mpa-1", true);
     assertTrue(state.isConnectedToBroker());
-    state.onBrokerConnectionStatusChanged(1, false);
+    state.onBrokerConnectionStatusChanged("1:ps-mpa-1", false);
     assertFalse(state.isConnectedToBroker());
-    state.onBrokerConnectionStatusChanged(1, true);
-    state.onDisconnected(1);
+    state.onBrokerConnectionStatusChanged("1:ps-mpa-1", true);
+    state.onDisconnected("1:ps-mpa-1");
     assertFalse(state.isConnectedToBroker());
   }
   
@@ -67,7 +67,7 @@ class TerminalStateTest {
   void testReturnsAccountInformation() {
     MetatraderAccountInformation expected = new MetatraderAccountInformation() {{ balance = 1000; }};
     assertTrue(!state.getAccountInformation().isPresent());
-    state.onAccountInformationUpdated(1, expected);
+    state.onAccountInformationUpdated("1:ps-mpa-1", expected);
     assertEquals(expected, state.getAccountInformation().get());
   }
   
@@ -80,10 +80,10 @@ class TerminalStateTest {
   @Test
   void testReturnsPositions() {
     assertTrue(state.getPositions().isEmpty());
-    state.onPositionUpdated(1, new MetatraderPosition() {{ id = "1"; profit = 10.0; }});
-    state.onPositionUpdated(1, new MetatraderPosition() {{ id = "2"; }});
-    state.onPositionUpdated(1, new MetatraderPosition() {{ id = "1"; profit = 11.0; }});
-    state.onPositionRemoved(1, "2");
+    state.onPositionUpdated("1:ps-mpa-1", new MetatraderPosition() {{ id = "1"; profit = 10.0; }});
+    state.onPositionUpdated("1:ps-mpa-1", new MetatraderPosition() {{ id = "2"; }});
+    state.onPositionUpdated("1:ps-mpa-1", new MetatraderPosition() {{ id = "1"; profit = 11.0; }});
+    state.onPositionRemoved("1:ps-mpa-1", "2");
     assertEquals(1, state.getPositions().size());
     assertThat(state.getPositions()).usingRecursiveComparison().isEqualTo(Lists.list(
       new MetatraderPosition() {{ id = "1"; profit = 11.0; }}
@@ -99,10 +99,11 @@ class TerminalStateTest {
   @Test
   void testReturnsOrders() {
     assertTrue(state.getOrders().isEmpty());
-    state.onOrderUpdated(1, new MetatraderOrder() {{ id = "1"; openPrice = 10.0; }});
-    state.onOrderUpdated(1, new MetatraderOrder() {{ id = "2"; }});
-    state.onOrderUpdated(1, new MetatraderOrder() {{ id = "1"; openPrice = 11.0; }});
-    state.onOrderCompleted(1, "2");
+    state.onOrderUpdated("1:ps-mpa-1", new MetatraderOrder() {{ id = "1"; openPrice = 10.0; }}).join();
+    state.onOrderUpdated("1:ps-mpa-1", new MetatraderOrder() {{ id = "2"; }}).join();
+    state.onOrderUpdated("1:ps-mpa-1", new MetatraderOrder() {{ id = "1"; openPrice = 11.0; }}).join();
+    assertEquals(2, state.getOrders().size());
+    state.onOrderCompleted("1:ps-mpa-1", "2");
     assertEquals(1, state.getOrders().size());
     assertThat(state.getOrders()).usingRecursiveComparison().isEqualTo(Lists.list(
       new MetatraderOrder() {{ id = "1"; openPrice = 11.0; }}
@@ -118,11 +119,11 @@ class TerminalStateTest {
   @Test
   void testReturnsSpecifications() {
     assertTrue(state.getSpecifications().isEmpty());
-    state.onSymbolSpecificationsUpdated(1, Lists.list(
+    state.onSymbolSpecificationsUpdated("1:ps-mpa-1", Lists.list(
       new MetatraderSymbolSpecification() {{ symbol = "EURUSD"; tickSize = 0.00001; }},
       new MetatraderSymbolSpecification() {{ symbol = "GBPUSD"; }}
     ), Lists.list());
-    state.onSymbolSpecificationsUpdated(1, Lists.list(
+    state.onSymbolSpecificationsUpdated("1:ps-mpa-1", Lists.list(
       new MetatraderSymbolSpecification() {{ symbol = "AUDNZD"; }},
       new MetatraderSymbolSpecification() {{ symbol = "EURUSD"; tickSize = 0.0001; }}
     ), Lists.list("AUDNZD"));
@@ -145,13 +146,13 @@ class TerminalStateTest {
   void testReturnsPrice() {
     assertTrue(!state.getPrice("EURUSD").isPresent());
     IsoTime isoTime = new IsoTime();
-    state.onSymbolPricesUpdated(1, Arrays.asList(
+    state.onSymbolPricesUpdated("1:ps-mpa-1", Arrays.asList(
       new MetatraderSymbolPrice() {{ time = isoTime; symbol = "EURUSD";
       bid = 1; ask = 1.1; }}), null, null, null, null, null);
-    state.onSymbolPricesUpdated(1, Arrays.asList(
+    state.onSymbolPricesUpdated("1:ps-mpa-1", Arrays.asList(
       new MetatraderSymbolPrice() {{ time = isoTime; symbol = "GBPUSD"; }}),
       null, null, null, null, null);
-    state.onSymbolPricesUpdated(1, Arrays.asList(
+    state.onSymbolPricesUpdated("1:ps-mpa-1", Arrays.asList(
       new MetatraderSymbolPrice() {{ time = isoTime; symbol = "EURUSD";
       bid = 1; ask = 1.2; }}), null, null, null, null, null);
     assertThat(state.getPrice("EURUSD").get()).usingRecursiveComparison()
@@ -167,8 +168,9 @@ class TerminalStateTest {
    */
   @Test
   void testUpdatesAccountEquityAndPositionProfitOnPriceUpdate() {
-    state.onAccountInformationUpdated(1, new MetatraderAccountInformation() {{ equity = 1000; balance = 800; }});
-    state.onPositionsReplaced(1, Arrays.asList(new MetatraderPosition() {{
+    state.onAccountInformationUpdated("1:ps-mpa-1", new MetatraderAccountInformation() {{
+      equity = 1000; balance = 800; }});
+    state.onPositionsReplaced("1:ps-mpa-1", Arrays.asList(new MetatraderPosition() {{
       id = "1";
       symbol = "EURUSD";
       type = PositionType.POSITION_TYPE_BUY;
@@ -178,7 +180,7 @@ class TerminalStateTest {
       profit = 100.0;
       volume = 2;
     }}));
-    state.onPositionUpdated(1, new MetatraderPosition() {{
+    state.onPositionUpdated("1:ps-mpa-1", new MetatraderPosition() {{
       id = "2";
       symbol = "AUDUSD";
       type = PositionType.POSITION_TYPE_BUY;
@@ -188,11 +190,11 @@ class TerminalStateTest {
       profit = 100.0;
       volume = 2;
     }});
-    state.onSymbolSpecificationsUpdated(1, Arrays.asList(
+    state.onSymbolSpecificationsUpdated("1:ps-mpa-1", Arrays.asList(
       new MetatraderSymbolSpecification() {{ symbol = "EURUSD"; tickSize = 0.01; digits = 5; }},
       new MetatraderSymbolSpecification() {{ symbol = "AUDUSD"; tickSize = 0.01; digits = 5; }}
     ), Arrays.asList());
-    state.onSymbolPricesUpdated(1, Arrays.asList(new MetatraderSymbolPrice() {{
+    state.onSymbolPricesUpdated("1:ps-mpa-1", Arrays.asList(new MetatraderSymbolPrice() {{
       time = new IsoTime();
       symbol = "EURUSD";
       profitTickValue = 0.5;
@@ -224,9 +226,9 @@ class TerminalStateTest {
    */
   @Test
   void testUpdatesMarginFieldsOnPriceUpdate() {
-    state.onAccountInformationUpdated(1, new MetatraderAccountInformation() {{
+    state.onAccountInformationUpdated("1:ps-mpa-1", new MetatraderAccountInformation() {{
       equity = 1000; balance = 800; }}).join();
-    state.onSymbolPricesUpdated(1, Arrays.asList(), 100.0, 200.0, 400.0, 40000.0, null).join();
+    state.onSymbolPricesUpdated("1:ps-mpa-1", Arrays.asList(), 100.0, 200.0, 400.0, 40000.0, null).join();
     assertEquals(100, state.getAccountInformation().get().equity);
     assertEquals(200, state.getAccountInformation().get().margin);
     assertEquals(400, state.getAccountInformation().get().freeMargin);
@@ -240,23 +242,23 @@ class TerminalStateTest {
    */
   @Test
   void testUpdatesOrderCurrentPriceOnPriceUpdate() {
-    state.onOrderUpdated(1, new MetatraderOrder() {{
+    state.onOrderUpdated("1:ps-mpa-1", new MetatraderOrder() {{
       id = "1";
       symbol = "EURUSD";
       type = OrderType.ORDER_TYPE_BUY_LIMIT;
       currentPrice = 9;
     }});
-    state.onOrderUpdated(1, new MetatraderOrder() {{
+    state.onOrderUpdated("1:ps-mpa-1", new MetatraderOrder() {{
       id = "2";
       symbol = "AUDUSD";
       type = OrderType.ORDER_TYPE_SELL_LIMIT;
       currentPrice = 9;
     }});
-    state.onSymbolSpecificationsUpdated(1, Arrays.asList(new MetatraderSymbolSpecification() {{
+    state.onSymbolSpecificationsUpdated("1:ps-mpa-1", Arrays.asList(new MetatraderSymbolSpecification() {{
       symbol = "EURUSD";
       tickSize = 0.01;
     }}), Arrays.asList());
-    state.onSymbolPricesUpdated(1, Arrays.asList(new MetatraderSymbolPrice() {{
+    state.onSymbolPricesUpdated("1:ps-mpa-1", Arrays.asList(new MetatraderSymbolPrice() {{
       time = new IsoTime();
       symbol = "EURUSD";
       profitTickValue = 0.5;
@@ -266,5 +268,23 @@ class TerminalStateTest {
     }}), null, null, null, null, null);
     assertThat(state.getOrders().stream().map(order -> order.currentPrice).toArray())
       .isEqualTo(Stream.of(11.0, 9.0).toArray());
+  }
+  
+  /**
+   * Tests {@link TerminalState#onStreamClosed}
+   */
+  @Test
+  void testRemovesStateOnClosedStream() {
+    assertFalse(state.getPrice("EURUSD").isPresent());
+    IsoTime t = new IsoTime();
+    state.onSymbolPricesUpdated("1:ps-mpa-1", Arrays.asList(new MetatraderSymbolPrice() {{
+      time = t; symbol = "EURUSD"; bid = 1; ask = 1.1;
+    }}), 0.0, 0.0, 0.0, 0.0, 0.0).join();
+    assertThat(state.getPrice("EURUSD").get()).usingRecursiveComparison().isEqualTo(
+      new MetatraderSymbolPrice() {{
+      time = t; symbol = "EURUSD"; bid = 1; ask = 1.1;
+    }});
+    state.onStreamClosed("1:ps-mpa-1").join();
+    assertFalse(state.getPrice("EURUSD").isPresent());
   }
 }

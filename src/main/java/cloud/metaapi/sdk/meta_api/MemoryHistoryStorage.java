@@ -23,8 +23,8 @@ public class MemoryHistoryStorage extends HistoryStorage {
   private HistoryFileManager fileManager;
   private List<MetatraderDeal> deals = new ArrayList<>();
   private List<MetatraderOrder> historyOrders = new ArrayList<>();
-  private Map<Integer, Long> lastDealTimeByInstanceIndex = new HashMap<>();
-  private Map<Integer, Long> lastHistoryOrderTimeByInstanceIndex = new HashMap<>();
+  private Map<String, Long> lastDealTimeByInstanceIndex = new HashMap<>();
+  private Map<String, Long> lastHistoryOrderTimeByInstanceIndex = new HashMap<>();
   
   /**
    * Constructs the in-memory history store instance with default parameters
@@ -63,12 +63,12 @@ public class MemoryHistoryStorage extends HistoryStorage {
   }
   
   @Override
-  public Map<Integer, Long> getLastDealTimeByInstanceIndex() {
+  public Map<String, Long> getLastDealTimeByInstanceIndex() {
     return lastDealTimeByInstanceIndex;
   }
   
   @Override
-  public Map<Integer, Long> getLastHistoryOrderTimeByInstanceIndex() {
+  public Map<String, Long> getLastHistoryOrderTimeByInstanceIndex() {
     return lastHistoryOrderTimeByInstanceIndex;
   }
   
@@ -116,11 +116,11 @@ public class MemoryHistoryStorage extends HistoryStorage {
   }
   
   @Override
-  public CompletableFuture<IsoTime> getLastHistoryOrderTime(Integer instanceIndex) {
+  public CompletableFuture<IsoTime> getLastHistoryOrderTime(Integer instanceNumber) {
     long result = 0;
-    if (instanceIndex != null) {
-      result = lastHistoryOrderTimeByInstanceIndex.containsKey(instanceIndex)
-        ? lastHistoryOrderTimeByInstanceIndex.get(instanceIndex) : 0;
+    if (instanceNumber != null) {
+      result = lastHistoryOrderTimeByInstanceIndex.containsKey("" + instanceNumber)
+        ? lastHistoryOrderTimeByInstanceIndex.get("" + instanceNumber) : 0;
     } else {
       for (long time : lastHistoryOrderTimeByInstanceIndex.values()) {
         if (time > result) {
@@ -132,11 +132,11 @@ public class MemoryHistoryStorage extends HistoryStorage {
   }
 
   @Override
-  public CompletableFuture<IsoTime> getLastDealTime(Integer instanceIndex) {
+  public CompletableFuture<IsoTime> getLastDealTime(Integer instanceNumber) {
     long result = 0;
-    if (instanceIndex != null) {
-      result = lastDealTimeByInstanceIndex.containsKey(instanceIndex)
-        ? lastDealTimeByInstanceIndex.get(instanceIndex) : 0;
+    if (instanceNumber != null) {
+      result = lastDealTimeByInstanceIndex.containsKey("" + instanceNumber)
+        ? lastDealTimeByInstanceIndex.get("" + instanceNumber) : 0;
     } else {
       for (long time : lastDealTimeByInstanceIndex.values()) {
         if (time > result) {
@@ -148,13 +148,14 @@ public class MemoryHistoryStorage extends HistoryStorage {
   }
 
   @Override
-  public CompletableFuture<Void> onHistoryOrderAdded(int instanceIndex, MetatraderOrder historyOrder) {
+  public CompletableFuture<Void> onHistoryOrderAdded(String instanceIndex, MetatraderOrder historyOrder) {
+    Integer instance = getInstanceNumber(instanceIndex);
     int insertIndex = 0;
     int replacementIndex = -1;
     Date newHistoryOrderTime = getOrderDoneTime(historyOrder);
-    if (!lastHistoryOrderTimeByInstanceIndex.containsKey(instanceIndex)
-      || lastHistoryOrderTimeByInstanceIndex.get(instanceIndex) < newHistoryOrderTime.getTime()) {
-      lastHistoryOrderTimeByInstanceIndex.put(instanceIndex, newHistoryOrderTime.getTime());
+    if (!lastHistoryOrderTimeByInstanceIndex.containsKey("" + instance)
+      || lastHistoryOrderTimeByInstanceIndex.get("" + instance) < newHistoryOrderTime.getTime()) {
+      lastHistoryOrderTimeByInstanceIndex.put("" + instance, newHistoryOrderTime.getTime());
     }
     for (int i = historyOrders.size() - 1; i >= 0; i--) {
       MetatraderOrder order = historyOrders.get(i);
@@ -181,13 +182,14 @@ public class MemoryHistoryStorage extends HistoryStorage {
   }
 
   @Override
-  public CompletableFuture<Void> onDealAdded(int instanceIndex, MetatraderDeal deal) {
+  public CompletableFuture<Void> onDealAdded(String instanceIndex, MetatraderDeal deal) {
+    Integer instance = getInstanceNumber(instanceIndex);
     int insertIndex = 0;
     int replacementIndex = -1;
     Date newDealTime = deal.time.getDate();
-    if (!lastDealTimeByInstanceIndex.containsKey(instanceIndex)
-      || lastDealTimeByInstanceIndex.get(instanceIndex) < newDealTime.getTime()) {
-      lastDealTimeByInstanceIndex.put(instanceIndex, newDealTime.getTime());
+    if (!lastDealTimeByInstanceIndex.containsKey("" + instance)
+      || lastDealTimeByInstanceIndex.get("" + instance) < newDealTime.getTime()) {
+      lastDealTimeByInstanceIndex.put("" + instance, newDealTime.getTime());
     }
     for (int i = deals.size() - 1; i >= 0; i--) {
       MetatraderDeal d = deals.get(i);
@@ -215,9 +217,10 @@ public class MemoryHistoryStorage extends HistoryStorage {
   }
   
   @Override
-  public CompletableFuture<Void> onDealSynchronizationFinished(int instanceIndex, String synchronizationId) {
-    super.onDealSynchronizationFinished(instanceIndex, synchronizationId);
-    return updateDiskStorage(); 
+  public CompletableFuture<Void> onDealSynchronizationFinished(String instanceIndex, String synchronizationId) {
+    Integer instance = getInstanceNumber(instanceIndex);
+    dealSynchronizationFinished.add("" + instance);
+    return updateDiskStorage();
   }
   
   private Date getOrderDoneTime(MetatraderOrder order) {

@@ -9,11 +9,13 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.assertj.core.util.Lists;
 import org.assertj.core.util.Maps;
 import org.junit.jupiter.api.AfterEach;
@@ -67,6 +69,7 @@ class MetaApiConnectionTest {
   private MetaApiWebsocketClient client;
   private HistoryStorage storageMock;
   private ConnectionRegistry connectionRegistry;
+  private TerminalState apiTerminalState;
   
   @BeforeEach
   void setUp() throws Exception {
@@ -82,6 +85,10 @@ class MetaApiConnectionTest {
     connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
     Mockito.when(connectionRegistry.getApplication()).thenReturn("MetaApi");
     api = new MetaApiConnection(client, account, storageMock, connectionRegistry);
+    
+    apiTerminalState = (TerminalState) FieldUtils.readField(api, "terminalState", true);
+    apiTerminalState = Mockito.spy(apiTerminalState);
+    FieldUtils.writeField(api, "terminalState", apiTerminalState, true);
   }
   
   @AfterEach
@@ -677,6 +684,18 @@ class MetaApiConnectionTest {
   }
   
   /**
+   * Tests {@link MetaApiConnection#synchronize}
+   */
+  @Test
+  void testDoesNotSubscribeIfConnectionIsClosed() {
+    Mockito.when(client.ensureSubscribe(Mockito.anyString(), Mockito.anyInt())).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(client.unsubscribe(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
+    api.close().join();
+    api.subscribe().join();
+    Mockito.verify(client, Mockito.never()).ensureSubscribe(Mockito.anyString(), Mockito.anyInt());
+  };
+  
+  /**
    * Tests {@link MetaApiConnection#synchronize()}
    */
   @Test
@@ -684,26 +703,21 @@ class MetaApiConnectionTest {
     IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
     IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
     Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1),
-      Mockito.anyString(), Mockito.any(), Mockito.any()))
+      Mockito.anyString(), Mockito.anyString(), Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
     MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
     Mockito.when(account.getId()).thenReturn("accountId");
     MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
-    api.getHistoryStorage().onHistoryOrderAdded(1, new MetatraderOrder() {{
+    api.getHistoryStorage().onHistoryOrderAdded("1:ps-mpa-1", new MetatraderOrder() {{
       doneTime = startingHistoryOrderTime;
     }});
-    api.getHistoryStorage().onDealAdded(1, new MetatraderDeal() {{
+    api.getHistoryStorage().onDealAdded("1:ps-mpa-1", new MetatraderDeal() {{
       time = startingDealTime;
     }});
-    api.synchronize(1).join();
+    api.synchronize("1:ps-mpa-1").join();
     Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1),
-      Mockito.anyString(), Mockito.argThat((arg) -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(startingHistoryOrderTime);
-      return true;
-    }), Mockito.argThat((arg) -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(startingDealTime);
-      return true;
-    }));
+      Mockito.eq("ps-mpa-1"), Mockito.anyString(), Mockito.eq(startingHistoryOrderTime),
+      Mockito.eq(startingDealTime));
   }
   
   /**
@@ -712,21 +726,21 @@ class MetaApiConnectionTest {
   @Test
   void testSynchronizesStateWithTerminalFromSpecifiedTime() {
     IsoTime historyStartTime = new IsoTime("2020-10-07T00:00:00.000Z");
-    Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1),
+    Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(),
       Mockito.anyString(), Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
     MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
     Mockito.when(account.getId()).thenReturn("accountId");
     MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry, historyStartTime);
-    api.getHistoryStorage().onHistoryOrderAdded(1, new MetatraderOrder() {{
+    api.getHistoryStorage().onHistoryOrderAdded("1:ps-mpa-1", new MetatraderOrder() {{
       doneTime = new IsoTime("2020-01-01T00:00:00.000Z");
     }});
-    api.getHistoryStorage().onDealAdded(1, new MetatraderDeal() {{
+    api.getHistoryStorage().onDealAdded("1:ps-mpa-1", new MetatraderDeal() {{
       time = new IsoTime("2020-01-02T00:00:00.000Z");
     }});
-    api.synchronize(1).join();
-    Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(),
-      Mockito.eq(historyStartTime), Mockito.eq(historyStartTime));
+    api.synchronize("1:ps-mpa-1").join();
+    Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.eq("ps-mpa-1"),
+      Mockito.anyString(), Mockito.eq(historyStartTime), Mockito.eq(historyStartTime));
   }
   
   /**
@@ -768,7 +782,7 @@ class MetaApiConnectionTest {
     Mockito.doReturn(CompletableFuture.completedFuture(null)).when(api)
       .unsubscribeFromMarketData(Mockito.anyString(), Mockito.anyList());
     List<MarketDataUnsubscription> unsubscriptions = Arrays.asList(new MarketDataUnsubscription() {{ type = "ticks"; }});
-    api.onSubscriptionDowngraded(1, "EURUSD", new ArrayList<>(), unsubscriptions).join();
+    api.onSubscriptionDowngraded("1:ps-mpa-1", "EURUSD", new ArrayList<>(), unsubscriptions).join();
     Mockito.verify(api).unsubscribeFromMarketData("EURUSD", unsubscriptions);
     Mockito.verify(api, Mockito.never()).subscribeToMarketData(Mockito.anyString(), Mockito.anyList());
   }
@@ -787,7 +801,7 @@ class MetaApiConnectionTest {
       type = "quotes";
       intervalInMilliseconds = 30000;
     }});
-    api.onSubscriptionDowngraded(1, "EURUSD", updates, new ArrayList<>()).join();
+    api.onSubscriptionDowngraded("1:ps-mpa-1", "EURUSD", updates, new ArrayList<>()).join();
     Mockito.verify(api).subscribeToMarketData("EURUSD", updates);
     Mockito.verify(api, Mockito.never()).unsubscribeFromMarketData(Mockito.anyString(), Mockito.anyList());
   }
@@ -967,25 +981,21 @@ class MetaApiConnectionTest {
   void testSynchronizesOnConnection() throws Exception {
     IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
     IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
-    Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(), Mockito.any(), Mockito.any()))
+    Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(),
+      Mockito.anyString(), Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
     MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
     Mockito.when(account.getId()).thenReturn("accountId");
     MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
-    api.getHistoryStorage().onHistoryOrderAdded(1, new MetatraderOrder() {{
+    api.getHistoryStorage().onHistoryOrderAdded("1:ps-mpa-1", new MetatraderOrder() {{
       doneTime = startingHistoryOrderTime;
     }});
-    api.getHistoryStorage().onDealAdded(1, new MetatraderDeal() {{
+    api.getHistoryStorage().onDealAdded("1:ps-mpa-1", new MetatraderDeal() {{
       time = startingDealTime;
     }});
-    api.onConnected(1, 0).get();
-    Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(), Mockito.argThat(arg -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(startingHistoryOrderTime);
-      return true;
-    }), Mockito.argThat(arg -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(startingDealTime);
-      return true;
-    }));
+    api.onConnected("1:ps-mpa-1", 0).get();
+    Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.eq("ps-mpa-1"),
+      Mockito.anyString(), Mockito.eq(startingHistoryOrderTime), Mockito.eq(startingDealTime));
   }
   
   /**
@@ -995,62 +1005,64 @@ class MetaApiConnectionTest {
   void testMaintainsSynchronizationIfConnectionHasFailed() {
     IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
     IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
-    Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(), Mockito.any(), Mockito.any()))
+    Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(),
+      Mockito.anyString(), Mockito.any(), Mockito.any()))
       .thenThrow(new CompletionException(new Exception("test error")))
       .thenReturn(CompletableFuture.completedFuture(null));
     MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
     Mockito.when(account.getId()).thenReturn("accountId");
     MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
-    api.getHistoryStorage().onHistoryOrderAdded(1, new MetatraderOrder() {{
+    api.getHistoryStorage().onHistoryOrderAdded("1:ps-mpa-1", new MetatraderOrder() {{
       doneTime = startingHistoryOrderTime;
     }});
-    api.getHistoryStorage().onDealAdded(1, new MetatraderDeal() {{
+    api.getHistoryStorage().onDealAdded("1:ps-mpa-1", new MetatraderDeal() {{
       time = startingDealTime;
     }});
-    api.onConnected(1, 0).join();
-    Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(), Mockito.argThat(arg -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(startingHistoryOrderTime);
-      return true;
-    }), Mockito.argThat(arg -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(startingDealTime);
-      return true;
-    }));
+    api.onConnected("1:ps-mpa-1", 0).join();
+    Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.eq("ps-mpa-1"),
+      Mockito.anyString(), Mockito.eq(startingHistoryOrderTime), Mockito.eq(startingDealTime));
   }
   
   /**
-   * Tests {@link MetaApiConnection#onConnected()}
+   * Tests {@link MetaApiConnection#onConnected}
+   */
+  @Test
+  void testDoesNotSynchronizeIfConnectionIsClosed() {
+    Mockito.when(client.synchronize(Mockito.anyString(), Mockito.anyInt(),
+      Mockito.anyString(), Mockito.anyString(), Mockito.any(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(client.unsubscribe(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
+    MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
+    Mockito.when(account.getId()).thenReturn("accountId");
+    api = new MetaApiConnection(client, account, null, connectionRegistry);
+    api.getHistoryStorage().onHistoryOrderAdded("1:ps-mpa-1", new MetatraderOrder() {{
+      doneTime = new IsoTime("2020-01-01T00:00:00.000Z");
+    }}).join();
+    api.getHistoryStorage().onDealAdded("1:ps-mpa-1", new MetatraderDeal() {{
+      time = new IsoTime("2020-01-02T00:00:00.000Z");
+    }}).join();
+    api.close().join();
+    api.onConnected("1:ps-mpa-1", 1).join();
+    Mockito.verify(client, Mockito.never()).synchronize(Mockito.anyString(), Mockito.anyInt(),
+      Mockito.anyString(), Mockito.anyString(), Mockito.any(), Mockito.any());
+  };
+  
+  /**
+   * Tests {@link MetaApiConnection#onConnected}
    */
   @Test
   void testRestoresMarketDataSubscriptionsOnSynchronization() {
-    IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
-    IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
-    Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(),
-      Mockito.any(), Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
-    Mockito.when(client.subscribeToMarketData(Mockito.anyString(), Mockito.anyInt(),
-      Mockito.anyString(), Mockito.anyList())).thenReturn(CompletableFuture.completedFuture(null));
-    MetatraderAccount account = Mockito.mock(MetatraderAccount.class);
-    Mockito.when(account.getId()).thenReturn("accountId");
-    MetaApiConnection api = new MetaApiConnection(client, account, null, connectionRegistry);
-    api.getHistoryStorage().onHistoryOrderAdded(1, new MetatraderOrder() {{
-      doneTime = startingHistoryOrderTime;
-    }});
-    api.getHistoryStorage().onDealAdded(1, new MetatraderDeal() {{
-      time = startingDealTime;
-    }});
-    List<MarketDataSubscription> subscriptions = new ArrayList<>();
-    api.subscribeToMarketData("EURUSD", subscriptions, 1).join();
-    api.onConnected(1, 0).join();
-    Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), 
-      Mockito.anyString(), Mockito.argThat(arg -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(startingHistoryOrderTime);
-      return true;
-    }), Mockito.argThat(arg -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(startingDealTime);
-      return true;
-    }));
-    Mockito.verify(client, Mockito.times(2)).subscribeToMarketData("accountId", 1, "EURUSD",
-      subscriptions);
-  }
+    Mockito.doReturn(Optional.of(new MetatraderSymbolPrice() {{symbol = "EURUSD";}}))
+      .when(apiTerminalState).getPrice("EURUSD");
+    Mockito.doReturn(Optional.ofNullable(null)).when(apiTerminalState).getPrice("AUDNZD");
+    Mockito.when(client.subscribeToMarketData(Mockito.anyString(), Mockito.anyInt(), Mockito.anyString(),
+      Mockito.anyList())).thenReturn(CompletableFuture.completedFuture(null));
+    api.subscribeToMarketData("EURUSD").join();
+    api.subscribeToMarketData("AUDNZD").join();
+    api.onAccountInformationUpdated("1:ps-mpa-1", new MetatraderAccountInformation()).join();
+    Mockito.verify(client, Mockito.times(1)).subscribeToMarketData(Mockito.eq("accountId"),
+      Mockito.eq(1), Mockito.eq("AUDNZD"), Mockito.anyList());
+  };
   
   /**
    * Tests {@link MetaApiConnection#close()}
@@ -1076,7 +1088,7 @@ class MetaApiConnectionTest {
   void testWaitsUntilSynchronizationComplete() throws Exception {
     Mockito.when(client.waitSynchronized(Mockito.anyString(), Mockito.eq(1), Mockito.anyString(), Mockito.anyLong()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    assertFalse(api.isSynchronized(1, "synchronizationId").join());
+    assertFalse(api.isSynchronized("1:ps-mpa-1", "synchronizationId").join());
     CompletableFuture<Void> future = api.waitSynchronized(new SynchronizationOptions() {{
       applicationPattern = "app.*";
       synchronizationId = "synchronizationId";
@@ -1084,10 +1096,10 @@ class MetaApiConnectionTest {
       intervalInMilliseconds = 10;
     }});
     Thread.sleep(15);
-    api.onOrderSynchronizationFinished(1, "synchronizationId");
-    api.onDealSynchronizationFinished(1, "synchronizationId");
+    api.onOrderSynchronizationFinished("1:ps-mpa-1", "synchronizationId");
+    api.onDealSynchronizationFinished("1:ps-mpa-1", "synchronizationId");
     future.join();
-    assertTrue(api.isSynchronized(1, "synchronizationId").join());
+    assertTrue(api.isSynchronized("1:ps-mpa-1", "synchronizationId").join());
   }
 
   /**
@@ -1108,7 +1120,7 @@ class MetaApiConnectionTest {
         throw e.getCause();
       }
     });
-    assertFalse(api.isSynchronized(0, "synchronizationId").join());
+    assertFalse(api.isSynchronized("1:ps-mpa-1", "synchronizationId").join());
   }
   
   /**
@@ -1126,9 +1138,34 @@ class MetaApiConnectionTest {
    */
   @Test
   void testSetsSynchronizedFalseOnDisconnect() {
-    api.onDisconnected(0).join();
+    Mockito.when(storageMock.getLastHistoryOrderTime(Mockito.anyInt()))
+      .thenReturn(CompletableFuture.completedFuture(new IsoTime()));
+    Mockito.when(storageMock.getLastDealTime(Mockito.anyInt()))
+      .thenReturn(CompletableFuture.completedFuture(new IsoTime()));
+    Mockito.when(client.synchronize(Mockito.anyString(), Mockito.anyInt(), Mockito.anyString(),
+      Mockito.anyString(), Mockito.any(), Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
+    api.onConnected("1:ps-mpa-1", 2).join();
+    assertTrue(api.isSynchronized());
+    api.onDisconnected("1:ps-mpa-1").join();
     assertFalse(api.isSynchronized());
   }
+  
+  /**
+   * Tests {@link MetaApiConnection#onDisconnected}
+   */
+  @Test
+  void testDeletesStateIfStreamClosed() {
+    Mockito.when(storageMock.getLastHistoryOrderTime(Mockito.anyInt()))
+      .thenReturn(CompletableFuture.completedFuture(new IsoTime()));
+    Mockito.when(storageMock.getLastDealTime(Mockito.anyInt()))
+    .thenReturn(CompletableFuture.completedFuture(new IsoTime()));
+    Mockito.when(client.synchronize(Mockito.anyString(), Mockito.anyInt(), Mockito.anyString(),
+      Mockito.anyString(), Mockito.any(), Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
+    api.onConnected("1:ps-mpa-1", 2).join();
+    assertTrue(api.isSynchronized());
+    api.onStreamClosed("1:ps-mpa-1").join();
+    assertFalse(api.isSynchronized());
+  };
   
   private static Stream<Arguments> providePosition() {
     MetatraderPosition position = new MetatraderPosition();
