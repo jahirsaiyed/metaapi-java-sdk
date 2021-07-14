@@ -191,9 +191,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    */
   public void onOutOfOrderPacket(String accountId, int instanceIndex, long expectedSequenceNumber, 
     long actualSequenceNumber, JsonNode packet, IsoTime receivedAt) {
-    logger.error("MetaApi websocket client received an out of order packet type "
-      + packet.get("type").asText() + " for account id " + accountId + ". Expected s/n " 
-      + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber);
+    logger.error("MetaApi websocket client received an out of order packet type " +
+      packet.get("type").asText() + " for account id " + accountId + ":" + instanceIndex +
+      ". Expected s/n " + expectedSequenceNumber + " does not match the actual of " + actualSequenceNumber);
     ensureSubscribe(accountId, instanceIndex);
   }
   
@@ -1492,7 +1492,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   }
                   for (SynchronizationListener listener : listeners) {
                     onDisconnectedFutures.add(listener.onDisconnected(instanceIndex).exceptionally(e -> {
-                      logger.error(accountId + ": Failed to notify listener about disconnected event", e);
+                      logger.error(accountId + ":" + instanceIndex + ": Failed to notify "
+                        + "listener about disconnected event", e);
                       return null;
                     }));
                   }
@@ -1502,7 +1503,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   packetOrderer.onStreamClosed(instanceId);
                   for (SynchronizationListener listener : listeners) {
                     onStreamClosedFutures.add(listener.onStreamClosed(instanceIndex).exceptionally(e -> {
-                      logger.error(accountId + ": Failed to notify listener about stream closed event", e);
+                      logger.error(accountId + ":" + instanceIndex + ": Failed to notify "
+                        + "listener about stream closed event", e);
                       return null;
                     }));
                   }
@@ -1538,7 +1540,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (SynchronizationListener listener : listeners) {
                 completableFutures.add(listener.onConnected(instanceIndex, data.get("replicas").asInt())
                   .exceptionally(e -> {
-                  logger.error("Failed to notify listener about connected event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about connected event", e);
                   return null;
                 }));
               }
@@ -1552,7 +1554,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
               completableFutures.add(listener.onSynchronizationStarted(instanceIndex).exceptionally(e -> {
-                logger.error(accountId + ": Failed to notify listener about synchronization "
+                logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about synchronization "
                   + "started event", e);
                 return null;
               }));
@@ -1566,7 +1568,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (SynchronizationListener listener : listeners) {
                 completableFutures.add(listener.onAccountInformationUpdated(instanceIndex, 
                     accountInformation).exceptionally(e -> {
-                  logger.error("Failed to notify listener about " + type + " event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify "
+                    + "listener about accountInformation event", e);
                   return null;
                 }));
               }
@@ -1579,7 +1582,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
                   completableFutures.add(listener.onDealAdded(instanceIndex, deal).exceptionally(e -> {
-                    logger.error("Failed to notify listener about " + type + " event", e);
+                    logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about deals event", e);
                     return null;
                   }));
                 }
@@ -1594,7 +1597,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             for (SynchronizationListener listener : listeners) {
               completableFutures.add(listener.onOrdersReplaced(instanceIndex, Arrays.asList(orders))
                   .exceptionally(e -> {
-                logger.error("Failed to notify listener about orders event", e);
+                logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about orders event", e);
                 return null;
               }));
             }
@@ -1607,7 +1610,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 for (SynchronizationListener listener : listeners) {
                   completableFutures.add(listener.onHistoryOrderAdded(instanceIndex, historyOrder)
                       .exceptionally(e -> {
-                    logger.error("Failed to notify listener about " + type + " event", e);
+                    logger.error(accountId + ":" + instanceIndex + ": Failed to notify "
+                      + "listener about historyOrders event", e);
                     return null;
                   }));
                 }
@@ -1622,7 +1626,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             for (SynchronizationListener listener : listeners) {
               completableFutures.add(listener.onPositionsReplaced(instanceIndex, Arrays.asList(positions))
                   .exceptionally(e -> {
-                logger.error("Failed to notify listener about positions event", e);
+                logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about positions event", e);
                 return null;
               }));
             }
@@ -1635,7 +1639,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (SynchronizationListener listener : listeners) {
                 completableFutures.add(listener.onAccountInformationUpdated(instanceIndex,
                     accountInformation).exceptionally(e -> {
-                  logger.error("Failed to notify listener about update event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about update event", e);
                   return null;
                 }));
               }
@@ -1649,7 +1653,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 for (SynchronizationListener listener : listeners) {
                   completableFutures.add(listener.onPositionUpdated(instanceIndex, position)
                       .exceptionally(e -> {
-                    logger.error("Failed to notify listener about update event", e);
+                    logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about update event", e);
                     return null;
                   }));
                 }
@@ -1664,7 +1668,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 for (SynchronizationListener listener : listeners) {
                   completableFutures.add(listener.onPositionRemoved(instanceIndex, positionId)
                       .exceptionally(e -> {
-                    logger.error("Failed to notify listener about update event", e);
+                    logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about update event", e);
                     return null;
                   }));
                 }
@@ -1679,7 +1683,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 for (SynchronizationListener listener : listeners) {
                   completableFutures.add(listener.onOrderUpdated(instanceIndex, order)
                       .exceptionally(e -> {
-                    logger.error("Failed to notify listener about update event", e);
+                    logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about update event", e);
                     return null;
                   }));
                 }
@@ -1694,7 +1698,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 for (SynchronizationListener listener : listeners) {
                   completableFutures.add(listener.onOrderCompleted(instanceIndex, orderId)
                       .exceptionally(e -> {
-                    logger.error("Failed to notify listener about update event", e);
+                    logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about update event", e);
                     return null;
                   }));
                 }
@@ -1709,7 +1713,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 for (SynchronizationListener listener : listeners) {
                   completableFutures.add(listener.onHistoryOrderAdded(instanceIndex, historyOrder)
                       .exceptionally(e -> {
-                    logger.error("Failed to notify listener about update event", e);
+                    logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about update event", e);
                     return null;
                   }));
                 }
@@ -1723,7 +1727,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 List<CompletableFuture<Void>> completableFutures = new ArrayList<>();
                 for (SynchronizationListener listener : listeners) {
                   completableFutures.add(listener.onDealAdded(instanceIndex, deal).exceptionally(e -> {
-                    logger.error("Failed to notify listener about update event", e);
+                    logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about update event", e);
                     return null;
                   }));
                 }
@@ -1737,7 +1741,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               List<CompletableFuture<Void>> onUpdateFutures = new ArrayList<>();
               for (LatencyListener listener : latencyListeners) {
                 onUpdateFutures.add(listener.onUpdate(accountId, timestamps).exceptionally(e -> {
-                  logger.error("Failed to notify latency listener about update event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify latency "
+                    + "listener about update event", e);
                   return null;
                 }));
               }
@@ -1751,7 +1756,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               }
               completableFutures.add(listener.onDealSynchronizationFinished(instanceIndex,
                   data.get("synchronizationId").asText()).exceptionally(e -> {
-                logger.error("Failed to notify listener about " + type + " event", e);
+                logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener "
+                  + "about dealSynchronizationFinished event", e);
                 return null;
               }));
             }
@@ -1761,7 +1767,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             for (SynchronizationListener listener : listeners) {
               completableFutures.add(listener.onOrderSynchronizationFinished(instanceIndex,
                   data.get("synchronizationId").asText()).exceptionally(e -> {
-                logger.error("Failed to notify listener about " + type + " event", e);
+                logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener "
+                  + "about orderSynchronizationFinished event", e);
                 return null;
               }));
             }
@@ -1784,7 +1791,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 onBrokerConnectionStatusChangedFutures.add(listener
                     .onBrokerConnectionStatusChanged(instanceIndex, data.get("connected").asBoolean())
                     .exceptionally(e -> {
-                  logger.error("Failed to notify listener about brokerConnectionStatusChanged event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener "
+                    + "about brokerConnectionStatusChanged event", e);
                   return null;
                 }));
               }
@@ -1795,7 +1803,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   onHealthStatusFutures.add(listener.onHealthStatus(instanceIndex, 
                       jsonMapper.treeToValue(data.get("healthStatus"), SynchronizationListener.HealthStatus.class))
                     .exceptionally(e -> {
-                    logger.error("Failed to notify listener about server-side healthStatus event", e);
+                    logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener "
+                      + "about server-side healthStatus event", e);
                     return null;
                   }));
                 }
@@ -1803,9 +1812,10 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               }
             }
           } else if (type.equals("downgradeSubscription")) {
-            logger.info(accountId + ": Market data subscriptions for symbol " + data.get("symbol") + " were downgraded by "
-              + "the server due to rate limits. Updated subscriptions: " + data.get("updates") + ", removed subscriptions: "
-              + data.get("unsubscriptions") + ". Please read https://metaapi.cloud/docs/client/rateLimiting/ for more details.");
+            logger.info(accountId + ":" + instanceIndex + ": Market data subscriptions for symbol " + data.get("symbol") 
+              + " were downgraded by " + "the server due to rate limits. Updated subscriptions: " + data.get("updates")
+              + ", removed subscriptions: " + data.get("unsubscriptions") 
+              + ". Please read https://metaapi.cloud/docs/client/rateLimiting/ for more details.");
             List<CompletableFuture<Void>> onSubscriptionDowngradeFutures = new ArrayList<>();
             for (SynchronizationListener listener : listeners) {
               onSubscriptionDowngradeFutures.add(listener.onSubscriptionDowngraded(instanceIndex, data.get("symbol").asText(),
@@ -1816,7 +1826,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   ? Arrays.asList(jsonMapper.treeToValue(data.get("unsubscriptions"), MarketDataUnsubscription[].class))
                   : new ArrayList<>()
               ).exceptionally(e -> {
-                logger.error("Failed to notify listener about subscription downgrade event", e);
+                logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener "
+                  + "about subscription downgrade event", e);
                 return null;
               }));
             }
@@ -1833,7 +1844,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               onSymbolSpecificationsUpdatedFutures.add(
                 listener.onSymbolSpecificationsUpdated(instanceIndex, specifications, removedSymbols)
                     .exceptionally(e -> {
-                  logger.error(accountId + "Failed to notify listener about specifications updated event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener "
+                    + "about specifications updated event", e);
                   return null;
                 }));
             }
@@ -1843,7 +1855,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (SynchronizationListener listener : listeners) {
                 onSymbolSpecificationUpdatedFutures.add(listener.onSymbolSpecificationUpdated(instanceIndex,
                     specification).exceptionally(e -> {
-                  logger.error("Failed to notify listener about specification updated event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener "
+                    + "about specification updated event", e);
                   return null;
                 }));
               }
@@ -1854,7 +1867,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (SynchronizationListener listener : listeners) {
                 onSymbolSpecificationRemovedFutures.add(listener.onSymbolSpecificationRemoved(instanceIndex,
                     removedSymbol).exceptionally(e -> {
-                  logger.error("Failed to notify listener about specifications removed event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener "
+                    + "about specifications removed event", e);
                   return null;
                 }));
               }
@@ -1884,7 +1898,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   data.has("accountCurrencyExchangeRate")
                     ? data.get("accountCurrencyExchangeRate").asDouble() : null
                   ).exceptionally(e -> {
-                  logger.error("Failed to notify listener about prices event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about prices event", e);
                   return null;
                 }));
               }
@@ -1897,7 +1911,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   data.has("accountCurrencyExchangeRate")
                     ? data.get("accountCurrencyExchangeRate").asDouble() : null
                   ).exceptionally(e -> {
-                  logger.error("Failed to notify listener about candles event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about candles event", e);
                   return null;
                 }));
               }
@@ -1910,7 +1924,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   data.has("accountCurrencyExchangeRate")
                     ? data.get("accountCurrencyExchangeRate").asDouble() : null
                   ).exceptionally(e -> {
-                  logger.error("Failed to notify listener about ticks event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about ticks event", e);
                   return null;
                 }));
               }
@@ -1923,7 +1937,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                   data.has("accountCurrencyExchangeRate")
                     ? data.get("accountCurrencyExchangeRate").asDouble() : null
                   ).exceptionally(e -> {
-                  logger.error("Failed to notify listener about books event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about books event", e);
                   return null;
                 }));
               }
@@ -1934,7 +1948,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
               for (SynchronizationListener listener : listeners) {
                 onPriceUpdatedFutures.add(listener.onSymbolPriceUpdated(instanceIndex, price)
                     .exceptionally(e -> {
-                  logger.error("Failed to notify listener about price event", e);
+                  logger.error(accountId + ":" + instanceIndex + ": Failed to notify listener about price event", e);
                   return null;
                 }));
               }
@@ -1947,7 +1961,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
                 for (LatencyListener listener : latencyListeners) {
                   onSymbolPriceFutures.add(listener.onSymbolPrice(accountId, price.symbol, price.timestamps)
                     .exceptionally(e -> {
-                      logger.error("Failed to notify latency listener about price event", e);
+                      logger.error(accountId + ":" + instanceIndex + ": Failed to notify latency listener "
+                        + "about price event", e);
                       return null;
                     }));
                 }
