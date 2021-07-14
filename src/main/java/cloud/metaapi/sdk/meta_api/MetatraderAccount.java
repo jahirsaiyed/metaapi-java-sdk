@@ -1,7 +1,6 @@
 package cloud.metaapi.sdk.meta_api;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -176,6 +175,14 @@ public class MetatraderAccount {
    */
   public String getReliability() {
     return data.reliability;
+  }
+  
+  /**
+   * Returns version value. Possible values are 4 and 5
+   * @return account version value
+   */
+  public int getVersion() {
+    return data.version;
   }
   
   /**
@@ -443,10 +450,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<List<ExpertAdvisor>> getExpertAdvisors() {
     return CompletableFuture.supplyAsync(() -> {
-      if (!getType().equals("cloud-g1")) {
-        throw new CompletionException(new ValidationException(
-          "Custom expert advisor is available only for cloud-g1 accounts", new HashMap<>()));
-      }
+      checkExpertAdvisorAllowed();
       List<ExpertAdvisorDto> advisors = expertAdvisorClient.getExpertAdvisors(getId()).join();
       return advisors.stream().map(e -> new ExpertAdvisor(e, getId(), expertAdvisorClient))
         .collect(Collectors.toList());
@@ -460,10 +464,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<ExpertAdvisor> getExpertAdvisor(String expertId) {
     return CompletableFuture.supplyAsync(() -> {
-      if (!getType().equals("cloud-g1")) {
-        throw new CompletionException(new ValidationException(
-          "Custom expert advisor is available only for cloud-g1 accounts", new HashMap<>()));
-      }
+      checkExpertAdvisorAllowed();
       ExpertAdvisorDto advisor = expertAdvisorClient.getExpertAdvisor(getId(), expertId).join();
       return new ExpertAdvisor(advisor, getId(), expertAdvisorClient);
     });
@@ -477,10 +478,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<ExpertAdvisor> createExpertAdvisor(String expertId, NewExpertAdvisorDto expert) {
     return CompletableFuture.supplyAsync(() -> {
-      if (!getType().equals("cloud-g1")) {
-        throw new CompletionException(new ValidationException(
-          "Custom expert advisor is available only for cloud-g1 accounts", new HashMap<>()));
-      }
+      checkExpertAdvisorAllowed();
       expertAdvisorClient.updateExpertAdvisor(getId(), expertId, expert).join();
       return getExpertAdvisor(expertId).join();
     });
@@ -568,5 +566,12 @@ public class MetatraderAccount {
   public CompletableFuture<List<MetatraderTick>> getHistoricalTicks(String symbol,
     IsoTime startTime, Integer offset, Integer limit) {
     return historicalMarketDataClient.getHistoricalTicks(getId(), symbol, startTime, offset, limit);
+  }
+  
+  private void checkExpertAdvisorAllowed() throws CompletionException {
+    if (getVersion() != 4 || !getType().equals("cloud-g1")) {
+      throw new CompletionException(new ValidationException(
+        "Custom expert advisor is available only for MT4 G1 accounts", null));
+    }
   }
 }

@@ -516,7 +516,9 @@ public class MetatraderAccountApiTest {
    */
   @Test
   void testRetrievesExpertAdvisors() {
-    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }};
+    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{
+      _id = "id"; version = 4; type = "cloud-g1";
+    }};
     ExpertAdvisorDto advisorDto = new ExpertAdvisorDto() {{ expertId = "ea"; }};
     Mockito.when(client.getAccount(Mockito.anyString()))
       .thenReturn(CompletableFuture.completedFuture(accountDto));
@@ -534,7 +536,9 @@ public class MetatraderAccountApiTest {
    */
   @Test
   void testRetrievesExpertAdvisorByExpertId() {
-    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }};
+    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{
+      _id = "id"; version = 4; type = "cloud-g1";
+    }};
     ExpertAdvisorDto advisorDto = new ExpertAdvisorDto() {{
       expertId = "ea";
       period = "1H";
@@ -558,8 +562,10 @@ public class MetatraderAccountApiTest {
    * Tests {@link MetatraderAccount#getExpertAdvisor(String)}
    */
   @Test
-  void testValidatesAccountType() {
-    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g2"; }};
+  void testValidatesAccountVersion() {
+    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{
+      _id = "id"; version = 5; type = "cloud-g1";
+    }};
     ExpertAdvisorDto advisorDto = new ExpertAdvisorDto() {{
       expertId = "ea";
       period = "1H";
@@ -572,6 +578,56 @@ public class MetatraderAccountApiTest {
       .thenReturn(CompletableFuture.completedFuture(Arrays.asList(advisorDto)));
     Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
       .thenReturn(CompletableFuture.completedFuture(advisorDto));
+    Mockito.when(eaClient.updateExpertAdvisor(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    NewExpertAdvisorDto newExpertAdvisor = new NewExpertAdvisorDto() {{
+      period = "1H";
+      symbol = "EURUSD";
+      preset = "preset";
+    }};
+    MetatraderAccount account = api.getAccount("id").join();
+    try {
+      account.getExpertAdvisors().join();
+      throw new Exception("ValidationException expected");
+    } catch (Throwable err) {
+      assertTrue(err.getCause() instanceof ValidationException);
+    }
+    try {
+      account.getExpertAdvisor("ea").join();
+      throw new Exception("ValidationException expected");
+    } catch (Throwable err) {
+      assertTrue(err.getCause() instanceof ValidationException);
+    }
+    try {
+      account.createExpertAdvisor("ea", newExpertAdvisor).join();
+      throw new Exception("ValidationException expected");
+    } catch (Throwable err) {
+      assertTrue(err.getCause() instanceof ValidationException);
+    }
+  }
+  
+  /**
+   * Tests {@link MetatraderAccount#getExpertAdvisor(String)}
+   */
+  @Test
+  void testValidatesAccountType() {
+    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{
+      _id = "id"; version = 4; type = "cloud-g2";
+    }};
+    ExpertAdvisorDto advisorDto = new ExpertAdvisorDto() {{
+      expertId = "ea";
+      period = "1H";
+      symbol = "EURUSD";
+      fileUploaded = false;
+    }};
+    Mockito.when(client.getAccount(Mockito.anyString()))
+      .thenReturn(CompletableFuture.completedFuture(accountDto));
+    Mockito.when(eaClient.getExpertAdvisors(Mockito.anyString()))
+      .thenReturn(CompletableFuture.completedFuture(Arrays.asList(advisorDto)));
+    Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
+      .thenReturn(CompletableFuture.completedFuture(advisorDto));
+    Mockito.when(eaClient.updateExpertAdvisor(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
     NewExpertAdvisorDto newExpertAdvisor = new NewExpertAdvisorDto() {{
       period = "1H";
       symbol = "EURUSD";
@@ -603,7 +659,9 @@ public class MetatraderAccountApiTest {
    */
   @Test
   void testCreatesExpertAdvisor() {
-    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }};
+    MetatraderAccountDto accountDto = new MetatraderAccountDto() {{
+      _id = "id"; version = 4; type = "cloud-g1";
+    }};
     ExpertAdvisorDto advisorDto = new ExpertAdvisorDto() {{
       expertId = "ea";
       period = "1H";
@@ -636,8 +694,9 @@ public class MetatraderAccountApiTest {
    */
   @Test
   void testReloadsExpertAdvisor() {
-    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(
-      CompletableFuture.completedFuture(new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }}));
+    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(
+      new MetatraderAccountDto() {{_id = "id"; version = 4; type = "cloud-g1";}}
+    ));
     Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
       .thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
         expertId = "ea";
@@ -662,8 +721,9 @@ public class MetatraderAccountApiTest {
    */
   @Test
   void testUpdatesExpertAdvisor() {
-    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(
-      CompletableFuture.completedFuture(new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }}));
+    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(
+      new MetatraderAccountDto() {{_id = "id"; version = 4; type = "cloud-g1";}}
+    ));
     Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
       .thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
         expertId = "ea";
@@ -696,8 +756,9 @@ public class MetatraderAccountApiTest {
    */
   @Test
   void testUploadsExpertAdvisorFile() {
-    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(
-      CompletableFuture.completedFuture(new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }}));
+    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(
+      new MetatraderAccountDto() {{_id = "id"; version = 4; type = "cloud-g1";}}
+    ));
     Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
       .thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
         expertId = "ea";
@@ -725,8 +786,9 @@ public class MetatraderAccountApiTest {
    */
   @Test
   void testRemovesExpertAdvisor() {
-    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(
-      CompletableFuture.completedFuture(new MetatraderAccountDto() {{ _id = "id"; type = "cloud-g1"; }}));
+    Mockito.when(client.getAccount(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(
+      new MetatraderAccountDto() {{_id = "id"; version = 4; type = "cloud-g1";}}
+    ));
     Mockito.when(eaClient.getExpertAdvisor(Mockito.anyString(), Mockito.anyString()))
       .thenReturn(CompletableFuture.completedFuture(new ExpertAdvisorDto() {{
         expertId = "ea";
