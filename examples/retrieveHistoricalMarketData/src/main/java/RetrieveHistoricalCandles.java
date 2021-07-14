@@ -46,8 +46,11 @@ public class RetrieveHistoricalCandles {
       List<MetatraderCandle> candles = new ArrayList<>();
       for (int i = 0; i < pages; i++) {
         // the API to retrieve historical market data is currently available for G1 only
-        candles = account.getHistoricalCandles(symbol, "1m", startTime).join();
-        System.out.println("Downloaded " + candles.size() + " historical candles for " + symbol);
+        List<MetatraderCandle> newCandles = account.getHistoricalCandles(symbol, "1m", startTime).join();
+        System.out.println("Downloaded " + newCandles.size() + " historical candles for " + symbol);
+        if (newCandles.size() != 0) {
+          candles = newCandles;
+        }
         if (!candles.isEmpty()) {
           startTime = candles.get(0).time;
           startTime.setTime(startTime.getDate().toInstant().minusSeconds(60));
