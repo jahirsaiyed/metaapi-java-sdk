@@ -267,7 +267,7 @@ System.out.println(connection.getSymbolPrice("GBPUSD").join());
 ```
 
 ### Query historical market data via RPC API
-Currently this API is supported on G1 only.
+Currently this API is supported on G1 and MT4 G2 only.
 
 ```java
 // retrieve 1000 candles before the specified time

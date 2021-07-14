@@ -45,7 +45,7 @@ public class RetrieveHistoricalCandles {
       IsoTime startTime = null;
       List<MetatraderCandle> candles = new ArrayList<>();
       for (int i = 0; i < pages; i++) {
-        // the API to retrieve historical market data is currently available for G1 only
+        // the API to retrieve historical market data is currently available for G1 and MT4 G2 only
         List<MetatraderCandle> newCandles = account.getHistoricalCandles(symbol, "1m", startTime).join();
         System.out.println("Downloaded " + newCandles.size() + " historical candles for " + symbol);
         if (newCandles.size() != 0) {
