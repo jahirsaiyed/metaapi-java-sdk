@@ -28,10 +28,11 @@ public class StreamQuotesExample {
   private static String token = getEnvOrDefault("TOKEN", "<put in your token here>");
   private static String accountId = getEnvOrDefault("ACCOUNT_ID", "<put in your account id here>");
   private static String symbol = getEnvOrDefault("SYMBOL", "EURUSD");
+  private static String domain = getEnvOrDefault("OMAIN", "agiliumtrade.agiliumtrade.ai");
   
   private static class QuoteListener extends SynchronizationListener {
     @Override
-    public CompletableFuture<Void> onSymbolPriceUpdated(int instanceIndex, MetatraderSymbolPrice price) {
+    public CompletableFuture<Void> onSymbolPriceUpdated(String instanceIndex, MetatraderSymbolPrice price) {
       if (price.symbol.equals(symbol)) {
         try {
           System.out.println(symbol + " price updated " + asJson(price));
@@ -42,7 +43,7 @@ public class StreamQuotesExample {
       return CompletableFuture.completedFuture(null);
     }
     @Override
-    public CompletableFuture<Void> onCandlesUpdated(int instanceIndex, List<MetatraderCandle> candles,
+    public CompletableFuture<Void> onCandlesUpdated(String instanceIndex, List<MetatraderCandle> candles,
       Double equity, Double margin, Double freeMargin, Double marginLevel, Double accountCurrencyExchangeRate) {
       for (MetatraderCandle candle : candles) {
         if (candle.symbol.equals(symbol)) {
@@ -56,7 +57,7 @@ public class StreamQuotesExample {
       return CompletableFuture.completedFuture(null);
     }
     @Override
-    public CompletableFuture<Void> onTicksUpdated(int instanceIndex, List<MetatraderTick> ticks,
+    public CompletableFuture<Void> onTicksUpdated(String instanceIndex, List<MetatraderTick> ticks,
       Double equity, Double margin, Double freeMargin, Double marginLevel, Double accountCurrencyExchangeRate) {
       for (MetatraderTick tick : ticks) {
         if (tick.symbol.equals(symbol)) {
@@ -70,7 +71,7 @@ public class StreamQuotesExample {
       return CompletableFuture.completedFuture(null);
     }
     @Override
-    public CompletableFuture<Void> onBooksUpdated(int instanceIndex, List<MetatraderBook> books,
+    public CompletableFuture<Void> onBooksUpdated(String instanceIndex, List<MetatraderBook> books,
       Double equity, Double margin, Double freeMargin, Double marginLevel, Double accountCurrencyExchangeRate) {
       for (MetatraderBook book : books) {
         if (book.symbol.equals(symbol)) {
@@ -84,7 +85,7 @@ public class StreamQuotesExample {
       return CompletableFuture.completedFuture(null);
     }
     @Override
-    public CompletableFuture<Void> onSubscriptionDowngraded(int instanceIndex, String symbol,
+    public CompletableFuture<Void> onSubscriptionDowngraded(String instanceIndex, String symbol,
       List<MarketDataSubscription> updates, List<MarketDataUnsubscription> unsubscriptions) {
       System.out.println("Market data subscriptions for " + symbol
         + " were downgraded by the server due to rate limits");
@@ -94,7 +95,9 @@ public class StreamQuotesExample {
   
   public static void main(String[] args) {
     try {
-      MetaApi api = new MetaApi(token);
+      MetaApi.Options apiOpts = new MetaApi.Options();
+      apiOpts.domain = domain;
+      MetaApi api = new MetaApi(token, apiOpts);
       MetatraderAccount account = api.getMetatraderAccountApi().getAccount(accountId).get();
       
       // wait until account is deployed and connected to broker
