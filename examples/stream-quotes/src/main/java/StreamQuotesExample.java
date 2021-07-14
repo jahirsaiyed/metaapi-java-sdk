@@ -124,8 +124,10 @@ public class StreamQuotesExample {
       connection.waitSynchronized().get();
       
       // Add symbol to MarketWatch if not yet added and subscribe to market data
-      // Please note that currently only G1 instances support extended subscription management
+      // Please note that currently only G1 and MT4 G2 instances support extended subscription management
       // Other instances will only stream quotes in response
+      // Market depth streaming is available in MT5 only
+      // ticks streaming is not available for MT4 G1
       connection.subscribeToMarketData(symbol, Arrays.asList(
         new MarketDataSubscription() {{ type = "quotes"; intervalInMilliseconds = 5000; }},
         new MarketDataSubscription() {{ type = "candles"; timeframe = "1m"; intervalInMilliseconds = 10000; }},
