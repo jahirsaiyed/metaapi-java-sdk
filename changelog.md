@@ -26,6 +26,7 @@
   - fixed deal sorting in memory history store
   - improve stability for connection host migration
   - disable synchronization after connection is closed
+  - make it possible to specify relative SL/TP
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

@@ -37,6 +37,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
+import cloud.metaapi.sdk.clients.meta_api.models.StopOptions;
 import cloud.metaapi.sdk.clients.meta_api.models.SynchronizationOptions;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade.ActionType;
 import cloud.metaapi.sdk.clients.models.*;
@@ -280,15 +281,33 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createMarketBuyOrder(
-    String symbol, double volume, Double stopLoss, Double takeProfit, MarketTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createMarketBuyOrder(String symbol,
+    double volume, Double stopLoss, Double takeProfit, MarketTradeOptions options) {
+    return createMarketBuyOrder(symbol, volume, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a market buy order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createMarketBuyOrder(String symbol,
+    double volume, StopOptions stopLoss, StopOptions takeProfit, MarketTradeOptions options) {
+    return createMarketBuyOrder(symbol, volume, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createMarketBuyOrder(String symbol,
+    double volume, Object stopLoss, Object takeProfit, MarketTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_BUY;
     trade.symbol = symbol;
     trade.volume = volume;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -303,15 +322,33 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createMarketSellOrder(
-    String symbol, double volume, Double stopLoss, Double takeProfit, MarketTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createMarketSellOrder(String symbol,
+    double volume, Double stopLoss, Double takeProfit, MarketTradeOptions options) {
+    return createMarketSellOrder(symbol, volume, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a market sell order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createMarketSellOrder(String symbol,
+    double volume, StopOptions stopLoss, StopOptions takeProfit, MarketTradeOptions options) {
+    return createMarketSellOrder(symbol, volume, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createMarketSellOrder(String symbol,
+    double volume, Object stopLoss, Object takeProfit, MarketTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_SELL;
     trade.symbol = symbol;
     trade.volume = volume;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -327,17 +364,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createLimitBuyOrder(
-    String symbol, double volume, double openPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createLimitBuyOrder(String symbol, double volume,
+    double openPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createLimitBuyOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a limit buy order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order limit price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createLimitBuyOrder(String symbol, double volume,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createLimitBuyOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createLimitBuyOrder(String symbol, double volume,
+    double openPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_BUY_LIMIT;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -353,17 +408,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createLimitSellOrder(
-    String symbol, double volume, double openPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createLimitSellOrder(String symbol, double volume,
+    double openPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createLimitSellOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a limit sell order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order limit price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createLimitSellOrder(String symbol, double volume,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createLimitSellOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createLimitSellOrder(String symbol, double volume,
+    double openPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_SELL_LIMIT;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -379,17 +452,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createStopBuyOrder(
-    String symbol, double volume, double openPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createStopBuyOrder(String symbol, double volume,
+    double openPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createStopBuyOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a stop buy order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order stop price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createStopBuyOrder(String symbol, double volume,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createStopBuyOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createStopBuyOrder(String symbol, double volume,
+    double openPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_BUY_STOP;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -405,17 +496,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally
    * with {@link TradeException}, check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createStopSellOrder(
-    String symbol, double volume, double openPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createStopSellOrder(String symbol, double volume,
+    double openPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createStopSellOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a stop sell order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order stop price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally
+   * with {@link TradeException}, check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createStopSellOrder(String symbol, double volume,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createStopSellOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createStopSellOrder(String symbol, double volume,
+    double openPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_SELL_STOP;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -432,18 +541,39 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally
    * with {@link TradeException}, check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createStopLimitBuyOrder(
-    String symbol, double volume, double openPrice, double stopLimitPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createStopLimitBuyOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createStopLimitBuyOrder(symbol, volume, openPrice, stopLimitPrice,
+      (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a stop limit buy order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order stop price
+   * @param stopLimitPrice the limit order price for the stop limit order
+   * @param stopLoss stop loss price, or {@code null}
+   * @param takeProfit take profit price, or {@code null}
+   * @param options trade options, or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally
+   * with {@link TradeException}, check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createStopLimitBuyOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createStopLimitBuyOrder(symbol, volume, openPrice, stopLimitPrice,
+      (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createStopLimitBuyOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_BUY_STOP_LIMIT;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
     trade.stopLimitPrice = stopLimitPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -460,18 +590,39 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally
    * with {@link TradeException}, check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createStopLimitSellOrder(
-    String symbol, double volume, double openPrice, double stopLimitPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createStopLimitSellOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createStopLimitSellOrder(symbol, volume, openPrice, stopLimitPrice,
+      (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a stop limit sell order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order stop price
+   * @param stopLimitPrice the limit order price for the stop limit order
+   * @param stopLoss stop loss price, or {@code null}
+   * @param takeProfit take profit price, or {@code null}
+   * @param options trade options, or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally
+   * with {@link TradeException}, check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createStopLimitSellOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createStopLimitSellOrder(symbol, volume, openPrice, stopLimitPrice,
+      (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createStopLimitSellOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_SELL_STOP_LIMIT;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
     trade.stopLimitPrice = stopLimitPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -485,13 +636,29 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * check error properties for error code details
    */
   public CompletableFuture<MetatraderTradeResponse> modifyPosition(
-    String positionId, Double stopLoss, Double takeProfit
-  ) {
+    String positionId, Double stopLoss, Double takeProfit) {
+    return modifyPosition(positionId, (Object) stopLoss, (Object) takeProfit);
+  }
+  
+  /**
+   * Modifies a position (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param positionId position id to modify
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> modifyPosition(
+    String positionId, StopOptions stopLoss, StopOptions takeProfit) {
+    return modifyPosition(positionId, (Object) stopLoss, (Object) takeProfit);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> modifyPosition(
+    String positionId, Object stopLoss, Object takeProfit) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.POSITION_MODIFY;
     trade.positionId = positionId;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     return websocketClient.trade(account.getId(), trade);
   }
   
@@ -576,15 +743,32 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> modifyOrder(
-    String orderId, double openPrice, double stopLoss, double takeProfit
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> modifyOrder(String orderId,
+    double openPrice, Double stopLoss, Double takeProfit) {
+    return modifyOrder(orderId, openPrice, (Object) stopLoss, (Object) takeProfit);
+  }
+  
+  /**
+   * Modifies a pending order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param orderId order id (ticket number)
+   * @param openPrice order stop price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> modifyOrder(String orderId,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit) {
+    return modifyOrder(orderId, openPrice, (Object) stopLoss, (Object) takeProfit);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> modifyOrder(String orderId,
+    double openPrice, Object stopLoss, Object takeProfit) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_MODIFY;
     trade.orderId = orderId;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     return websocketClient.trade(account.getId(), trade);
   }
   
@@ -1103,6 +1287,25 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    */
   public ConnectionHealthMonitor getHealthMonitor() {
     return healthMonitor;
+  }
+  
+  private void generateStopOptions(MetatraderTrade trade, Object stopLoss, Object takeProfit) {
+    if (stopLoss != null) {
+      if (stopLoss instanceof Double) {
+        trade.stopLoss = (Double) stopLoss;
+      } else {
+        trade.stopLoss = ((StopOptions) stopLoss).value;
+        trade.stopLossUnits = ((StopOptions) stopLoss).units;
+      }
+    }
+    if (takeProfit != null) {
+      if (takeProfit instanceof Double) {
+        trade.takeProfit = (Double) takeProfit;
+      } else {
+        trade.takeProfit = ((StopOptions) takeProfit).value;
+        trade.takeProfitUnits = ((StopOptions) takeProfit).units;
+      }
+    }
   }
   
   private void ensureSynchronized(String instanceIndex, String key) {

@@ -48,6 +48,8 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
+import cloud.metaapi.sdk.clients.meta_api.models.StopOptions;
+import cloud.metaapi.sdk.clients.meta_api.models.StopOptions.StopUnits;
 import cloud.metaapi.sdk.clients.meta_api.models.SynchronizationOptions;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal.DealEntryType;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal.DealType;
@@ -264,7 +266,7 @@ class MetaApiConnectionTest {
   }
   
   /**
-   * Tests {@link MetaApiConnection#createMarketBuyOrder(String, double, Double, Double, TradeOptions)}
+   * Tests {@link MetaApiConnection#createMarketBuyOrder}
    */
   @ParameterizedTest
   @MethodSource("provideTradeOrderResponse")
@@ -284,6 +286,36 @@ class MetaApiConnectionTest {
         comment = trade.comment; clientId = trade.clientId;
       }}
     ).get();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(expected);
+    Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
+      assertThat(arg).usingRecursiveComparison().isEqualTo(trade);
+      return true;
+    }));
+  }
+  
+  /**
+   * Tests {@link MetaApiConnection#createMarketBuyOrder}
+   */
+  @ParameterizedTest
+  @MethodSource("provideTradeOrderResponse")
+  void testCreatesMarketBuyOrderWithRelativeSLTP(MetatraderTradeResponse expected) {
+    MetatraderTrade trade = new MetatraderTrade();
+    trade.actionType = ActionType.ORDER_TYPE_BUY;
+    trade.symbol = "GBPUSD";
+    trade.volume = 0.07;
+    trade.stopLoss = 0.1;
+    trade.stopLossUnits = StopUnits.RELATIVE_PRICE;
+    trade.takeProfit = 2000.0;
+    trade.takeProfitUnits = StopUnits.RELATIVE_POINTS;
+    trade.comment = "comment";
+    trade.clientId = "TE_GBPUSD_7hyINWqAlE";
+    Mockito.when(client.trade(Mockito.eq("accountId"), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(expected));
+    MetatraderTradeResponse actual = api.createMarketBuyOrder(trade.symbol, trade.volume,
+        new StopOptions() {{value = 0.1; units = StopUnits.RELATIVE_PRICE;}},
+        new StopOptions() {{value = 2000.0; units = StopUnits.RELATIVE_POINTS;}},
+        new MarketTradeOptions() {{comment = trade.comment; clientId = trade.clientId;}}
+    ).join();
     assertThat(actual).usingRecursiveComparison().isEqualTo(expected);
     Mockito.verify(client).trade(Mockito.eq("accountId"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(trade);
