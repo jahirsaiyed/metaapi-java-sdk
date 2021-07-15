@@ -30,6 +30,7 @@
   - fixed synchronization queue
   - breaking change: added sequential packet processing
   - increased health status tracking interval to decrease CPU load
+  - added copyFactoryRoles field to MetatraderAccount entity
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

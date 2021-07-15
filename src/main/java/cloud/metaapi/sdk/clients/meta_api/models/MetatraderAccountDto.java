@@ -19,6 +19,11 @@ public class MetatraderAccountDto {
   public enum ConnectionStatus { CONNECTED, DISCONNECTED, DISCONNECTED_FROM_BROKER }
   
   /**
+   * Account roles for CopyFactory2 application
+   */
+  public enum CopyFactoryRole { PROVIDER, SUBSCRIBER }
+  
+  /**
    * Extension model
    */
   public static class Extension {
@@ -113,4 +118,8 @@ public class MetatraderAccountDto {
    * understand what you are doing.
    */
   public String baseCurrency;
+  /**
+   * Account roles for CopyFactory2 application
+   */
+  public List<CopyFactoryRole> copyFactoryRoles;
 }
