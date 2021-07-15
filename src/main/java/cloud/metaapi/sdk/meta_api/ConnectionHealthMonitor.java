@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.log4j.Logger;
@@ -25,6 +24,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSessions;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolPrice;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolSpecification;
 import cloud.metaapi.sdk.meta_api.reservoir.Reservoir;
+import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
 /**
@@ -32,7 +32,7 @@ import cloud.metaapi.sdk.util.ServiceProvider;
  */
 public class ConnectionHealthMonitor extends SynchronizationListener {
 
-  protected static int measureInterval = 1000;
+  protected static int measureInterval = 30000;
   protected static int minQuoteInterval = 60000;
   private static Logger logger = Logger.getLogger(ConnectionHealthMonitor.class);
   private MetaApiConnection connection;
@@ -50,15 +50,10 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   public ConnectionHealthMonitor(MetaApiConnection connection) {
     super();
     this.connection = connection;
-    ConnectionHealthMonitor self = this;
-    this.updateMeasurementsInterval = new Timer();
-    this.updateMeasurementsInterval.schedule(new TimerTask() {
-      @Override
-      public void run() {
-        self.updateQuoteHealthStatus();
-        self.measureUptime();
-      }
-    }, measureInterval, measureInterval);
+    this.updateMeasurementsInterval = Js.setInterval(() -> {
+      this.updateQuoteHealthStatus();
+      this.measureUptime();
+    }, measureInterval);
     this.uptimeReservoirs = new HashMap<>();
     this.uptimeReservoirs.put("5m", new Reservoir(300, 5 * 60 * 1000));
     this.uptimeReservoirs.put("1h", new Reservoir(600, 60 * 60 * 1000));

@@ -16,13 +16,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -40,6 +42,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
+import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient.EventProcessingOptions;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.SubscriptionManager;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto;
@@ -353,16 +356,32 @@ class SyncStabilityTest {
     io.stop();
   }
   
-  FakeServer fakeServer;
-  MetaApiWebsocketClient websocketClient;
-  MetaApiConnection connection;
-  MetaApi api;
+  static FakeServer fakeServer;
+  static MetaApiWebsocketClient websocketClient;
+  static MetaApiConnection connection;
+  static MetaApi api;
   boolean subscribeCalled;
   int synchronizeCounter;
   int subscribeCounter;
   
-  @BeforeEach
-  void setUp() throws Exception {
+  static Stream<Arguments> provideBeforeEach() {
+    Stream<Arguments> result = Stream.of();
+    boolean[] sequentialProcessing = {true, false};
+    for (int i = 0; i < sequentialProcessing.length; ++i) {
+      int finalI = i;
+      Runnable beforeEach = () -> {
+        try {
+          beforeEach(sequentialProcessing[finalI]);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      };
+      result = Stream.concat(result, Stream.of(Arguments.of(beforeEach)));
+    }
+    return result;
+  }
+  
+  static void beforeEach(boolean param) throws Exception {
     port++;
     startWebsocketServer();
     api = new MetaApi("token", new MetaApi.Options() {{
@@ -374,6 +393,9 @@ class SyncStabilityTest {
         minDelayInSeconds = 1;
         maxDelayInSeconds = 5;
         subscribeCooldownInSeconds = 6;
+      }};
+      eventProcessing = new EventProcessingOptions() {{
+        sequentialProcessing = param;
       }};
     }});
     MetatraderAccountClient accountClient = Mockito.spy((MetatraderAccountClient) FieldUtils.readField(
@@ -419,8 +441,10 @@ class SyncStabilityTest {
     stopWebsocketServer();
   }
   
-  @Test
-  void testSynchronizesAccount() {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testSynchronizesAccount(Runnable beforeEach) {
+    beforeEach.run();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
@@ -431,8 +455,10 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   }
   
-  @Test
-  void testReconnectsOnServerSocketCrash() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testReconnectsOnServerSocketCrash(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
@@ -442,8 +468,10 @@ class SyncStabilityTest {
     Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
   }
 
-  @Test
-  void testSetsStateToDisconnectedOnTimeout() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testSetsStateToDisconnectedOnTimeout(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
@@ -458,8 +486,10 @@ class SyncStabilityTest {
     assertFalse(connection.getTerminalState().isConnectedToBroker());
   }
 
-  @Test
-  void testResubscribesOnTimeout() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testResubscribesOnTimeout(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
@@ -472,8 +502,10 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   }
 
-  @Test
-  void testSynchronizesIfSubscribeResponseArrivesAfterSynchronization() {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testSynchronizesIfSubscribeResponseArrivesAfterSynchronization(Runnable beforeEach) {
+    beforeEach.run();
     fakeServer.enableSyncMethod = (socket) -> {
       socket.requestListener = (data) -> {
         try {
@@ -508,8 +540,10 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   }
 
-  @Test
-  void testWaitsUntilAccountIsRedeployedAfterDisconnect() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testWaitsUntilAccountIsRedeployedAfterDisconnect(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
@@ -537,8 +571,10 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   }
 
-  @Test
-  void testResubscribesImmediatelyAfterDisconnectOnStatusPacket() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testResubscribesImmediatelyAfterDisconnectOnStatusPacket(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
@@ -563,8 +599,10 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   };
   
-  @Test
-  void testReconnectsAfterServerRestarts() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testReconnectsAfterServerRestarts(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     MetaApiConnection connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{ timeoutInSeconds = 10; }}).join();
@@ -578,8 +616,10 @@ class SyncStabilityTest {
     Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
   };
   
-  @Test
-  void testSynchronizesIfConnectingWhileServerIsRebooting() {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testSynchronizesIfConnectingWhileServerIsRebooting(Runnable beforeEach) {
+    beforeEach.run();
     stopWebsocketServer();
     startWebsocketServer(9000);
     fakeServer.start();
@@ -599,8 +639,10 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   };
   
-  @Test
-  void testResubscribesOtherAccountsAfterOneOfConnectionsIsClosed() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testResubscribesOtherAccountsAfterOneOfConnectionsIsClosed(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 3;}});
@@ -631,8 +673,10 @@ class SyncStabilityTest {
       && connection2.getTerminalState().isConnectedToBroker());
   };
   
-  @Test
-  void testLimitsSubscriptionsDuringPerUser429error() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testLimitsSubscriptionsDuringPerUser429error(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     Set<String> subscribedAccounts = new HashSet<>();
     fakeServer.enableSyncMethod = (socket) -> {
       socket.requestListener = (data) -> {
@@ -685,8 +729,10 @@ class SyncStabilityTest {
     assertTrue(connection3.isSynchronized());
   }
   
-  @Test
-  void testWaitsForRetryTimeAfterPerUser429error() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testWaitsForRetryTimeAfterPerUser429error(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     requestTimestamp = 0;
     Set<String> subscribedAccounts = new HashSet<>();
     fakeServer.enableSyncMethod = (socket) -> {
@@ -744,8 +790,10 @@ class SyncStabilityTest {
     assertTrue(connection3.isSynchronized());
   }
   
-  @Test
-  void testWaitsForRetryTimeAfterPerServer429Error() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testWaitsForRetryTimeAfterPerServer429Error(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     requestTimestamp = 0;
     Map<String, String> sidByAccounts = new HashMap<>();
 
@@ -800,8 +848,10 @@ class SyncStabilityTest {
     assertEquals(sidByAccounts.get("accountId"), sidByAccounts.get("accountId4"));
   };
   
-  @Test
-  void testReconnectsAfterPerServer429ErrorIfConnectionHasNoSubscribedAccounts() {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testReconnectsAfterPerServer429ErrorIfConnectionHasNoSubscribedAccounts(Runnable beforeEach) {
+    beforeEach.run();
     List<String> sids = new ArrayList<>();
     fakeServer.enableSyncMethod = (socket) -> {
       socket.requestListener = (data) -> {
@@ -840,8 +890,10 @@ class SyncStabilityTest {
     assertNotEquals(sids.get(0), sids.get(1));
   };
   
-  @Test
-  void testFreesASubscribeSlotOnUnsubscribeAfterPerServer429Error() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testFreesASubscribeSlotOnUnsubscribeAfterPerServer429Error(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     Map<String, String> sidByAccounts = new HashMap<>();
     fakeServer.enableSyncMethod = (socket) -> {
       socket.requestListener = (data) -> {
@@ -895,8 +947,10 @@ class SyncStabilityTest {
     assertEquals(sidByAccounts.get("accountId"), sidByAccounts.get("accountId4"));
   }
   
-  @Test
-  void testWaitsForRetryTimeAfterPerServerPerUser429error() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testWaitsForRetryTimeAfterPerServerPerUser429error(Runnable beforeEach) throws InterruptedException {
+    beforeEach.run();
     requestTimestamp = 0;
     Map<String, String> sidByAccounts = new HashMap<>();
     fakeServer.enableSyncMethod = (socket) -> {
@@ -957,8 +1011,10 @@ class SyncStabilityTest {
     assertEquals(sidByAccounts.get("accountId"), sidByAccounts.get("accountId5"));
   }
   
-  @Test
-  void testAttemptsToResubscribeOnDisconnectedPacket() throws Exception {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testAttemptsToResubscribeOnDisconnectedPacket(Runnable beforeEach) throws Exception {
+    beforeEach.run();
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     connection = account.connect().join();
     connection.waitSynchronized(new SynchronizationOptions() {{timeoutInSeconds = 3;}}).join(); 
@@ -978,8 +1034,10 @@ class SyncStabilityTest {
       && connection.getTerminalState().isConnectedToBroker());
   }
   
-  @Test
-  void testHandlesMultipleStreamsInOneInstanceNumber() throws Exception {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testHandlesMultipleStreamsInOneInstanceNumber(Runnable beforeEach) throws Exception {
+    beforeEach.run();
     FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 7500, true);
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     connection = account.connect().join();
@@ -1023,8 +1081,10 @@ class SyncStabilityTest {
     assertFalse(connection.getTerminalState().isConnectedToBroker());
   };
   
-  @Test
-  void testDoesNotResubscribeIfMultipleStreamsAndOneTimedOut() throws Exception {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testDoesNotResubscribeIfMultipleStreamsAndOneTimedOut(Runnable beforeEach) throws Exception {
+    beforeEach.run();
     FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 7500, true);
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     connection = account.connect().join();
@@ -1066,8 +1126,10 @@ class SyncStabilityTest {
     assertTrue(subscribeCalled);
   }
   
-  @Test
-  void testDoesNotSynchronizeIfConnectionIsClosed() throws Exception {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testDoesNotSynchronizeIfConnectionIsClosed(Runnable beforeEach) throws Exception {
+    beforeEach.run();
     FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 60000, true);
     synchronizeCounter = 0;
     fakeServer.enableSyncMethod = socket -> {
@@ -1110,8 +1172,10 @@ class SyncStabilityTest {
     assertEquals(1, synchronizeCounter);
   }
   
-  @Test
-  void testDoesNotResubscribeAfterConnectionIsClosed() throws Exception {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testDoesNotResubscribeAfterConnectionIsClosed(Runnable beforeEach) throws Exception {
+    beforeEach.run();
     FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 3750, true);
     subscribeCounter = 0;
 
@@ -1167,8 +1231,10 @@ class SyncStabilityTest {
     assertFalse(connection.getTerminalState().isConnectedToBroker());
   }
   
-  @Test
-  void testDoesNotResubscribeOnTimeoutIfConnectionIsClosed() throws Exception {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testDoesNotResubscribeOnTimeoutIfConnectionIsClosed(Runnable beforeEach) throws Exception {
+    beforeEach.run();
     FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 3750, true);
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();
     connection = account.connect().join();
@@ -1181,8 +1247,10 @@ class SyncStabilityTest {
     assertFalse(connection.isSynchronized());
   }
   
-  @Test
-  void testDoesNotSendMultipleSubscribeRequestsIfStatusArrivesFasterThanSubscribe() throws Exception {
+  @ParameterizedTest
+  @MethodSource("provideBeforeEach")
+  void testDoesNotSendMultipleSubscribeRequestsIfStatusArrivesFasterThanSubscribe(Runnable beforeEach) throws Exception {
+    beforeEach.run();
     FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 3750, true);
     subscribeCounter = 0;
     MetatraderAccount account = api.getMetatraderAccountApi().getAccount("accountId").join();

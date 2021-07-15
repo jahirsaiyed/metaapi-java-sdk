@@ -40,7 +40,7 @@ public class Js {
     T last = null;
     for (T value : values) {
       last = value;
-      if (value != null && !value.equals(0)) {
+      if (value != null && !value.equals(0) && !value.equals("")) {
         return value;
       }
     }

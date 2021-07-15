@@ -82,7 +82,11 @@ class MetaApiConnectionTest {
     Mockito.when(historyFileManagerMock.getHistoryFromDisk()).thenReturn(CompletableFuture.completedFuture(
       new History() {{ deals = Lists.list(); historyOrders = Lists.list(); }}));
     ServiceProvider.setHistoryFileManagerMock(historyFileManagerMock);
+    
     client = Mockito.mock(MetaApiWebsocketClient.class);
+    Mockito.when(client.synchronize(Mockito.anyString(), Mockito.anyInt(), Mockito.any(),
+      Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(CompletableFuture.completedFuture(true));
+    
     storageMock = Mockito.mock(HistoryStorage.class);
     connectionRegistry = Mockito.mock(ConnectionRegistry.class, Mockito.RETURNS_DEEP_STUBS);
     Mockito.when(connectionRegistry.getApplication()).thenReturn("MetaApi");
@@ -1025,7 +1029,8 @@ class MetaApiConnectionTest {
     api.getHistoryStorage().onDealAdded("1:ps-mpa-1", new MetatraderDeal() {{
       time = startingDealTime;
     }});
-    api.onConnected("1:ps-mpa-1", 0).get();
+    api.onConnected("1:ps-mpa-1", 1).get();
+    Thread.sleep(50);
     Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.eq("ps-mpa-1"),
       Mockito.anyString(), Mockito.eq(startingHistoryOrderTime), Mockito.eq(startingDealTime));
   }
@@ -1034,7 +1039,7 @@ class MetaApiConnectionTest {
    * Tests {@link MetaApiConnection#onConnected()}
    */
   @Test
-  void testMaintainsSynchronizationIfConnectionHasFailed() {
+  void testMaintainsSynchronizationIfConnectionHasFailed() throws InterruptedException {
     IsoTime startingHistoryOrderTime = new IsoTime("2020-01-01T00:00:00.000Z");
     IsoTime startingDealTime = new IsoTime("2020-01-02T00:00:00.000Z");
     Mockito.when(client.synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.anyString(),
@@ -1050,7 +1055,8 @@ class MetaApiConnectionTest {
     api.getHistoryStorage().onDealAdded("1:ps-mpa-1", new MetatraderDeal() {{
       time = startingDealTime;
     }});
-    api.onConnected("1:ps-mpa-1", 0).join();
+    api.onConnected("1:ps-mpa-1", 1).join();
+    Thread.sleep(50);
     Mockito.verify(client).synchronize(Mockito.eq("accountId"), Mockito.eq(1), Mockito.eq("ps-mpa-1"),
       Mockito.anyString(), Mockito.eq(startingHistoryOrderTime), Mockito.eq(startingDealTime));
   }
@@ -1169,14 +1175,14 @@ class MetaApiConnectionTest {
    * Tests {@link MetaApiConnection#onDisconnected(int)}
    */
   @Test
-  void testSetsSynchronizedFalseOnDisconnect() {
+  void testSetsSynchronizedFalseOnDisconnect() throws InterruptedException {
     Mockito.when(storageMock.getLastHistoryOrderTime(Mockito.anyInt()))
       .thenReturn(CompletableFuture.completedFuture(new IsoTime()));
     Mockito.when(storageMock.getLastDealTime(Mockito.anyInt()))
       .thenReturn(CompletableFuture.completedFuture(new IsoTime()));
-    Mockito.when(client.synchronize(Mockito.anyString(), Mockito.anyInt(), Mockito.anyString(),
-      Mockito.anyString(), Mockito.any(), Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
+    
     api.onConnected("1:ps-mpa-1", 2).join();
+    Thread.sleep(50);
     assertTrue(api.isSynchronized());
     api.onDisconnected("1:ps-mpa-1").join();
     assertFalse(api.isSynchronized());
@@ -1186,14 +1192,14 @@ class MetaApiConnectionTest {
    * Tests {@link MetaApiConnection#onDisconnected}
    */
   @Test
-  void testDeletesStateIfStreamClosed() {
+  void testDeletesStateIfStreamClosed() throws InterruptedException {
     Mockito.when(storageMock.getLastHistoryOrderTime(Mockito.anyInt()))
       .thenReturn(CompletableFuture.completedFuture(new IsoTime()));
     Mockito.when(storageMock.getLastDealTime(Mockito.anyInt()))
     .thenReturn(CompletableFuture.completedFuture(new IsoTime()));
-    Mockito.when(client.synchronize(Mockito.anyString(), Mockito.anyInt(), Mockito.anyString(),
-      Mockito.anyString(), Mockito.any(), Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
+    
     api.onConnected("1:ps-mpa-1", 2).join();
+    Thread.sleep(50);
     assertTrue(api.isSynchronized());
     api.onStreamClosed("1:ps-mpa-1").join();
     assertFalse(api.isSynchronized());

@@ -7,13 +7,16 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 import org.apache.log4j.Logger;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import cloud.metaapi.sdk.clients.TimeoutException;
+import cloud.metaapi.sdk.clients.models.IsoTime;
+import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
 /**
@@ -33,7 +36,6 @@ public class SynchronizationThrottler {
   private List<SynchronizationQueueItem> synchronizationQueue = new ArrayList<>();
   private Timer removeOldSyncIdsTimer = null;
   private Timer processQueueTimer = null;
-  private boolean isProcessingQueue = false;
   
   /**
    * Options for synchronization throttler
@@ -62,7 +64,7 @@ public class SynchronizationThrottler {
   
   private static class SynchronizationQueueItem {
     public String synchronizationId;
-    public CompletableFuture<Boolean> future;
+    public CompletableFuture<String> future;
     public long queueTime;
   }
   
@@ -118,14 +120,14 @@ public class SynchronizationThrottler {
     long now = ServiceProvider.getNow().toEpochMilli();
     for (String key : new ArrayList<>(synchronizationIds.keySet())) {
       if ((now - synchronizationIds.get(key)) > synchronizationTimeoutInSeconds * 1000) {
-        advanceQueue();
         synchronizationIds.remove(key);
       }
     }
-    while (synchronizationQueue.size() != 0 && (ServiceProvider.getNow().toEpochMilli() 
+    while (synchronizationQueue.size() > 0 && (ServiceProvider.getNow().toEpochMilli() 
       - synchronizationQueue.get(0).queueTime > queueTimeoutInSeconds * 1000)) {
-      removeFromQueue(synchronizationQueue.get(0).synchronizationId);
+      removeFromQueue(synchronizationQueue.get(0).synchronizationId, "timeout");
     }
+    advanceQueue();
   }
   
   /**
@@ -175,11 +177,9 @@ public class SynchronizationThrottler {
    * @return Flag whether there are free slots for synchronization requests
    */
   public boolean isSynchronizationAvailable() {
-    int synchronizingAccountsCount = 0;
-    for (MetaApiWebsocketClient.SocketInstance socketInstance : client.getSocketInstances()) {
-      synchronizingAccountsCount += socketInstance.synchronizationThrottler.getSynchronizingAccounts().size();
-    }
-    if (synchronizingAccountsCount >= maxConcurrentSynchronizations) {
+    if (Js.reduce(client.getSocketInstances(), (acc, socketInstance) -> 
+      acc + socketInstance.synchronizationThrottler.getSynchronizingAccounts().size(), 0) >=
+      maxConcurrentSynchronizations) {
       return false;
     }
     return getSynchronizingAccounts().size() < getMaxConcurrentSynchronizations();
@@ -196,8 +196,8 @@ public class SynchronizationThrottler {
       for (String key : new ArrayList<>(accountsBySynchronizationIds.keySet())) {
         if (accountsBySynchronizationIds.get(key).accountId.equals(accountId) &&
             instanceIndex == accountsBySynchronizationIds.get(key).instanceIndex) {
-          removeFromQueue(key);
-          accountsBySynchronizationIds.remove(key);;
+          removeFromQueue(key, "cancel");
+          accountsBySynchronizationIds.remove(key);
         }
       }
     }
@@ -211,22 +211,33 @@ public class SynchronizationThrottler {
    * Clears synchronization ids on disconnect
    */
   public void onDisconnect() {
+    synchronizationQueue.forEach(synchronization -> {
+      synchronization.future.complete("cancel");
+    });
     synchronizationIds.clear();
-    advanceQueue();
+    accountsBySynchronizationIds.clear();
+    synchronizationQueue.clear();
+    stop();
+    start();
   }
   
   private void advanceQueue() {
-    if (isSynchronizationAvailable() && synchronizationQueue.size() != 0) {
-      synchronizationQueue.get(0).future.complete(true);
+    int index = 0;
+    while (isSynchronizationAvailable() && synchronizationQueue.size() > 0 && 
+        index < synchronizationQueue.size()) {
+      SynchronizationQueueItem queueItem = synchronizationQueue.get(index);
+      queueItem.future.complete("synchronize");
+      updateSynchronizationId(queueItem.synchronizationId);
+      index++;
     }
   }
   
-  private void removeFromQueue(String synchronizationId) {
-    for (int i = 0; i < synchronizationQueue.size(); ++i) {
-      if (synchronizationQueue.get(i).synchronizationId.equals(synchronizationId)) {
-        synchronizationQueue.get(i).future.complete(false);
+  private void removeFromQueue(String synchronizationId, String result) {
+    new ArrayList<>(synchronizationQueue).forEach(syncItem -> {
+      if (syncItem.synchronizationId.equals(synchronizationId)) {
+        syncItem.future.complete(result);
       }
-    }
+    });
     synchronizationQueue = synchronizationQueue.stream()
       .filter(item -> !item.synchronizationId.equals(synchronizationId))
       .collect(Collectors.toList());
@@ -234,18 +245,23 @@ public class SynchronizationThrottler {
   
   private CompletableFuture<Void> processQueueJob() {
     return CompletableFuture.runAsync(() -> {
-      if (!isProcessingQueue) {
-        isProcessingQueue = true;
-        try {
-          while (synchronizationQueue.size() != 0
-            && synchronizationIds.size() < getMaxConcurrentSynchronizations()) {
-            synchronizationQueue.get(0).future.join();
+      try {
+        while (synchronizationQueue.size() > 0) {
+          SynchronizationQueueItem queueItem = synchronizationQueue.get(0);
+          queueItem.future.join();
+          
+          // Often synchronizationQueue.remove(0) raises IndexOutOfBoundsException because
+          // somehow synchronizationQueue size becomes 0 right after checking it. This is a
+          // hook that tells Java to do not hurry
+          CompletableFuture.runAsync(() -> {}).join();
+
+          if (synchronizationQueue.size() > 0 && synchronizationQueue.get(0).synchronizationId
+            .equals(queueItem.synchronizationId)) {
             synchronizationQueue.remove(0);
           }
-        } catch (Throwable err) {
-          logger.info("Error processing queue job", err);
         }
-        isProcessingQueue = false;
+      } catch (Throwable err) {
+        logger.info("[" + new IsoTime() + "] Error processing queue job", err);
       }
     });
   }
@@ -256,7 +272,7 @@ public class SynchronizationThrottler {
    * @param request Request to send
    * @return Completable future resolving when synchronization is scheduled
    */
-  public CompletableFuture<JsonNode> scheduleSynchronize(String accountId, ObjectNode request) {
+  public CompletableFuture<Boolean> scheduleSynchronize(String accountId, ObjectNode request) {
     return CompletableFuture.supplyAsync(() -> {
       String synchronizationId = request.get("requestId").asText();
       int instanceIndex = request.has("instanceIndex") ? request.get("instanceIndex").asInt() : -1;
@@ -271,20 +287,24 @@ public class SynchronizationThrottler {
       accountData.instanceIndex = instanceIndex;
       accountsBySynchronizationIds.put(synchronizationId, accountData);
       if (!isSynchronizationAvailable()) {
-        CompletableFuture<Boolean> requestFuture = new CompletableFuture<>();
+        CompletableFuture<String> requestFuture = new CompletableFuture<>();
         String sid = synchronizationId;
         synchronizationQueue.add(new SynchronizationQueueItem() {{
           synchronizationId = sid;
           future = requestFuture;
           queueTime = ServiceProvider.getNow().toEpochMilli();
         }});
-        boolean result = requestFuture.join();
-        if (!result) {
-          return null;
+        String result = requestFuture.join();
+        if (result.equals("cancel")) {
+          return false;
+        } else if (result.equals("timeout")) {
+          throw new CompletionException(new TimeoutException("Account " + accountId 
+            + " synchronization " + synchronizationId + "timed out in synchronization queue"));
         }
       }
       updateSynchronizationId(synchronizationId);
-      return client.rpcRequest(accountId, request, null).join();
+      client.rpcRequest(accountId, request, null).join();
+      return true;
     });
   }
 }

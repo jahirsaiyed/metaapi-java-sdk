@@ -225,10 +225,10 @@ class SynchronizationThrottlerTest {
   void testClearsExistingSyncIdsOnDisconnect() throws InterruptedException {
     throttler.scheduleSynchronize("accountId1", provideRequest("test1")).join();
     throttler.scheduleSynchronize("accountId2", provideRequest("test2")).join();
-    throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
     Thread.sleep(20);
     Mockito.verify(websocketClient, Mockito.times(2)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
     throttler.onDisconnect();
+    throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
     Thread.sleep(20);
     Mockito.verify(websocketClient, Mockito.times(3)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
   }
@@ -292,6 +292,59 @@ class SynchronizationThrottlerTest {
     Mockito.verify(websocketClient).rpcRequest("accountId1", provideRequest("test1"), null);
     Mockito.verify(websocketClient).rpcRequest("accountId2", provideRequest("test2"), null);
     Mockito.verify(websocketClient).rpcRequest("accountId5", provideRequest("test5"), null);
+  }
+  
+  /**
+   * Tests {@link SynchronizationThrottler#scheduleSynchronize}
+   */
+  @Test
+  void testDoesNotGetQueueStuckDueToAppSynchronizationsLimit() throws Exception {
+    SynchronizationThrottler otherThrottler = Mockito.mock(SynchronizationThrottler.class);
+    List<String> otherSynchronizingAccounts = Arrays.asList(
+      "accountId21", "accountId22", "accountId23", "accountId24", "accountId25", "accountId26",
+      "accountId27", "accountId28", "accountId29", "accountId210", "accountId211", "accountId212",
+      "accountId213", "accountId214", "accountId215");
+    Mockito.when(otherThrottler.getSynchronizingAccounts()).thenReturn(otherSynchronizingAccounts);
+    Mockito.when(websocketClient.getSocketInstances()).thenReturn(Arrays.asList(
+      new MetaApiWebsocketClient.SocketInstance() {{synchronizationThrottler = otherThrottler;}},
+      new MetaApiWebsocketClient.SocketInstance() {{synchronizationThrottler = throttler;}}
+    ));
+    throttler.scheduleSynchronize("accountId1", provideRequest("test1"));
+    throttler.scheduleSynchronize("accountId2", provideRequest("test2"));
+    throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
+    tick(5000);
+    Mockito.verify(websocketClient, Mockito.never()).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+    Mockito.when(otherThrottler.getSynchronizingAccounts())
+      .thenReturn(otherSynchronizingAccounts.subList(1, otherSynchronizingAccounts.size()));
+    tick(5000);
+    Mockito.verify(websocketClient, Mockito.times(1)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+    Mockito.when(otherThrottler.getSynchronizingAccounts())
+      .thenReturn(otherSynchronizingAccounts.subList(2, otherSynchronizingAccounts.size()));
+    tick(5000);
+    Mockito.verify(websocketClient, Mockito.times(2)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+  }
+  
+  /**
+   * Tests {@link SynchronizationThrottler#removeSynchronizationId}
+   */
+  @Test
+  void testDoesNotSkipQueueItemsWhenSynchronizationIdIsRemoved() throws Exception {
+    throttler.scheduleSynchronize("accountId1", provideRequest("test1"));
+    Thread.sleep(50);
+    throttler.scheduleSynchronize("accountId2", provideRequest("test2"));
+    Thread.sleep(50);
+    throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
+    Thread.sleep(50);
+    throttler.scheduleSynchronize("accountId4", provideRequest("test4"));
+    Thread.sleep(50);
+    throttler.scheduleSynchronize("accountId5", provideRequest("test5"));
+    Thread.sleep(3000);
+    throttler.removeSynchronizationId("test3");
+    Thread.sleep(3000);
+    throttler.removeSynchronizationId("test1");
+    throttler.removeSynchronizationId("test2");
+    Thread.sleep(3000);
+    Mockito.verify(websocketClient, Mockito.times(4)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
   }
   
   private ObjectNode provideRequest(String requestId) {

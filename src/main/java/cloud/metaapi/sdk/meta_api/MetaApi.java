@@ -10,6 +10,7 @@ import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.meta_api.HistoricalMarketDataClient;
 import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
+import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient.EventProcessingOptions;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderDemoAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
@@ -80,6 +81,10 @@ public class MetaApi {
      * Demo account request timeout in seconds. By default is {@code 4 minutes}
      */
     public int demoAccountRequestTimeout = 240;
+    /**
+     * Options for processing websocket client events
+     */
+    public EventProcessingOptions eventProcessing = new EventProcessingOptions();
   }
   
   /**
@@ -165,6 +170,7 @@ public class MetaApi {
     websocketOptions.packetLogger = opts.packetLogger;
     websocketOptions.synchronizationThrottler = opts.synchronizationThrottler;
     websocketOptions.retryOpts = opts.retryOpts;
+    websocketOptions.eventProcessing = opts.eventProcessing;
     metaApiWebsocketClient = new MetaApiWebsocketClient(token, websocketOptions);
     provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, opts.domain));
     connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, opts.application);

@@ -27,6 +27,9 @@
   - improve stability for connection host migration
   - disable synchronization after connection is closed
   - make it possible to specify relative SL/TP
+  - fixed synchronization queue
+  - breaking change: added sequential packet processing
+  - increased health status tracking interval to decrease CPU load
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

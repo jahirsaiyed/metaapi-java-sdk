@@ -799,8 +799,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @param instanceIndex instance index
    * @return completable future which resolves when synchronization started
    */
-  public CompletableFuture<Void> synchronize(String instanceIndex) {
-    return CompletableFuture.runAsync(() -> {
+  public CompletableFuture<Boolean> synchronize(String instanceIndex) {
+    return CompletableFuture.supplyAsync(() -> {
       Integer instance = getInstanceNumber(instanceIndex);
       String host = getHostName(instanceIndex);
       IsoTime lastHistoryOrderTime = historyStorage.getLastHistoryOrderTime(instance).join();
@@ -815,7 +815,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
       } else startingDealTime = historyStartTime;
       String synchronizationId = RandomStringUtils.randomAlphanumeric(32);
       getState(instanceIndex).lastSynchronizationId = synchronizationId;
-      websocketClient.synchronize(account.getId(), instance, host, synchronizationId,
+      return websocketClient.synchronize(account.getId(), instance, host, synchronizationId,
         startingHistoryOrderTime, startingDealTime).join();
     });
   }
@@ -927,33 +927,32 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   
   @Override
   public CompletableFuture<Void> onSubscriptionDowngraded(String instanceIndex, String symbol,
-      List<MarketDataSubscription> updates, List<MarketDataUnsubscription> unsubscriptions) {
-      return CompletableFuture.runAsync(() -> {
-        List<MarketDataSubscription> subscriptions = this.subscriptions.containsKey(symbol)
-            ? this.subscriptions.get(symbol).subscriptions : new ArrayList<>();
-        if (unsubscriptions.size() != 0) {
-          if (subscriptions.size() != 0) {
-            for (MarketDataUnsubscription subscription : unsubscriptions) {
-              subscriptions = subscriptions.stream().filter(s -> s.type.equals(subscription.type))
-                .collect(Collectors.toList());
-            }
-          }
-          unsubscribeFromMarketData(symbol, unsubscriptions);
+    List<MarketDataSubscription> updates, List<MarketDataUnsubscription> unsubscriptions) {
+    List<MarketDataSubscription> subscriptions = this.subscriptions.containsKey(symbol)
+        ? this.subscriptions.get(symbol).subscriptions : new ArrayList<>();
+    if (unsubscriptions.size() != 0) {
+      if (subscriptions.size() != 0) {
+        for (MarketDataUnsubscription subscription : unsubscriptions) {
+          subscriptions = subscriptions.stream().filter(s -> s.type.equals(subscription.type))
+            .collect(Collectors.toList());
         }
-        if (updates.size() != 0) {
-          if (subscriptions.size() != 0) {
-            for (MarketDataSubscription subscription : updates) {
-              subscriptions.stream().filter(s -> s.type.equals(subscription.type))
-                .forEach(s -> s.intervalInMilliseconds = subscription.intervalInMilliseconds);
-            }
-          }
-          subscribeToMarketData(symbol, updates);
-        }
-        if (subscriptions.size() != 0) {
-          this.subscriptions.remove(symbol);
-        }
-      });
+      }
+      unsubscribeFromMarketData(symbol, unsubscriptions);
     }
+    if (updates.size() != 0) {
+      if (subscriptions.size() != 0) {
+        for (MarketDataSubscription subscription : updates) {
+          subscriptions.stream().filter(s -> s.type.equals(subscription.type))
+            .forEach(s -> s.intervalInMilliseconds = subscription.intervalInMilliseconds);
+        }
+      }
+      subscribeToMarketData(symbol, updates);
+    }
+    if (subscriptions.size() != 0) {
+      this.subscriptions.remove(symbol);
+    }
+    return CompletableFuture.completedFuture(null);
+  }
   
   /**
    * Returns list of the symbols connection is subscribed to
@@ -1081,23 +1080,22 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   
   @Override
   public CompletableFuture<Void> onConnected(String instanceIndex, int replicas) {
-    return CompletableFuture.runAsync(() -> {
-      String key = RandomStringUtils.randomAlphanumeric(32);
-      State state = getState(instanceIndex);
-      state.shouldSynchronize = key;
-      state.synchronizationRetryIntervalInSeconds = 1;
-      state.isSynchronized = false;
-      ensureSynchronized(instanceIndex, key);
-      List<Integer> indices = new ArrayList<>(replicas);
-      for (int i = 0; i < replicas; i++) {
-        indices.add(i);
+    String key = RandomStringUtils.randomAlphanumeric(32);
+    State state = getState(instanceIndex);
+    state.shouldSynchronize = key;
+    state.synchronizationRetryIntervalInSeconds = 1;
+    state.isSynchronized = false;
+    ensureSynchronized(instanceIndex, key);
+    List<Integer> indices = new ArrayList<>(replicas);
+    for (int i = 0; i < replicas; i++) {
+      indices.add(i);
+    }
+    for (Entry<String, State> e : new ArrayList<>(stateByInstanceIndex.entrySet())) {
+      if (indices.indexOf(getInstanceNumber(e.getValue().instanceIndex)) == -1) {
+        stateByInstanceIndex.remove(e.getKey());
       }
-      for (Entry<String, State> e : new ArrayList<>(stateByInstanceIndex.entrySet())) {
-        if (indices.indexOf(getInstanceNumber(e.getValue().instanceIndex)) == -1) {
-          stateByInstanceIndex.remove(e.getKey());
-        }
-      }
-    });
+    }
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override
@@ -1130,23 +1128,22 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   @Override
   public CompletableFuture<Void> onAccountInformationUpdated(String instanceIndex,
     MetatraderAccountInformation accountInformation) {
-    return CompletableFuture.runAsync(() -> {
-      for (String symbol : new ArrayList<>(getSubscribedSymbols())) {
-        if (!terminalState.getPrice(symbol).isPresent()) {
-          try {
-            Integer instance = getInstanceNumber(instanceIndex);
-            subscribeToMarketData(symbol, subscriptions.get(symbol).subscriptions, instance).join();
-          } catch (Throwable err) {
-            logger.error("[" + new IsoTime() + "] MetaApi websocket client for account " +
-              account.getId() + ":" + instanceIndex + " failed to resubscribe to symbol " + symbol, err);
-          }
-        }
+    for (String symbol : new ArrayList<>(getSubscribedSymbols())) {
+      if (!terminalState.getPrice(symbol).isPresent()) {
+        Integer instance = getInstanceNumber(instanceIndex);
+        subscribeToMarketData(symbol, subscriptions.get(symbol).subscriptions, instance).exceptionally(err -> {
+          logger.error("[" + new IsoTime() + "] MetaApi websocket client for account " +
+            account.getId() + ":" + instanceIndex + " failed to resubscribe to symbol " + symbol, err);
+          return null;
+        });
       }
-    });
+    }
+    return CompletableFuture.completedFuture(null);
   }
   
   @Override
   public CompletableFuture<Void> onReconnected() {
+    stateByInstanceIndex.clear();
     return CompletableFuture.completedFuture(null);
   }
   
@@ -1312,9 +1309,11 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     State state = getState(instanceIndex);
     if (state != null && !closed) {
       try {
-        synchronize(instanceIndex).join();
-        state.isSynchronized = true;
-        state.synchronizationRetryIntervalInSeconds = 1;
+        Boolean synchronizationResult = synchronize(instanceIndex).join();
+        if (synchronizationResult != null && synchronizationResult) {
+          state.isSynchronized = true;
+          state.synchronizationRetryIntervalInSeconds = 1;
+        }
       } catch (CompletionException e) {
         logger.error("MetaApi websocket client for account " + account.getId() + ":"
           + instanceIndex + " failed to synchronize", e.getCause());
