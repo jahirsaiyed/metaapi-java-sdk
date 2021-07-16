@@ -119,7 +119,12 @@ public class MetatraderAccountDto {
    */
   public String baseCurrency;
   /**
-   * Account roles for CopyFactory2 application
+   * Account roles for CopyFactory2 application, or {@code null}
    */
   public List<CopyFactoryRole> copyFactoryRoles;
+  /**
+   * Number of resource slots to allocate to account, or {@code null}. Please note that
+   * allocating extra resource slots is a paid option. Default is 1
+   */
+  public Integer resourceSlots;
 }

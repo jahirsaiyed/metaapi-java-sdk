@@ -23,6 +23,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderCandle;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.ConnectionStatus;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.CopyFactoryRole;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.Extension;
 import cloud.metaapi.sdk.util.ServiceProvider;
@@ -167,6 +168,41 @@ public class MetatraderAccount {
    */
   public Map<String, Object> getMetadata() {
     return data.metadata;
+  }
+  
+  /**
+   * Returns user-defined account tags
+   * @return user-defined account tags
+   */
+  public List<String> getTags() {
+    return data.tags;
+  }
+
+  /**
+   * Returns account roles for CopyFactory2 application
+   * @return account roles for CopyFactory2 application
+   */
+  public List<CopyFactoryRole> getCopyFactoryRoles() {
+    return data.copyFactoryRoles;
+  }
+
+  /**
+   * Returns number of resource slots to allocate to account. Please note that allocating extra resource slots is a
+   * paid option.
+   * @return number of resource slots to allocate to account
+   */
+  public int getResourceSlots() {
+    return data.resourceSlots;
+  }
+
+  /**
+   * Returns 3-character ISO currency code of the account base currency. Default value is USD. The setting is to be used
+   * for copy trading accounts which use national currencies only, such as some Brazilian brokers. You should not alter
+   * this setting unless you understand what you are doing.
+   * @return 3-character ISO currency code of the account base currency
+   */
+  public String getBaseCurrency() {
+    return data.baseCurrency;
   }
   
   /**

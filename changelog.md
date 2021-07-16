@@ -1,4 +1,4 @@
-13.0.0
+13.1.0
   - added clientId to query websocket url
   - added equity curve filter to CopyFactory
   - fixed health state tracking for multiple replicas
@@ -31,6 +31,7 @@
   - breaking change: added sequential packet processing
   - increased health status tracking interval to decrease CPU load
   - added copyFactoryRoles field to MetatraderAccount entity
+  - added resourceSlots field to MetatraderAccount model so that user can request extra resource allocation for specific accounts for an extra fee
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
