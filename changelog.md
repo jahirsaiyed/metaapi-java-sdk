@@ -34,6 +34,7 @@
   - added resourceSlots field to MetatraderAccount model so that user can request extra resource allocation for specific accounts for an extra fee
   - added logging URL on websocket connection
   - fixed initializing websocket connection for multiple accounts
+  - remove synchronization listeners on connection close
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)

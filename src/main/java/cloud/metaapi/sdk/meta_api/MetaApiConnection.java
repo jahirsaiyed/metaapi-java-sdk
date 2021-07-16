@@ -58,6 +58,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   private ConnectionHealthMonitor healthMonitor;
   private Map<String, Subscriptions> subscriptions = new HashMap<>();
   private Map<String, State> stateByInstanceIndex = new HashMap<>();
+  private List<SynchronizationListener> synchronizationListeners = new ArrayList<>(); 
   private boolean closed = false;
 
   private static class State {
@@ -1067,6 +1068,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @param listener synchronization listener to add
    */
   public void addSynchronizationListener(SynchronizationListener listener)  {
+    synchronizationListeners.add(listener);
     websocketClient.addSynchronizationListener(account.getId(), listener);
   }
   
@@ -1075,6 +1077,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @param listener synchronization listener to remove
    */
   public void removeSynchronizationListener(SynchronizationListener listener) {
+    synchronizationListeners.remove(listener);
     websocketClient.removeSynchronizationListener(account.getId(), listener);
   }
   
@@ -1254,6 +1257,9 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
         websocketClient.removeSynchronizationListener(account.getId(), terminalState);
         websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
         websocketClient.removeSynchronizationListener(account.getId(), healthMonitor);
+        for (SynchronizationListener listener : synchronizationListeners) {
+          websocketClient.removeSynchronizationListener(account.getId(), listener);
+        }
         websocketClient.removeReconnectListener(this);
         connectionRegistry.remove(account.getId());
         healthMonitor.stop();
