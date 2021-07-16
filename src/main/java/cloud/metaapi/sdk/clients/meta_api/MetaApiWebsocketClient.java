@@ -277,7 +277,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   public boolean isConnected(Integer socketInstanceIndex) {
     SocketInstance instance = (socketInstanceIndex != null && socketInstances.size() > socketInstanceIndex)
       ? socketInstances.get(socketInstanceIndex) : null;
-    return (instance != null && instance.socket.connected()) || false;
+    return (instance != null && instance.socket != null && instance.socket.connected()) || false;
   }
   
   /**
@@ -346,6 +346,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     public SynchronizationThrottler synchronizationThrottler;
     public SubscribeLock subscribeLock;
     public double clientId;
+    public Boolean firstConnect;
   }
   
   /**
@@ -367,16 +368,18 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           connectResult = result;
           sessionId = RandomStringUtils.randomAlphanumeric(32);
           isReconnecting = false;
+          socket = null;
           synchronizationThrottler = new SynchronizationThrottler(self, socketInstanceIndex,
             synchronizationThrottlerOpts);
           subscribeLock = null;
           clientId = Math.random();
         }};
-        createSocket(instance, serverUrl, result);
-        instance.synchronizationThrottler.start();
-        Socket socketInstance = instance.socket;
-        socketInstances.add(instance);
         instance.connected = true;
+        socketInstances.add(instance);
+        instance.synchronizationThrottler.start();
+        instance.firstConnect = true;
+        createSocket(instance, serverUrl, result);
+        Socket socketInstance = instance.socket;
         if (socketInstances.size() == 1) {
           packetOrderer.start();
         }
@@ -416,7 +419,14 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     
     socketInstance.on(Socket.EVENT_CONNECT, (Object[] args) -> {
       CompletableFuture.runAsync(() -> {
-        logger.info("MetaApi websocket client connected to the MetaApi server");
+        boolean isSharedClientApi = uri.equals(this.url);
+        logger.info("MetaApi websocket client connected to the MetaApi server via " 
+          + uri + " via " + (isSharedClientApi ? "shared" : "dedicated") + " server");
+        if (instance.id == 0 && (instance.firstConnect != null && instance.firstConnect) && !isSharedClientApi) {
+          logger.info("Please note that it can take up to 3 minutes for your dedicated server to start for the " +
+          "first time. During this time it is OK if you see some connection errors.");
+          instance.firstConnect = false;
+        }
         instance.isReconnecting = false;
         if (result != null && !result.isDone()) {
           result.complete(null);

@@ -32,6 +32,8 @@
   - increased health status tracking interval to decrease CPU load
   - added copyFactoryRoles field to MetatraderAccount entity
   - added resourceSlots field to MetatraderAccount model so that user can request extra resource allocation for specific accounts for an extra fee
+  - added logging URL on websocket connection
+  - fixed initializing websocket connection for multiple accounts
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
