@@ -1474,6 +1474,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             } else {
               throw err;
             }
+            if (!socketInstancesByAccounts.containsKey(accountId)) {
+              throw err;
+            }
           }
         }
       } catch (Throwable err) {

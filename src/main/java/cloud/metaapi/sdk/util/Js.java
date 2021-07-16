@@ -9,6 +9,8 @@ import java.util.function.BiFunction;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 /**
  * JavaScript-like helper functions
  */
@@ -76,6 +78,17 @@ public class Js {
       result.put(pairs[i], pairs[i + 1]);
     }
     return result;
+  }
+  
+  /**
+   * Creates a json from variadic value pairs
+   * @param <T> Type of the json keys and values
+   * @param pairs Key-Value pairs
+   * @return Json object created from the key-value pairs
+   */
+  @SafeVarargs
+  public static <T> JsonNode asJson(T... pairs) {
+    return JsonMapper.getInstance().valueToTree(Js.asMap(pairs));
   }
   
   /**

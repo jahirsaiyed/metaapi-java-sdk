@@ -2144,6 +2144,43 @@ class MetaApiWebsocketClientTest {
   }
   
   /**
+   * Tests {@link MetaApiWebsocketClient#rpcRequest}
+   */
+  @Test
+  void testDoesNotRetryRequestIfConnectionClosedBetweenRetries() throws Exception {
+    requestCounter = 0;
+    JsonNode response = jsonMapper.valueToTree(Js.asMap("type", "response", "accountId", "accountId"));
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (request.get("type").asText().equals("unsubscribe")
+          && request.get("accountId").asText().equals("accountId")) {
+          ObjectNode r = response.deepCopy();
+          r.put("requestId", request.get("requestId").asText());
+          client.sendEvent("response", r.toString());
+        }
+        if (request.get("type").asText().equals("getOrders")
+          && request.get("accountId").asText().equals("accountId")
+          && request.get("application").asText().equals("RPC")) {
+          requestCounter++;
+          client.sendEvent("processingError", Js.asJson("id", 1, "error", "NotSynchronizedError",
+            "message", "Error message", "requestId", request.get("requestId").asText()).toString());
+        }
+      }
+    });
+    client.unsubscribe("accountId");
+    try {
+      client.getOrders("accountId").join();
+      throw new CompletionException(new Exception("NotSynchronizedException expected"));
+    } catch (Throwable err) {
+      assertTrue(err.getCause() instanceof NotSynchronizedException);
+    }
+    assertEquals(1, requestCounter);
+    assertFalse(client.socketInstancesByAccounts.containsKey("accountId"));
+  }
+  
+  /**
    * Tests {@link MetaApiWebsocketClient#trade(String, MetatraderTrade)}
    */
   @Test
