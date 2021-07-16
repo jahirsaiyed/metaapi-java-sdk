@@ -9,7 +9,9 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Arrays;
 import org.assertj.core.util.Lists;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -31,6 +33,16 @@ class ConnectionHealthMonitorTest {
   private MetaApiConnection connection;
   private String[] brokerTimes = { "2020-10-05 09:00:00.000", "2020-10-10 10:00:00.000" };
   private SimpleDateFormat brokerTimeFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+  
+  @BeforeAll
+  static void setUpBeforeClass() {
+    ServiceProvider.setRandom(0.0);
+  }
+  
+  @AfterAll
+  static void tearDownAfterClass() {
+    ServiceProvider.setRandom(null);
+  }
   
   @BeforeEach
   void setUp() throws Exception {
@@ -54,7 +66,7 @@ class ConnectionHealthMonitorTest {
     Mockito.when(connection.getSubscribedSymbols()).thenReturn(Lists.list("EURUSD"));
     Mockito.when(connection.getTerminalState()).thenReturn(terminalState);
     Mockito.when(connection.isSynchronized()).thenReturn(true);
-    ConnectionHealthMonitor.measureInterval = 250;
+    ConnectionHealthMonitor.minMeasureInterval = 250;
     ConnectionHealthMonitor.minQuoteInterval = 15000;
     healthMonitor = new ConnectionHealthMonitor(connection);
     prices = Arrays.array(new MetatraderSymbolPrice() {{
@@ -233,9 +245,9 @@ class ConnectionHealthMonitorTest {
   
   private void sleepIntervals(int count) throws InterruptedException {
     for (int i = 0; i < count; ++i) {
-      Thread.sleep(ConnectionHealthMonitor.measureInterval);
+      Thread.sleep(healthMonitor.getRandomTimeout());
       ServiceProvider.setNowInstantMock(ServiceProvider.getNow()
-        .plusMillis(ConnectionHealthMonitor.measureInterval));
+        .plusMillis(healthMonitor.getRandomTimeout()));
     }
   }
 }

@@ -15,6 +15,8 @@ import java.util.concurrent.CompletableFuture;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.assertj.core.util.Maps;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -26,6 +28,7 @@ import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException;
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException.TooManyRequestsExceptionMetadata;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.util.Js;
+import cloud.metaapi.sdk.util.ServiceProvider;
 import io.socket.client.Socket;
 
 /**
@@ -35,6 +38,16 @@ class SubscriptionManagerTest {
 
   private SubscriptionManager manager;
   private MetaApiWebsocketClient client;
+  
+  @BeforeAll
+  static void setUpBeforeClass() {
+    ServiceProvider.setRandom(0.2);
+  }
+  
+  @AfterAll
+  static void tearDownAftterClass() {
+    ServiceProvider.setRandom(null);
+  }
   
   @BeforeEach
   void setUp() throws Exception {
@@ -152,12 +165,14 @@ class SubscriptionManagerTest {
       Pair.of("accountId", 0), Pair.of("accountId2", 0), Pair.of("accountId3", 0)
     ));
     manager.subscribe("accountId", null, false);
+    Thread.sleep(50);
     manager.subscribe("accountId2", null, false);
+    Thread.sleep(50);
     manager.subscribe("accountId3", null, false);
-    Thread.sleep(1000);
+    Thread.sleep(2000);
     manager.onReconnected(0, Arrays.asList("accountId", "accountId2"));
-    Thread.sleep(1000);
-    Mockito.verify(client, Mockito.times(5)).subscribe(Mockito.anyString(), Mockito.nullable(Integer.class));
+    Thread.sleep(3000);
+    Mockito.verify(client, Mockito.times(5)).subscribe(Mockito.anyString(), Mockito.any());
   };
 
   /**
@@ -184,7 +199,7 @@ class SubscriptionManagerTest {
     manager.subscribe("accountId", null, false);
     Thread.sleep(1000);
     manager.onReconnected(0, Arrays.asList("accountId"));
-    Thread.sleep(2000);
+    Thread.sleep(3000);
     Mockito.verify(client, Mockito.times(2)).subscribe(Mockito.anyString(), Mockito.nullable(Integer.class));
   };
   

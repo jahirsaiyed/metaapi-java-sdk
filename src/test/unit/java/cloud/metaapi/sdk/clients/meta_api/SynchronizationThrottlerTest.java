@@ -275,12 +275,15 @@ class SynchronizationThrottlerTest {
     throttler.scheduleSynchronize("accountId1", provideRequest("test1")).join();
     throttler.scheduleSynchronize("accountId2", provideRequest("test2")).join();
     throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
+    Thread.sleep(50);
     throttler.scheduleSynchronize("accountId4", provideRequest("test4"));
+    Thread.sleep(50);
     for (int i = 0; i < 20; ++i) {
       tick(8000);
       throttler.updateSynchronizationId("test1");
       throttler.updateSynchronizationId("test2");
     }
+    Thread.sleep(50);
     throttler.scheduleSynchronize("accountId5", provideRequest("test5"));
     for (int i = 0; i < 20; ++i) {
       tick(8000);
@@ -347,6 +350,30 @@ class SynchronizationThrottlerTest {
     Mockito.verify(websocketClient, Mockito.times(4)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
   }
   
+  /**
+   * Tests {@link SynchronizationThrottler#removeIdByParameters}
+   */
+  @Test
+  void testRemovesIdByParameters() throws InterruptedException {
+    throttler.scheduleSynchronize("accountId1", provideRequest("test1")).join();
+    throttler.scheduleSynchronize("accountId2", provideRequest("test2", 0, "ps-mpa-0")).join();
+    throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
+    Thread.sleep(50);
+    throttler.scheduleSynchronize("accountId2", provideRequest("test4", 1, "ps-mpa-1"));
+    Thread.sleep(50);
+    throttler.scheduleSynchronize("accountId2", provideRequest("test5", 0, "ps-mpa-2"));
+    Thread.sleep(50);
+    throttler.scheduleSynchronize("accountId4", provideRequest("test6"));
+    Thread.sleep(50);
+    throttler.removeIdByParameters("accountId2", 0, "ps-mpa-0");
+    throttler.removeIdByParameters("accountId2", 1, "ps-mpa-1");
+    throttler.removeSynchronizationId("test1");
+    Thread.sleep(50);
+    Mockito.verify(websocketClient).rpcRequest("accountId3", provideRequest("test3"), null);
+    Mockito.verify(websocketClient).rpcRequest("accountId2", provideRequest("test5", 0, "ps-mpa-2"), null);
+    Mockito.verify(websocketClient, Mockito.times(4)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
+  };
+  
   private ObjectNode provideRequest(String requestId) {
     ObjectNode request = JsonMapper.getInstance().createObjectNode();
     request.put("requestId", requestId);
@@ -356,6 +383,12 @@ class SynchronizationThrottlerTest {
   private ObjectNode provideRequest(String requestId, int instanceIndex) {
     ObjectNode request = provideRequest(requestId);
     request.put("instanceIndex", instanceIndex);
+    return request;
+  }
+
+  private ObjectNode provideRequest(String requestId, int instanceIndex, String host) {
+    ObjectNode request = provideRequest(requestId, instanceIndex);
+    request.put("host", host);
     return request;
   }
   

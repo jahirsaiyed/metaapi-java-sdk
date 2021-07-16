@@ -21,7 +21,9 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Lists;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -54,6 +56,7 @@ import cloud.metaapi.sdk.meta_api.MetaApiConnection;
 import cloud.metaapi.sdk.meta_api.MetatraderAccount;
 import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.JsonMapper;
+import cloud.metaapi.sdk.util.ServiceProvider;
 
 class SyncStabilityTest {
 
@@ -381,12 +384,23 @@ class SyncStabilityTest {
     return result;
   }
   
+  @BeforeAll
+  static void setUpBeforeClass() {
+    ServiceProvider.setRandom(0.2);
+  }
+  
+  @AfterAll
+  static void tearDownAfterClass() {
+    ServiceProvider.setRandom(null);
+  }
+  
   static void beforeEach(boolean param) throws Exception {
     port++;
     startWebsocketServer();
     api = new MetaApi("token", new MetaApi.Options() {{
       application = "application";
       domain = "project-stock.agiliumlabs.cloud";
+      useSharedClientApi = true;
       requestTimeout = 10;
       retryOpts = new RetryOptions() {{
         retries = 3;
@@ -664,7 +678,7 @@ class SyncStabilityTest {
     Thread.sleep(50);
     fakeServer.enableSync(server);
     server.socket.disconnect();
-    Thread.sleep(3000);
+    Thread.sleep(7000);
     Thread.sleep(50);
     assertFalse(connection.isSynchronized());
     assertTrue(connection2.isSynchronized() && connection2.getTerminalState().isConnected()

@@ -32,7 +32,7 @@ import cloud.metaapi.sdk.util.ServiceProvider;
  */
 public class ConnectionHealthMonitor extends SynchronizationListener {
 
-  protected static int measureInterval = 30000;
+  protected static int minMeasureInterval = 1000;
   protected static int minQuoteInterval = 60000;
   private static Logger logger = Logger.getLogger(ConnectionHealthMonitor.class);
   private MetaApiConnection connection;
@@ -50,15 +50,18 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   public ConnectionHealthMonitor(MetaApiConnection connection) {
     super();
     this.connection = connection;
-    this.updateMeasurementsInterval = Js.setInterval(() -> {
-      this.updateQuoteHealthStatus();
-      this.measureUptime();
-    }, measureInterval);
+    this.updateMeasurementsInterval = Js.setTimeout(() -> updateMeasurements(), getRandomTimeout());
     this.uptimeReservoirs = new HashMap<>();
     this.uptimeReservoirs.put("5m", new Reservoir(300, 5 * 60 * 1000));
     this.uptimeReservoirs.put("1h", new Reservoir(600, 60 * 60 * 1000));
     this.uptimeReservoirs.put("1d", new Reservoir(24 * 60, 24 * 60 * 60 * 1000));
     this.uptimeReservoirs.put("1w", new Reservoir(24 * 7, 7 * 24 * 60 * 60 * 1000));
+  }
+  
+  private void updateMeasurements() {
+    updateQuoteHealthStatus();
+    measureUptime();
+    updateMeasurementsInterval = Js.setTimeout(() -> updateMeasurements(), getRandomTimeout());
   }
   
   /**
@@ -242,5 +245,9 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
         break;
     }
     return result != null ? result : new ArrayList<>();
+  }
+  
+  protected int getRandomTimeout() {
+    return (int) (ServiceProvider.getRandom() * 59 * 1000 + minMeasureInterval);
   }
 }

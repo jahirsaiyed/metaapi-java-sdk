@@ -60,6 +60,7 @@ public class SynchronizationThrottler {
   private static class AccountData {
     public String accountId;
     public int instanceIndex;
+    public String host;
   }
   
   private static class SynchronizationQueueItem {
@@ -186,6 +187,22 @@ public class SynchronizationThrottler {
   }
   
   /**
+   * Removes synchronizations from queue and from the list by parameters
+   * @param accountId account id
+   * @param instanceIndex account instance index
+   * @param host account host name
+   */
+  public void removeIdByParameters(String accountId, int instanceIndex, String host) {
+    for (String key : new ArrayList<>(accountsBySynchronizationIds.keySet())) {
+      if (accountsBySynchronizationIds.get(key).accountId.equals(accountId) &&
+          accountsBySynchronizationIds.get(key).instanceIndex == instanceIndex &&
+          Js.or(accountsBySynchronizationIds.get(key).host, "").equals(Js.or(host, ""))) {
+        removeSynchronizationId(key);
+      }
+    }
+  }
+  
+  /**
    * Removes synchronization id from slots and removes ids for the same account from the queue
    * @param synchronizationId Synchronization id
    */
@@ -193,9 +210,11 @@ public class SynchronizationThrottler {
     if (accountsBySynchronizationIds.containsKey(synchronizationId)) {
       String accountId = accountsBySynchronizationIds.get(synchronizationId).accountId;
       int instanceIndex = accountsBySynchronizationIds.get(synchronizationId).instanceIndex;
+      String host = Js.or(accountsBySynchronizationIds.get(synchronizationId).host, "");
       for (String key : new ArrayList<>(accountsBySynchronizationIds.keySet())) {
         if (accountsBySynchronizationIds.get(key).accountId.equals(accountId) &&
-            instanceIndex == accountsBySynchronizationIds.get(key).instanceIndex) {
+            accountsBySynchronizationIds.get(key).instanceIndex == instanceIndex &&
+            Js.or(accountsBySynchronizationIds.get(key).host, "").equals(host)) {
           removeFromQueue(key, "cancel");
           accountsBySynchronizationIds.remove(key);
         }
@@ -285,6 +304,7 @@ public class SynchronizationThrottler {
       AccountData accountData = new AccountData();
       accountData.accountId = accountId;
       accountData.instanceIndex = instanceIndex;
+      accountData.host = request.hasNonNull("host") ? request.get("host").asText() : null;
       accountsBySynchronizationIds.put(synchronizationId, accountData);
       if (!isSynchronizationAvailable()) {
         CompletableFuture<String> requestFuture = new CompletableFuture<>();

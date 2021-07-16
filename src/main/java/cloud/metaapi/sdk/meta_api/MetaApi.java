@@ -85,6 +85,10 @@ public class MetaApi {
      * Options for processing websocket client events
      */
     public EventProcessingOptions eventProcessing = new EventProcessingOptions();
+    /**
+     * Option to use a shared server
+     */
+    public boolean useSharedClientApi = false;
   }
   
   /**
@@ -171,7 +175,8 @@ public class MetaApi {
     websocketOptions.synchronizationThrottler = opts.synchronizationThrottler;
     websocketOptions.retryOpts = opts.retryOpts;
     websocketOptions.eventProcessing = opts.eventProcessing;
-    metaApiWebsocketClient = new MetaApiWebsocketClient(token, websocketOptions);
+    websocketOptions.useSharedClientApi = opts.useSharedClientApi;
+    metaApiWebsocketClient = new MetaApiWebsocketClient(httpClient, token, websocketOptions);
     provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, opts.domain));
     connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, opts.application);
     HistoricalMarketDataClient historicalMarketDataClient = new HistoricalMarketDataClient(

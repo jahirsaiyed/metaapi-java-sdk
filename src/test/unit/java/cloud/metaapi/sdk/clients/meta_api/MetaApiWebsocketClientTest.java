@@ -44,6 +44,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import cloud.metaapi.sdk.clients.HttpClient;
 import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.*;
@@ -87,9 +88,10 @@ class MetaApiWebsocketClientTest {
   private static SocketIOServer server;
   private static SocketIOClient socket;
   private static int initResetDisconnectTimerTimeout;
-  private static MetaApiWebsocketClient client;
-  private static SubscriptionManager clientSubscriptionManager;
-  private static PacketOrderer clientPacketOrderer;
+  private MetaApiWebsocketClient client;
+  private SubscriptionManager clientSubscriptionManager;
+  private PacketOrderer clientPacketOrderer;
+  private HttpClient httpClient;
   
   // Some variables that cannot be written from request callbacks 
   // if they are local test variables
@@ -128,7 +130,8 @@ class MetaApiWebsocketClientTest {
   @BeforeEach
   void setUp() throws Throwable {
     MetaApiWebsocketClient.resetDisconnectTimerTimeout = initResetDisconnectTimerTimeout;
-    client = new MetaApiWebsocketClient("token", new MetaApiWebsocketClient.ClientOptions() {{
+    httpClient = Mockito.mock(HttpClient.class);
+    client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
       application = "application";
       domain = "project-stock.agiliumlabs.cloud";
       requestTimeout = 6000L;
@@ -138,6 +141,7 @@ class MetaApiWebsocketClientTest {
         minDelayInSeconds = 1;
         maxDelayInSeconds = 3;
       }};
+      useSharedClientApi = true;
     }});
     client.setUrl("http://localhost:6784");
     client.socketInstancesByAccounts = Maps.newHashMap("accountId", 0);
@@ -201,6 +205,50 @@ class MetaApiWebsocketClientTest {
    client.connect().join();
    Thread.sleep(2000);
    assertTrue(connectAmount >= 2);
+ }
+ 
+ /**
+  * Tests {@link MetaApiWebsocketClient#getServerUrl}
+  */
+ @ParameterizedTest
+ @MethodSource("provideMetatraderPosition")
+ void testConnectsToDedicatedServer(MetatraderPosition position) throws IOException {
+   Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any())).thenReturn(CompletableFuture
+     .completedFuture(new MetaApiWebsocketClient.ServerUrl() {{url = "http://localhost:6784";}}));
+   List<MetatraderPosition> positions = Arrays.asList(position);
+   socket.disconnect();
+   client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+     application = "application";
+     domain = "project-stock.agiliumlabs.cloud";
+     requestTimeout = 15000L;
+     connectTimeout = 15000L;
+     useSharedClientApi = false;
+     retryOpts = new RetryOptions() {{
+       retries = 3;
+       minDelayInSeconds = 1;
+       maxDelayInSeconds = 3;
+     }};
+   }});
+   server.addEventListener("request", Object.class, new DataListener<Object>() {
+     @Override
+     public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+       JsonNode request = jsonMapper.valueToTree(data);
+       if (  request.get("type").asText().equals("getPositions") 
+          && request.get("accountId").asText().equals("accountId")
+          && request.get("application").asText().equals("RPC")
+        ) {
+         ObjectNode response = jsonMapper.createObjectNode();
+         response.put("type", "response");
+         response.set("accountId", request.get("accountId"));
+         response.set("requestId", request.get("requestId"));
+         response.set("positions", jsonMapper.valueToTree(positions));
+         client.sendEvent("response", response.toString());
+       }
+     }
+   });
+   List<MetatraderPosition> actual = client.getPositions("accountId").join();
+   assertThat(actual).usingRecursiveComparison().isEqualTo(positions);
+   Mockito.verify(httpClient).requestJson(Mockito.any(), Mockito.any());
  }
 
   /**

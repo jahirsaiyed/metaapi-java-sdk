@@ -17,6 +17,7 @@ import org.apache.log4j.Logger;
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.util.Js;
+import cloud.metaapi.sdk.util.ServiceProvider;
 
 /**
  * Subscription manager to handle account subscription logic
@@ -209,7 +210,7 @@ public class SubscriptionManager {
   public CompletableFuture<Void> onDisconnected(String accountId, int instanceNumber) {
     return CompletableFuture.runAsync(() -> {
       try {
-        Thread.sleep((long) (Math.max(Math.random() * 5, 1) * 1000));
+        Thread.sleep((long) (Math.max(ServiceProvider.getRandom() * 5, 1) * 1000));
       } catch (InterruptedException e) {
         logger.error(e);
       }
@@ -242,6 +243,7 @@ public class SubscriptionManager {
                 Thread.sleep(1000);
               }
               awaitingResubscribe.remove(accountId);
+              Thread.sleep((long) (ServiceProvider.getRandom() * 5000));
               subscribe(accountId, null, false);
             }
           } catch (Throwable err) {
