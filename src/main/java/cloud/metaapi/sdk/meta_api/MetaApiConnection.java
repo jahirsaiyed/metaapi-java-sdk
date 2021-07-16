@@ -847,7 +847,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when subscription request was processed
    */
   public CompletableFuture<Void> subscribeToMarketData(String symbol) {
-    return subscribeToMarketData(symbol, new ArrayList<>(), 0);
+    return subscribeToMarketData(symbol, new ArrayList<>(), 0, null);
   }
   
   /**
@@ -860,7 +860,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    */
   public CompletableFuture<Void> subscribeToMarketData(String symbol,
     List<MarketDataSubscription> subscriptions) {
-    return subscribeToMarketData(symbol, subscriptions, 0);
+    return subscribeToMarketData(symbol, subscriptions, 0, null);
   }
   
   /**
@@ -874,11 +874,26 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    */
   public CompletableFuture<Void> subscribeToMarketData(String symbol,
     List<MarketDataSubscription> subscriptions, Integer instanceIndex) {
+    return subscribeToMarketData(symbol, subscriptions, instanceIndex, null); 
+  }
+  
+  /**
+   * Subscribes on market data of specified symbol (see
+   * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/subscribeToMarketData/).
+   * @param symbol symbol (e.g. currency pair or an index)
+   * @param subscriptions array of market data subscription to create or update. Please
+   * note that this feature is not fully implemented on server-side yet
+   * @param instanceIndex instance index
+   * @param timeoutInSeconds timeout to wait for prices in seconds, or {@code null}. Default is 30
+   * @return completable future which resolves when subscription request was processed
+   */
+  public CompletableFuture<Void> subscribeToMarketData(String symbol,
+    List<MarketDataSubscription> subscriptions, Integer instanceIndex, Long timeoutInSeconds) {
     Subscriptions subscriptionsItem = new Subscriptions();
     subscriptionsItem.subscriptions = subscriptions;
     this.subscriptions.put(symbol, subscriptionsItem);
     return websocketClient.subscribeToMarketData(account.getId(), instanceIndex, symbol, subscriptions)
-      .thenApply(res -> terminalState.waitForPrice(symbol)).thenApply(res -> null);
+      .thenApply(res -> terminalState.waitForPrice(symbol, timeoutInSeconds)).thenApply(res -> null);
   }
   
   /**

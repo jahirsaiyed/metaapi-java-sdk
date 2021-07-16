@@ -783,13 +783,15 @@ class MetaApiConnectionTest {
    * Tests {@link MetaApiConnection#subscribeToMarketData(String)}
    */
   @Test
-  void testSubscribesToMarketData() throws Exception {
+  void testSubscribesToMarketData() {
     Mockito.when(client.subscribeToMarketData(Mockito.anyString(), Mockito.anyInt(),
       Mockito.anyString(), Mockito.anyList())).thenReturn(CompletableFuture.completedFuture(null));
-    List<MarketDataSubscription> subscriptions = Arrays.asList(new MarketDataSubscription() {{
-      type = "quotes";
-    }});
-    api.subscribeToMarketData("EURUSD", subscriptions, 1).get();
+    List<MarketDataSubscription> subscriptions = Arrays.asList(new MarketDataSubscription() {{type = "quotes";}});
+    CompletableFuture<Void> future = api.subscribeToMarketData("EURUSD", subscriptions, 1);
+    api.getTerminalState().onSymbolPricesUpdated("1:ps-mpa-1", Arrays.asList(new MetatraderSymbolPrice() {{
+      time = new IsoTime(); symbol = "EURUSD"; bid = 1.0; ask = 1.1;
+    }}), null, null, null, null, null);
+    future.join();
     Mockito.verify(client).subscribeToMarketData("accountId", 1, "EURUSD", subscriptions);
   }
   
