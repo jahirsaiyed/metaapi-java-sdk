@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.text.Collator;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,7 +42,7 @@ class PacketLoggerTest {
     private Map<String, JsonNode> packets;
     
     @BeforeEach
-    void setUp() throws ParseException, IOException {
+    void setUp() throws Exception {
         ServiceProvider.setNowInstantMock(longTimeFormat.parse("2020-10-10 00:00:00.000").toInstant());
         packetLogger = new PacketLogger(new PacketLogger.LoggerOptions() {{
             fileNumberLimit = 3;

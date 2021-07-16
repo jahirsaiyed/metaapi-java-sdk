@@ -5,6 +5,7 @@ import java.io.IOException;
 import org.apache.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.HttpClient;
+import cloud.metaapi.sdk.clients.OptionsValidator;
 import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.meta_api.HistoricalMarketDataClient;
@@ -156,10 +157,20 @@ public class MetaApi {
   }
   
   private void initialize(String token, Options opts) throws ValidationException, IOException {
-    if (opts == null) opts = new Options();
+    if (opts == null) {
+      opts = new Options();
+    }
+    
     if (!opts.application.matches("[a-zA-Z0-9_]+")) {
       throw new ValidationException("Application name must be non-empty string consisting from letters, digits and _ only", null);
     }
+    OptionsValidator validator = new OptionsValidator();
+    validator.validateNonZeroInt(opts.requestTimeout, "requestTimeout");
+    validator.validateNonZeroInt(opts.historicalMarketDataRequestTimeout, "historicalMarketDataRequestTimeout");
+    validator.validateNonZeroInt(opts.connectTimeout, "connectTimeout");
+    validator.validateNonZeroInt(opts.packetOrderingTimeout, "packetOrderingTimeout");
+    validator.validateNonZeroInt(opts.demoAccountRequestTimeout, "demoAccountRequestTimeout");
+    
     HttpClient httpClient = new HttpClient(opts.requestTimeout * 1000, opts.connectTimeout * 1000, opts.retryOpts);
     HttpClient historicalMarketDataHttpClient = new HttpClient(opts.historicalMarketDataRequestTimeout * 1000,
       opts.connectTimeout * 1000, opts.retryOpts);

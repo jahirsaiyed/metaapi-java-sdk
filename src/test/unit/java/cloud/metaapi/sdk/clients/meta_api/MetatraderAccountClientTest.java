@@ -19,6 +19,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 import cloud.metaapi.sdk.clients.HttpRequestOptions;
 import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
+import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.meta_api.models.*;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.*;
 import cloud.metaapi.sdk.clients.mocks.HttpClientMock;
@@ -34,7 +35,7 @@ class MetatraderAccountClientTest {
   private HttpClientMock httpClient;
   
   @BeforeEach
-  void setUp() {
+  void setUp() throws ValidationException {
     httpClient = new HttpClientMock((opts) -> CompletableFuture.completedFuture("empty"));
     accountClient = new MetatraderAccountClient(httpClient, "header.payload.sign");
   }

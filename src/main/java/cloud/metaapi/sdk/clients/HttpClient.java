@@ -36,7 +36,7 @@ public class HttpClient {
   /**
    * Constructs HttpClient class instance. Connect and request timeout are {@code 1 minute} each.
    */
-  public HttpClient() {
+  public HttpClient() throws ValidationException {
     this(60000, 60000);
   }
   
@@ -45,7 +45,7 @@ public class HttpClient {
    * @param requestTimeout request timeout in milliseconds
    * @param connectTimeout connect timeout in milliseconds
    */
-  public HttpClient(int requestTimeout, int connectTimeout) {
+  public HttpClient(int requestTimeout, int connectTimeout) throws ValidationException {
     this(requestTimeout, connectTimeout, new RetryOptions());
   }
   
@@ -55,7 +55,11 @@ public class HttpClient {
    * @param connectTimeout connect timeout in milliseconds
    * @param retryOpts retrying options
    */
-  public HttpClient(int requestTimeout, int connectTimeout, RetryOptions retryOpts) {
+  public HttpClient(int requestTimeout, int connectTimeout, RetryOptions retryOpts) throws ValidationException {
+    OptionsValidator validator = new OptionsValidator();
+    validator.validateNonZeroInt(retryOpts.minDelayInSeconds, "retryOpts.minDelayInSeconds");
+    validator.validateNonZeroInt(retryOpts.maxDelayInSeconds, "retryOpts.maxDelayInSeconds");
+    
     this.requestTimeout = requestTimeout;
     this.connectTimeout = connectTimeout;
     this.retries = retryOpts.retries;

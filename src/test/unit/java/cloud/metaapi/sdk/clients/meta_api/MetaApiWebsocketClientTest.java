@@ -212,7 +212,7 @@ class MetaApiWebsocketClientTest {
   */
  @ParameterizedTest
  @MethodSource("provideMetatraderPosition")
- void testConnectsToDedicatedServer(MetatraderPosition position) throws IOException {
+ void testConnectsToDedicatedServer(MetatraderPosition position) throws Exception {
    Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any())).thenReturn(CompletableFuture
      .completedFuture(new MetaApiWebsocketClient.ServerUrl() {{url = "http://localhost:6784";}}));
    List<MetatraderPosition> positions = Arrays.asList(position);

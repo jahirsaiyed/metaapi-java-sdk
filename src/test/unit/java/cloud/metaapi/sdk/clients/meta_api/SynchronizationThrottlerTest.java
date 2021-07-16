@@ -122,7 +122,7 @@ class SynchronizationThrottlerTest {
    * Tests {@link SynchronizationThrottler#scheduleSynchronize}
    */
   @Test
-  void testSetsHardLimitForConcurrentSynchronizationsViaOptions() throws InterruptedException {
+  void testSetsHardLimitForConcurrentSynchronizationsViaOptions() throws Exception {
     Mockito.when(websocketClient.getSubscribedAccountIds(Mockito.anyInt())).thenReturn(provideListOfSize(21));
     throttler = new SynchronizationThrottler(websocketClient, 0, new SynchronizationThrottler.Options() {{
       maxConcurrentSynchronizations = 3;

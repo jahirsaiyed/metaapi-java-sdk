@@ -26,6 +26,8 @@ import org.apache.log4j.Logger;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import cloud.metaapi.sdk.clients.OptionsValidator;
+import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.util.JsonMapper;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
@@ -96,7 +98,7 @@ public class PacketLogger {
    * Constructs the class with default options
    * @throws IOException if log directory cannot be created
    */
-  public PacketLogger() throws IOException {
+  public PacketLogger() throws IOException, ValidationException {
     this(new LoggerOptions());
   }
   
@@ -104,8 +106,13 @@ public class PacketLogger {
    * Constructs the class
    * @param opts packet logger options
    * @throws IOException if log directory cannot be created
+   * @throws ValidationException if specified opts are invalid
    */
-  public PacketLogger(LoggerOptions opts) throws IOException {
+  public PacketLogger(LoggerOptions opts) throws IOException, ValidationException {
+    OptionsValidator validator = new OptionsValidator();
+    validator.validateNonZeroInt(opts.fileNumberLimit, "packetLogger.fileNumberLimit");
+    validator.validateNonZeroInt(opts.logFileSizeInHours, "packetLogger.logFileSizeInHours");
+    
     this.fileNumberLimit = opts.fileNumberLimit;
     this.logFileSizeInHours = opts.logFileSizeInHours;
     this.compressSpecifications = opts.compressSpecifications;

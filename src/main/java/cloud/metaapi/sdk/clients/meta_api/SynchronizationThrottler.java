@@ -14,7 +14,9 @@ import org.apache.log4j.Logger;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import cloud.metaapi.sdk.clients.OptionsValidator;
 import cloud.metaapi.sdk.clients.TimeoutException;
+import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.ServiceProvider;
@@ -74,8 +76,15 @@ public class SynchronizationThrottler {
    * @param client MetaApi websocket client
    * @param socketInstanceIndex index of socket instance that uses the throttler
    * @param opts Synchronization throttler options
+   * @throws ValidationException if specified options are invalid 
    */
-  public SynchronizationThrottler(MetaApiWebsocketClient client, int socketInstanceIndex, Options opts) {
+  public SynchronizationThrottler(MetaApiWebsocketClient client, int socketInstanceIndex, Options opts)
+    throws ValidationException {
+    OptionsValidator validator = new OptionsValidator();
+    validator.validateNonZeroInt(opts.maxConcurrentSynchronizations, "synchronizationThrottler.maxConcurrentSynchronizations");
+    validator.validateNonZeroInt(opts.queueTimeoutInSeconds, "synchronizationThrottler.queueTimeoutInSeconds");
+    validator.validateNonZeroInt(opts.synchronizationTimeoutInSeconds, "synchronizationThrottler.synchronizationTimeoutInSeconds");
+    
     this.maxConcurrentSynchronizations = opts.maxConcurrentSynchronizations;
     this.queueTimeoutInSeconds = opts.queueTimeoutInSeconds;
     this.synchronizationTimeoutInSeconds = opts.synchronizationTimeoutInSeconds;

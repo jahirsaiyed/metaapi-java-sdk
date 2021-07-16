@@ -51,7 +51,7 @@ public class HttpClientTest {
   private HttpRequestOptions requestOpts = new HttpRequestOptions("http://metaapi.cloud", Method.GET);
   
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws Exception {
     httpClient = new HttpClient();
   }
   
@@ -115,7 +115,7 @@ public class HttpClientTest {
    * Tests {@link HttpClient#request(HttpRequestOptions)}
    */
   @Test
-  public void testReturnsTimeoutExceptionIfRequestIsTimedOut() {
+  public void testReturnsTimeoutExceptionIfRequestIsTimedOut() throws ValidationException {
     httpClient = new HttpClient(1, 60000, new RetryOptions() {{ retries = 2; }});
     assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
       try {
@@ -168,7 +168,7 @@ public class HttpClientTest {
    */
   @Test
   @SuppressWarnings("unchecked")
-  public void testReturnsErrorIfRetryLimitIsExceeded() {
+  public void testReturnsErrorIfRetryLimitIsExceeded() throws ValidationException {
     HttpResponse<String> httpResponse = (HttpResponse<String>) Mockito.mock(HttpResponse.class);
     Mockito.when(httpResponse.getStatus()).thenReturn(502);
     Mockito.when(httpResponse.getBody()).thenReturn("{\"message\": \"test\"}");
@@ -281,7 +281,7 @@ public class HttpClientTest {
    * Tests {@link HttpClient#request(HttpRequestOptions)}
    */
   @Test
-  public void testDoesNotCountsRetryingTooManyRequestsError() {
+  public void testDoesNotCountsRetryingTooManyRequestsError() throws ValidationException {
     HttpResponse<String> httpErrorResponse1 = getTooManyRequestsError(1);
     CompletableFuture<HttpResponse<String>> httpErrorResponse2 = new CompletableFuture<>();
     httpErrorResponse2.completeExceptionally(new Exception("test"));
@@ -310,7 +310,7 @@ public class HttpClientTest {
    * Tests {@link HttpClient#request(HttpRequestOptions)}
    */
   @Test
-  public void testWaitsForTheRetryAfterHeaderTimeBeforeRetrying() {
+  public void testWaitsForTheRetryAfterHeaderTimeBeforeRetrying() throws ValidationException {
     HttpResponse<String> retryResponse = getHttpRetryResponse(3);
     HttpResponse<String> httpOkResponse = getHttpOkResponse();
     httpClient = Mockito.spy(new HttpClient(60000, 60000, new RetryOptions() {{ retries = 1; }}));
@@ -327,7 +327,7 @@ public class HttpClientTest {
    * Tests {@link HttpClient#request(HttpRequestOptions)}
    */
   @Test
-  public void testReturnsTimeoutErrorIfRetryAfterHeaderTimeIsTooLong() {
+  public void testReturnsTimeoutErrorIfRetryAfterHeaderTimeIsTooLong() throws ValidationException {
     HttpResponse<String> retryResponse = getHttpRetryResponse(30);
     httpClient = Mockito.spy(new HttpClient(60000, 60000, new RetryOptions() {{ maxDelayInSeconds = 3; }}));
     Mockito.when(httpClient.makeRequest(Mockito.any())).thenReturn(CompletableFuture.completedFuture(retryResponse));
@@ -345,7 +345,7 @@ public class HttpClientTest {
    * Tests {@link HttpClient#request(HttpRequestOptions)}
    */
   @Test
-  public void testReturnsTimeoutErrorIfTimedOutToRetry() {
+  public void testReturnsTimeoutErrorIfTimedOutToRetry() throws ValidationException {
     HttpResponse<String> retryResponse = getHttpRetryResponse(1);
     httpClient = Mockito.spy(new HttpClient(60000, 60000, new RetryOptions() {{ maxDelayInSeconds = 2; retries = 3; }}));
     Mockito.when(httpClient.makeRequest(Mockito.any())).thenReturn(CompletableFuture.completedFuture(retryResponse));

@@ -35,6 +35,7 @@ import cloud.metaapi.sdk.clients.HttpRequestOptions;
 import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
+import cloud.metaapi.sdk.clients.OptionsValidator;
 import cloud.metaapi.sdk.clients.error_handler.*;
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException.TooManyRequestsExceptionMetadata;
 import cloud.metaapi.sdk.clients.meta_api.LatencyListener.ResponseTimestamps;
@@ -179,7 +180,16 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @param opts websocket client options
    * @throws IOException if packet logger is enabled and failed to create the log directory
    */
-  public MetaApiWebsocketClient(HttpClient httpClient, String token, ClientOptions opts) throws IOException {
+  public MetaApiWebsocketClient(HttpClient httpClient, String token, ClientOptions opts)
+    throws IOException, ValidationException {
+    OptionsValidator validator = new OptionsValidator();
+    validator.validateNonZeroInt(opts.packetOrderingTimeout, "packetOrderingTimeout");
+    validator.validateNonZeroLong(opts.requestTimeout, "requestTimeout");
+    validator.validateNonZeroLong(opts.connectTimeout, "requestTimeout");
+    validator.validateNonZeroInt(opts.retryOpts.minDelayInSeconds, "retryOpts.minDelayInSeconds");
+    validator.validateNonZeroInt(opts.retryOpts.maxDelayInSeconds, "retryOpts.maxDelayInSeconds");
+    validator.validateNonZeroLong(opts.retryOpts.subscribeCooldownInSeconds, "retryOpts.subscribeCooldownInSeconds");
+    
     this.httpClient = httpClient;
     this.application = opts.application;
     this.domain = opts.domain;
@@ -384,7 +394,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           packetOrderer.start();
         }
         socketInstance.connect();
-      } catch (URISyntaxException e) {
+      } catch (Exception e) {
         result.completeExceptionally(e);
       }
       return result.join();
