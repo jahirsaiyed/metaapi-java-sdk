@@ -49,8 +49,10 @@ public class MetatraderAccountUpdateDto {
    */
   public List<CopyFactoryRole> copyFactoryRoles;
   /**
-   * Number of resource slots to allocate to account, or {@code null}. Please note that
-   * allocating extra resource slots is a paid option. Default is 1
+   * Number of resource slots to allocate to account, or {@code null}. Allocating extra resource slots
+   * results in better account performance under load which is useful for some applications. E.g. if you have many
+   * accounts copying the same strategy via CopyFactory API, then you can increase resourceSlots to get a lower trade
+   * copying latency. Please note that allocating extra resource slots is a paid option. Default is 1
    */
   public Integer resourceSlots;
 }

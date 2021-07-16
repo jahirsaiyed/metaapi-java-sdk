@@ -187,8 +187,10 @@ public class MetatraderAccount {
   }
 
   /**
-   * Returns number of resource slots to allocate to account. Please note that allocating extra resource slots is a
-   * paid option.
+   * Returns number of resource slots to allocate to account. Allocating extra resource slots
+   * results in better account performance under load which is useful for some applications. E.g. if you have many
+   * accounts copying the same strategy via CopyFactory API, then you can increase resourceSlots to get a lower trade
+   * copying latency. Please note that allocating extra resource slots is a paid option. Default is 1
    * @return number of resource slots to allocate to account
    */
   public int getResourceSlots() {
