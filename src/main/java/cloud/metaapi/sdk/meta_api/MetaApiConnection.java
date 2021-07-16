@@ -877,7 +877,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     Subscriptions subscriptionsItem = new Subscriptions();
     subscriptionsItem.subscriptions = subscriptions;
     this.subscriptions.put(symbol, subscriptionsItem);
-    return websocketClient.subscribeToMarketData(account.getId(), instanceIndex, symbol, subscriptions);
+    return websocketClient.subscribeToMarketData(account.getId(), instanceIndex, symbol, subscriptions)
+      .thenApply(res -> terminalState.waitForPrice(symbol)).thenApply(res -> null);
   }
   
   /**

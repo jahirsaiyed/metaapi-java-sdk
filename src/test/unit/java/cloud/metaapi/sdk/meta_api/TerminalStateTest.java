@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 import org.assertj.core.util.Lists;
@@ -158,6 +160,22 @@ class TerminalStateTest {
     assertThat(state.getPrice("EURUSD").get()).usingRecursiveComparison()
       .isEqualTo(new MetatraderSymbolPrice() {{ time = isoTime; symbol = "EURUSD";
       bid = 1; ask = 1.2; }});
+  }
+  
+  /**
+   * Tests
+   * {@link TerminalState#onSymbolPricesUpdated}
+   * {@link TerminalState#price}
+   */
+  @Test
+  void testWaitsForPrice() {
+    assertFalse(state.getPrice("EURUSD").isPresent());    
+    CompletableFuture<Optional<MetatraderSymbolPrice>> future = state.waitForPrice("EURUSD");
+    MetatraderSymbolPrice price = new MetatraderSymbolPrice() {{
+      time = new IsoTime(); symbol = "EURUSD"; bid = 1.0; ask = 1.1;
+    }}; 
+    state.onSymbolPricesUpdated("1:ps-mpa-1", Arrays.asList(price), null, null, null, null, null);
+    assertEquals(price, future.join().get());
   }
   
   /**

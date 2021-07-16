@@ -9,6 +9,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
@@ -29,6 +32,7 @@ public class TerminalState extends SynchronizationListener {
   protected int statusTimerTimeoutInMilliseconds = 60000;
   
   private Map<String, State> stateByInstanceIndex = new HashMap<>();
+  private Map<String, List<CompletableFuture<Void>>> waitForPriceResolves = new HashMap<>(); 
   
   private static class State {
     public boolean connected = false;
@@ -111,6 +115,45 @@ public class TerminalState extends SynchronizationListener {
    */
   public Optional<MetatraderSymbolPrice> getPrice(String symbol) {
     return Optional.ofNullable(getBestState().pricesBySymbol.get(symbol));
+  }
+  
+  /**
+   * Waits for price to be received
+   * @param symbol symbol (e.g. currency pair or an index)
+   * @return completable future resolving with price or null if price has not been received
+   */
+  public CompletableFuture<Optional<MetatraderSymbolPrice>> waitForPrice(String symbol) {
+    return waitForPrice(symbol, null);
+  }
+  
+  /**
+   * Waits for price to be received
+   * @param symbol symbol (e.g. currency pair or an index)
+   * @param timeoutInSeconds timeout in seconds, or {@code null}. Default is 30
+   * @return completable future resolving with price or empty optional value if price has not been received
+   */
+  public CompletableFuture<Optional<MetatraderSymbolPrice>> waitForPrice(String symbol, Long timeoutInSeconds) {
+    if (timeoutInSeconds == null) {
+      timeoutInSeconds = 30L;
+    }
+    long timeoutInSecondsFinal = timeoutInSeconds;
+    return CompletableFuture.supplyAsync(() -> {
+      if (!getPrice(symbol).isPresent()) {
+        if (!waitForPriceResolves.containsKey(symbol)) {
+          waitForPriceResolves.put(symbol, new ArrayList<>());
+        }
+        CompletableFuture<Void> waitFuture = new CompletableFuture<>();
+        waitForPriceResolves.get(symbol).add(waitFuture);
+        try {
+          waitFuture.get(timeoutInSecondsFinal, TimeUnit.SECONDS);
+        } catch (TimeoutException err) {
+          // Ignore timeout
+        } catch (Throwable err) {
+          throw new CompletionException(err);
+        }
+      }
+      return getPrice(symbol);
+    });
   }
   
   @Override
@@ -312,6 +355,13 @@ public class TerminalState extends SynchronizationListener {
           || order.type == OrderType.ORDER_TYPE_BUY_STOP
           || order.type == OrderType.ORDER_TYPE_BUY_STOP_LIMIT
         ? price.ask : price.bid);
+      }
+      List<CompletableFuture<Void>> priceResolves = waitForPriceResolves.get(price.symbol);
+      if (priceResolves != null && priceResolves.size() > 0) {
+        for (CompletableFuture<Void> resolve : priceResolves) {
+          resolve.complete(null);
+        }
+        waitForPriceResolves.remove(price.symbol);
       }
     }
     if (state.accountInformation != null) {

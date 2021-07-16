@@ -35,6 +35,8 @@
   - added logging URL on websocket connection
   - fixed initializing websocket connection for multiple accounts
   - remove synchronization listeners on connection close
+  - added options validation
+  - added waitForPrice method into TerminalState class to make it possible to wait for price to arrive
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
