@@ -431,7 +431,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       CompletableFuture.runAsync(() -> {
         boolean isSharedClientApi = uri.equals(this.url);
         logger.info("MetaApi websocket client connected to the MetaApi server via " 
-          + uri + " via " + (isSharedClientApi ? "shared" : "dedicated") + " server");
+          + uri + " " + (isSharedClientApi ? "shared" : "dedicated") + " server");
         if (instance.id == 0 && (instance.firstConnect != null && instance.firstConnect) && !isSharedClientApi) {
           logger.info("Please note that it can take up to 3 minutes for your dedicated server to start for the " +
           "first time. During this time it is OK if you see some connection errors.");
