@@ -62,6 +62,7 @@ public class ExpertAdvisor {
   
   /**
    * Reloads expert advisor from API
+   * (see https://metaapi.cloud/docs/provisioning/api/expertAdvisor/readExpertAdvisor/)
    * @return completable future resolving when expert advisor is updated
    */
   public CompletableFuture<Void> reload() {
@@ -72,6 +73,7 @@ public class ExpertAdvisor {
   
   /**
    * Updates expert advisor data
+   * (see https://metaapi.cloud/docs/provisioning/api/expertAdvisor/updateExpertAdvisor/)
    * @param expert new expert advisor data
    * @return completable future resolving when expert advisor is updated
    */
@@ -83,7 +85,8 @@ public class ExpertAdvisor {
   }
   
   /**
-   * Uploads expert advisor file
+   * Uploads an expert advisor file. EAs which use DLLs are not supported
+   * (see https://metaapi.cloud/docs/provisioning/api/expertAdvisor/uploadEAFile/)
    * @param filePath path to a file to upload
    * @return completable future which resolves when the file was uploaded
    */
@@ -95,7 +98,8 @@ public class ExpertAdvisor {
   }
   
   /**
-   * Uploads expert advisor file
+   * Uploads an expert advisor file. EAs which use DLLs are not supported
+   * (see https://metaapi.cloud/docs/provisioning/api/expertAdvisor/uploadEAFile/)
    * @param fileContents input stream containing file contents
    * @return completable future which resolves when the file was uploaded
    */
@@ -108,6 +112,7 @@ public class ExpertAdvisor {
   
   /**
    * Removes expert advisor
+   * (see https://metaapi.cloud/docs/provisioning/api/expertAdvisor/deleteExpertAdvisor/)
    * @return completable future resolving when expert advisor removed
    */
   public CompletableFuture<Void> remove() {
