@@ -97,7 +97,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   private SynchronizationThrottler.Options synchronizationThrottlerOpts;
   private SubscriptionManager subscriptionManager;
   private Map<String, Timer> statusTimers = new HashMap<>();
-  private Map<String, List<CompletableFuture<Void>>> eventQueues = new HashMap<>();
+  private Map<String, List<Supplier<CompletableFuture<Void>>>> eventQueues = new HashMap<>();
   private SubscribeLock subscribeLock;
   private PacketOrderer packetOrderer;
   private PacketLogger packetLogger;
@@ -1326,8 +1326,14 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     String accountId = packet.get("accountId").asText();
     List<JsonNode> packets = packetOrderer.restoreOrder(packet);
     if (sequentialEventProcessing) {
-      List<CompletableFuture<Void>> events = packets.stream().map(packetItem ->
-        processSynchronizationPacket(packetItem)).collect(Collectors.toList());
+      List<Supplier<CompletableFuture<Void>>> events = packets.stream().map(packetItem -> {
+        return new Supplier<CompletableFuture<Void>>() {
+          @Override
+          public CompletableFuture<Void> get() {
+            return processSynchronizationPacket(packetItem);
+          }
+        };
+      }).collect(Collectors.toList());
       if (!eventQueues.containsKey(accountId)) {
         eventQueues.put(accountId, new ArrayList<>(events));
         callAccountEvents(accountId);
@@ -1344,16 +1350,18 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @param accountId account id
    * @param event event to execute
    */
-  public void queueEvent(String accountId, CompletableFuture<Void> event) {
+  public void queueEvent(String accountId, Supplier<CompletableFuture<Void>> event) {
     if (sequentialEventProcessing) {
       if (!eventQueues.containsKey(accountId)) {
-        List<CompletableFuture<Void>> events = new ArrayList<>();
+        List<Supplier<CompletableFuture<Void>>> events = new ArrayList<>();
         events.add(event);
         eventQueues.put(accountId, events);
         callAccountEvents(accountId);
       } else {
         eventQueues.get(accountId).add(event);
       }
+    } else {
+      event.get();
     }
   }
   
@@ -1361,7 +1369,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     return CompletableFuture.runAsync(() -> {
       if (eventQueues.containsKey(accountId)) {
         while (eventQueues.get(accountId).size() > 0) {
-          eventQueues.get(accountId).get(0).join();
+          eventQueues.get(accountId).get(0).get().join();
           eventQueues.get(accountId).remove(0);
         }
         eventQueues.remove(accountId);
@@ -1633,7 +1641,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
             if (isOnlyActiveInstance.get()) {
               subscriptionManager.onTimeout(accountId, instanceNumber);
             }
-            queueEvent(accountId, onDisconnected.apply(true));
+            queueEvent(accountId, () -> onDisconnected.apply(true));
           }, resetDisconnectTimerTimeout));
         };
         
@@ -2096,7 +2104,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
       packetOrderer.onReconnected(reconnectAccountIds);
 
       for (ReconnectListenerItem listener : reconnectListeners) {
-        queueEvent(listener.accountId, listener.listener.onReconnected().exceptionally(err -> {
+        queueEvent(listener.accountId, () -> listener.listener.onReconnected().exceptionally(err -> {
           logger.error("[" + new IsoTime() + "] Failed to notify reconnect listener", err);
           return null;
         }));

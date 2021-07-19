@@ -1,5 +1,6 @@
 package cloud.metaapi.sdk.util;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +25,7 @@ public class Js {
    */
   public static <U, T> U reduce(List<T> list, BiFunction<U, T, U> reducer, U initialValue) {
     U result = initialValue;
-    for (T item : list) {
+    for (T item : new ArrayList<>(list)) {
       result = reducer.apply(result, item);
     }
     return result;

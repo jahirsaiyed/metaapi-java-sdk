@@ -165,9 +165,9 @@ class SubscriptionManagerTest {
       Pair.of("accountId", 0), Pair.of("accountId2", 0), Pair.of("accountId3", 0)
     ));
     manager.subscribe("accountId", null, false);
-    Thread.sleep(50);
+    Thread.sleep(100);
     manager.subscribe("accountId2", null, false);
-    Thread.sleep(50);
+    Thread.sleep(100);
     manager.subscribe("accountId3", null, false);
     Thread.sleep(2000);
     manager.onReconnected(0, Arrays.asList("accountId", "accountId2"));

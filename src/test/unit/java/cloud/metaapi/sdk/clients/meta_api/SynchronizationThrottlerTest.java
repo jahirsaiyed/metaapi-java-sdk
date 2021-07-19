@@ -136,6 +136,7 @@ class SynchronizationThrottlerTest {
     throttler.scheduleSynchronize("accountId1", provideRequest("test1")).join();
     throttler.scheduleSynchronize("accountId2", provideRequest("test2")).join();
     throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
+    Thread.sleep(50);
     throttler.scheduleSynchronize("accountId4", provideRequest("test4"));
     Thread.sleep(50);
     Mockito.verify(websocketClient, Mockito.times(2)).rpcRequest(Mockito.anyString(), Mockito.any(), Mockito.any());
@@ -241,19 +242,19 @@ class SynchronizationThrottlerTest {
     throttler.scheduleSynchronize("accountId1", provideRequest("test1")).join();
     throttler.scheduleSynchronize("accountId2", provideRequest("test2")).join();
     throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
-    Thread.sleep(20);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId3", provideRequest("test4", 0));
-    Thread.sleep(20);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId4", provideRequest("test5"));
-    Thread.sleep(20);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId3", provideRequest("test6"));
-    Thread.sleep(20);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId4", provideRequest("test7"));
-    Thread.sleep(20);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId3", provideRequest("test8"));
-    Thread.sleep(20);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId5", provideRequest("test9"));
-    Thread.sleep(20);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId3", provideRequest("test10", 0));
     for (int i = 0; i < 8; ++i) {
       tick(6625);
@@ -333,13 +334,13 @@ class SynchronizationThrottlerTest {
   @Test
   void testDoesNotSkipQueueItemsWhenSynchronizationIdIsRemoved() throws Exception {
     throttler.scheduleSynchronize("accountId1", provideRequest("test1"));
-    Thread.sleep(50);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId2", provideRequest("test2"));
-    Thread.sleep(50);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId3", provideRequest("test3"));
-    Thread.sleep(50);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId4", provideRequest("test4"));
-    Thread.sleep(50);
+    Thread.sleep(200);
     throttler.scheduleSynchronize("accountId5", provideRequest("test5"));
     Thread.sleep(3000);
     throttler.removeSynchronizationId("test3");

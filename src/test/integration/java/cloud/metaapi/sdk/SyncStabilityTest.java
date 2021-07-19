@@ -678,13 +678,15 @@ class SyncStabilityTest {
     Thread.sleep(50);
     fakeServer.enableSync(server);
     server.socket.disconnect();
-    Thread.sleep(7000);
+    Thread.sleep(8000);
     Thread.sleep(50);
     assertFalse(connection.isSynchronized());
-    assertTrue(connection2.isSynchronized() && connection2.getTerminalState().isConnected()
-      && connection2.getTerminalState().isConnectedToBroker());
-    assertTrue(connection2.isSynchronized() && connection2.getTerminalState().isConnected()
-      && connection2.getTerminalState().isConnectedToBroker());
+    assertTrue(connection2.isSynchronized());
+    assertTrue(connection2.getTerminalState().isConnected());
+    assertTrue(connection2.getTerminalState().isConnectedToBroker());
+    assertTrue(connection3.isSynchronized());
+    assertTrue(connection3.getTerminalState().isConnected());
+    assertTrue(connection3.getTerminalState().isConnectedToBroker());
   };
   
   @ParameterizedTest

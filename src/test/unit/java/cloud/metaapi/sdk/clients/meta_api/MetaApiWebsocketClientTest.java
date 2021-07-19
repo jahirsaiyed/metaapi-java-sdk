@@ -2686,7 +2686,6 @@ class MetaApiWebsocketClientTest {
   
   /**
    * Tests {@link MetaApiWebsocketClient#rpcRequest}
-   * @throws InterruptedException 
    */
   @Test
   void testRemovesReconnectListener() throws InterruptedException {
@@ -2739,6 +2738,94 @@ class MetaApiWebsocketClientTest {
     Mockito.verify(listener, Mockito.times(1)).onReconnected();
     assertEquals(2, requestCounter);
   };
+  
+  long ordersCallTime;
+  long positionsCallTime;
+  long disconnectedCallTime;
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#queuePacket}
+   */
+  @Test
+  void testProcessesPacketsInOrder() throws Exception {
+    MetaApiWebsocketClient.resetDisconnectTimerTimeout = 7500;
+    ordersCallTime = 0;
+    positionsCallTime = 0;
+    disconnectedCallTime = 0;
+    SynchronizationListener listener = new SynchronizationListener() {
+      @Override
+      public CompletableFuture<Void> onDisconnected(String instanceIndex) {
+        return CompletableFuture.runAsync(() -> {
+          System.out.println("onDisconnected");
+          Js.sleep(625);
+          disconnectedCallTime = Date.from(Instant.now()).getTime();
+        });
+      }
+      @Override
+      public CompletableFuture<Void> onOrdersReplaced(String instanceIndex, List<MetatraderOrder> orders) {
+        return CompletableFuture.runAsync(() -> {
+          System.out.println("onOrdersReplaced");
+          Js.sleep(1250);
+          ordersCallTime = Date.from(Instant.now()).getTime();
+        });
+      }
+      @Override
+      public CompletableFuture<Void> onPositionsReplaced(String instanceIndex, List<MetatraderPosition> positions) {
+        return CompletableFuture.runAsync(() -> {
+          System.out.println("onPositionsReplaced");
+          Js.sleep(125);
+          positionsCallTime = Date.from(Instant.now()).getTime();
+        });
+      }
+    };
+    client.close();
+    socket.disconnect();
+    Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any())).thenReturn(CompletableFuture
+      .completedFuture(new MetaApiWebsocketClient.ServerUrl() {{url = "http://localhost:6784";}}));
+    client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+      application = "application";
+      domain = "project-stock.agiliumlabs.cloud";
+      requestTimeout = 6000L;
+      connectTimeout = 6000L;
+      useSharedClientApi = false;
+      retryOpts = new RetryOptions() {{retries = 3; minDelayInSeconds = 1; maxDelayInSeconds = 3;}};
+      eventProcessing = new MetaApiWebsocketClient.EventProcessingOptions() {{sequentialProcessing = true;}};
+    }});
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (  request.get("type").asText().equals("getPositions")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("application").asText().equals("RPC")
+        ) {
+          ObjectNode response = jsonMapper.createObjectNode();
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("positions", jsonMapper.valueToTree(Arrays.asList()));
+          client.sendEvent("response", response.toString());
+        }
+      }
+    });
+    client.getPositions("accountId").join();
+    client.addSynchronizationListener("accountId", listener);
+    socket.sendEvent("synchronization", Js.asJson("type", "authenticated",  "accountId", "accountId", 
+      "host", "ps-mpa-1", "instanceIndex", 1, "replicas", 2).toString());
+    Thread.sleep(50);
+    Thread.sleep(7375);
+    socket.sendEvent("synchronization", Js.asJson("type", "orders", "accountId", "accountId",
+      "orders", Arrays.asList(), "instanceIndex", 1, "host", "ps-mpa-1").toString());
+    Thread.sleep(50);
+    Thread.sleep(375);
+    socket.sendEvent("synchronization", Js.asJson("type", "positions", "accountId", "accountId",
+      "positions", Arrays.asList(), "instanceIndex", 1, "host", "ps-mpa-1").toString());
+    Thread.sleep(50);
+    Thread.sleep(2500);
+    Thread.sleep(50);
+    assertTrue(disconnectedCallTime > ordersCallTime);
+    assertTrue(positionsCallTime > disconnectedCallTime);
+  }
   
   private static Stream<Arguments> provideAccountInformation() throws Exception {
     MetatraderAccountInformation accountInformation = new MetatraderAccountInformation();
