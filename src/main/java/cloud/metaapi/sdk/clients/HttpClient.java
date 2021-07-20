@@ -171,7 +171,7 @@ public class HttpClient {
         if (Arrays.asList(ConflictException.class, InternalException.class, ApiException.class)
           .indexOf(error.getClass()) != - 1 && retryCounter < retries) {
           int pause = (int) Math.min(Math.pow(2, retryCounter) * minRetryDelay, maxRetryDelay);
-            Thread.sleep(pause);
+          Thread.sleep(pause);
           return retryCounter + 1;
         } else if (error instanceof TooManyRequestsException) {
           long retryTime = ((TooManyRequestsException) error).metadata.recommendedRetryTime
@@ -199,8 +199,9 @@ public class HttpClient {
       try {
         HttpRequest<?> request = null;
         
-        if (options.getMethod() == HttpRequestOptions.Method.GET) request = Unirest.get(options.getUrl());
-        else {
+        if (options.getMethod() == HttpRequestOptions.Method.GET) {
+          request = Unirest.get(options.getUrl());
+        } else {
           HttpRequestWithBody bodyRequest = null;
           switch (options.getMethod()) {
             case POST: bodyRequest = Unirest.post(options.getUrl()); break;

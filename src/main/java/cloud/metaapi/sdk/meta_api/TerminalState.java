@@ -230,7 +230,7 @@ public class TerminalState extends SynchronizationListener {
   public CompletableFuture<Void> onPositionRemoved(String instanceIndex, String positionId) {
     State state = getState(instanceIndex);
     Optional<MetatraderPosition> position = state.positions.stream()
-      .filter(p -> !p.id.equals(positionId)).findFirst();
+      .filter(p -> p.id.equals(positionId)).findFirst();
     if (!position.isPresent()) {
       for (Entry<String, Date> e : state.removedPositions.entrySet()) {
         if (e.getValue().getTime() + 5 * 60 * 1000 < Date.from(Instant.now()).getTime()) {
