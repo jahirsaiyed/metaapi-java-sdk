@@ -219,6 +219,11 @@
       <artifactId>java-dotenv</artifactId>
       <version>5.2.2</version>
     </dependency>
+    <dependency> 
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <version>1.7.31</version>
+    </dependency>
     <dependency>
       <groupId>cloud.metaapi.sdk</groupId>
       <artifactId>copyfactory-java-sdk</artifactId>
