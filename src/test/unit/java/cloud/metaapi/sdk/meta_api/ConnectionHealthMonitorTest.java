@@ -114,31 +114,31 @@ class ConnectionHealthMonitorTest {
   void testChecksConnectionForDowntime() throws InterruptedException {
     healthMonitor.onSymbolPriceUpdated("ps-mpa-1", prices[0]).join();
     sleepIntervals(4);
-    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(100, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(100, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(100, Assertions.within(2.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(100, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(100, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(100, Assertions.within(10.0));
     Mockito.when(connection.getTerminalState().isConnected()).thenReturn(false);
     sleepIntervals(4);
-    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(50, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(50, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(50, Assertions.within(2.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(50, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(50, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(50, Assertions.within(10.0));
     Mockito.when(connection.getTerminalState().isConnected()).thenReturn(true);
     Mockito.when(connection.getTerminalState().isConnectedToBroker()).thenReturn(false);
     sleepIntervals(8);
-    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(25, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(25, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(25, Assertions.within(2.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(25, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(25, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(25, Assertions.within(10.0));
     Mockito.when(connection.getTerminalState().isConnectedToBroker()).thenReturn(true);
     Mockito.when(connection.isSynchronized()).thenReturn(false);
     sleepIntervals(4);
-    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(20, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(20, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(20, Assertions.within(2.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(20, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(20, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(20, Assertions.within(10.0));
     Mockito.when(connection.isSynchronized()).thenReturn(true);
     sleepIntervals(12);
-    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(50, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(50, Assertions.within(2.0));
-    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(50, Assertions.within(2.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1h")).isCloseTo(50, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1d")).isCloseTo(50, Assertions.within(10.0));
+    Assertions.assertThat(healthMonitor.getUptime().get("1w")).isCloseTo(50, Assertions.within(10.0));
   }
   
   /**
