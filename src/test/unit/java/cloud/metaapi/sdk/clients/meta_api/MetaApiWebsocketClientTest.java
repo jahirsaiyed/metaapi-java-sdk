@@ -1556,13 +1556,14 @@ class MetaApiWebsocketClientTest {
     authPacket.put("host", "ps-mpa-1");
     authPacket.put("instanceIndex", 1);
     socket.sendEvent("synchronization", authPacket.toString());
+    Thread.sleep(400);
     ObjectNode disconnectPacket = jsonMapper.createObjectNode();
     disconnectPacket.put("type", "disconnected");
     disconnectPacket.put("accountId", "accountId");
     disconnectPacket.put("host", "ps-mpa-1");
     disconnectPacket.put("instanceIndex", 1);
     socket.sendEvent("synchronization", disconnectPacket.toString());
-    Thread.sleep(800);
+    Thread.sleep(400);
     Mockito.verify(listener).onDisconnected("1:ps-mpa-1");
   }
   
@@ -1578,8 +1579,10 @@ class MetaApiWebsocketClientTest {
     client.addSynchronizationListener("accountId", listener);
     socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "authenticated",
       "accountId", "accountId", "host", "ps-mpa-1", "instanceIndex", 1, "replicas", 2)));
+    Thread.sleep(200);
     socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "authenticated",
       "accountId", "accountId", "host", "ps-mpa-2", "instanceIndex", 1, "replicas", 2)));
+    Thread.sleep(200);
     socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
       "accountId", "accountId", "host", "ps-mpa-1", "instanceIndex", 1)));
     Thread.sleep(200);
