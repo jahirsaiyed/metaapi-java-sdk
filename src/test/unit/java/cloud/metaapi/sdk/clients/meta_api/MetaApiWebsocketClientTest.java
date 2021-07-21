@@ -1562,7 +1562,7 @@ class MetaApiWebsocketClientTest {
     disconnectPacket.put("host", "ps-mpa-1");
     disconnectPacket.put("instanceIndex", 1);
     socket.sendEvent("synchronization", disconnectPacket.toString());
-    Thread.sleep(400);
+    Thread.sleep(800);
     Mockito.verify(listener).onDisconnected("1:ps-mpa-1");
   }
   
@@ -1582,13 +1582,13 @@ class MetaApiWebsocketClientTest {
       "accountId", "accountId", "host", "ps-mpa-2", "instanceIndex", 1, "replicas", 2)));
     socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
       "accountId", "accountId", "host", "ps-mpa-1", "instanceIndex", 1)));
-    Thread.sleep(50);
+    Thread.sleep(200);
     Mockito.verify(listener).onStreamClosed("1:ps-mpa-1");
     Mockito.verify(listener, Mockito.never()).onDisconnected(Mockito.anyString());
     Mockito.verify(clientSubscriptionManager, Mockito.never()).onDisconnected(Mockito.anyString(), Mockito.anyInt());
     socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
       "accountId", "accountId", "host", "ps-mpa-2", "instanceIndex", 1)));
-    Thread.sleep(50);
+    Thread.sleep(200);
     Mockito.verify(listener).onDisconnected(Mockito.anyString());
     Mockito.verify(clientSubscriptionManager).onDisconnected("accountId", 1);
   };
