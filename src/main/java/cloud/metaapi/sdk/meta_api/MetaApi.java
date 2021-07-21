@@ -2,13 +2,17 @@ package cloud.metaapi.sdk.meta_api;
 
 import java.io.IOException;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.HttpClient;
+import cloud.metaapi.sdk.clients.OptionsValidator;
 import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.error_handler.ValidationException;
+import cloud.metaapi.sdk.clients.meta_api.HistoricalMarketDataClient;
 import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
+import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient.EventProcessingOptions;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderDemoAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
@@ -19,7 +23,7 @@ import cloud.metaapi.sdk.clients.meta_api.SynchronizationThrottler;
  */
 public class MetaApi {
   
-  private static Logger logger = Logger.getLogger(MetaApi.class);
+  private static Logger logger = LogManager.getLogger(MetaApi.class);
   private MetaApiWebsocketClient metaApiWebsocketClient;
   private ProvisioningProfileApi provisioningProfileApi;
   private MetatraderAccountApi metatraderAccountApi;
@@ -71,6 +75,22 @@ public class MetaApi {
      * Retry options
      */
     public RetryOptions retryOpts = new RetryOptions();
+    /**
+     * Historical market data request timeout in seconds. By default is {@code 1 minute}
+     */
+    public int historicalMarketDataRequestTimeout = 60;
+    /**
+     * Demo account request timeout in seconds. By default is {@code 4 minutes}
+     */
+    public int demoAccountRequestTimeout = 240;
+    /**
+     * Options for processing websocket client events
+     */
+    public EventProcessingOptions eventProcessing = new EventProcessingOptions();
+    /**
+     * Option to use a shared server
+     */
+    public boolean useSharedClientApi = false;
   }
   
   /**
@@ -138,11 +158,25 @@ public class MetaApi {
   }
   
   private void initialize(String token, Options opts) throws ValidationException, IOException {
-    if (opts == null) opts = new Options();
+    if (opts == null) {
+      opts = new Options();
+    }
+    
     if (!opts.application.matches("[a-zA-Z0-9_]+")) {
       throw new ValidationException("Application name must be non-empty string consisting from letters, digits and _ only", null);
     }
+    OptionsValidator validator = new OptionsValidator();
+    validator.validateNonZeroInt(opts.requestTimeout, "requestTimeout");
+    validator.validateNonZeroInt(opts.historicalMarketDataRequestTimeout, "historicalMarketDataRequestTimeout");
+    validator.validateNonZeroInt(opts.connectTimeout, "connectTimeout");
+    validator.validateNonZeroInt(opts.packetOrderingTimeout, "packetOrderingTimeout");
+    validator.validateNonZeroInt(opts.demoAccountRequestTimeout, "demoAccountRequestTimeout");
+    
     HttpClient httpClient = new HttpClient(opts.requestTimeout * 1000, opts.connectTimeout * 1000, opts.retryOpts);
+    HttpClient historicalMarketDataHttpClient = new HttpClient(opts.historicalMarketDataRequestTimeout * 1000,
+      opts.connectTimeout * 1000, opts.retryOpts);
+    HttpClient demoAccountHttpClient = new HttpClient(opts.demoAccountRequestTimeout * 1000,
+      opts.connectTimeout * 1000, opts.retryOpts);
     MetaApiWebsocketClient.ClientOptions websocketOptions = new MetaApiWebsocketClient.ClientOptions();
     websocketOptions.application = opts.application;
     websocketOptions.domain = opts.domain;
@@ -152,13 +186,18 @@ public class MetaApi {
     websocketOptions.packetLogger = opts.packetLogger;
     websocketOptions.synchronizationThrottler = opts.synchronizationThrottler;
     websocketOptions.retryOpts = opts.retryOpts;
-    metaApiWebsocketClient = new MetaApiWebsocketClient(token, websocketOptions);
+    websocketOptions.eventProcessing = opts.eventProcessing;
+    websocketOptions.useSharedClientApi = opts.useSharedClientApi;
+    metaApiWebsocketClient = new MetaApiWebsocketClient(httpClient, token, websocketOptions);
     provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, opts.domain));
     connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, opts.application);
+    HistoricalMarketDataClient historicalMarketDataClient = new HistoricalMarketDataClient(
+      historicalMarketDataHttpClient, token, opts.domain);
     metatraderAccountApi = new MetatraderAccountApi(new MetatraderAccountClient(httpClient, token, opts.domain),
-      metaApiWebsocketClient, connectionRegistry, new ExpertAdvisorClient(httpClient, token, opts.domain));
+      metaApiWebsocketClient, connectionRegistry, new ExpertAdvisorClient(httpClient, token, opts.domain),
+        historicalMarketDataClient);
     metatraderDemoAccountApi = new MetatraderDemoAccountApi(
-      new MetatraderDemoAccountClient(httpClient, token, opts.domain));
+      new MetatraderDemoAccountClient(demoAccountHttpClient, token, opts.domain));
     if (opts.enableLatencyMonitor) {
       latencyMonitor = new LatencyMonitor();
       metaApiWebsocketClient.addLatencyListener(latencyMonitor);

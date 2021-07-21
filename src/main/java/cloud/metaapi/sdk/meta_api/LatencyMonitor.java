@@ -8,7 +8,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.meta_api.LatencyListener;
 import cloud.metaapi.sdk.meta_api.reservoir.Reservoir;
@@ -131,7 +132,7 @@ public class LatencyMonitor extends LatencyListener {
     }
   }
   
-  private static Logger logger = Logger.getLogger(LatencyMonitor.class);
+  private static Logger logger = LogManager.getLogger(LatencyMonitor.class);
   private MapReservoirs<MapReservoirs<MonitorReservoir>> tradeReservoirs;
   private MapReservoirs<MapReservoirs<MonitorReservoir>> updateReservoirs;
   private MapReservoirs<MapReservoirs<MonitorReservoir>> priceReservoirs;

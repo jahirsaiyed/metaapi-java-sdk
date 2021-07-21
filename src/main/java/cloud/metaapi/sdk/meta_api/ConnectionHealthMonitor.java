@@ -13,10 +13,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
 import cloud.metaapi.sdk.clients.meta_api.models.ConnectionHealthStatus;
@@ -25,6 +25,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSessions;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolPrice;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderSymbolSpecification;
 import cloud.metaapi.sdk.meta_api.reservoir.Reservoir;
+import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
 /**
@@ -32,16 +33,16 @@ import cloud.metaapi.sdk.util.ServiceProvider;
  */
 public class ConnectionHealthMonitor extends SynchronizationListener {
 
-  protected static int measureInterval = 1000;
+  protected static int minMeasureInterval = 1000;
   protected static int minQuoteInterval = 60000;
-  private static Logger logger = Logger.getLogger(ConnectionHealthMonitor.class);
+  private static Logger logger = LogManager.getLogger(ConnectionHealthMonitor.class);
   private MetaApiConnection connection;
   private Map<String, Reservoir> uptimeReservoirs;
   private Date priceUpdatedAt;
   private long offset;
   private boolean quotesHealthy = false;
   private Timer updateMeasurementsInterval;
-  private Map<Integer, HealthStatus> serverHealthStatus;
+  private Map<String, HealthStatus> serverHealthStatus = new HashMap<>();
   
   /**
    * Constructs the listener
@@ -50,20 +51,18 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   public ConnectionHealthMonitor(MetaApiConnection connection) {
     super();
     this.connection = connection;
-    ConnectionHealthMonitor self = this;
-    this.updateMeasurementsInterval = new Timer();
-    this.updateMeasurementsInterval.schedule(new TimerTask() {
-      @Override
-      public void run() {
-        self.updateQuoteHealthStatus();
-        self.measureUptime();
-      }
-    }, measureInterval, measureInterval);
+    this.updateMeasurementsInterval = Js.setTimeout(() -> updateMeasurements(), getRandomTimeout());
     this.uptimeReservoirs = new HashMap<>();
     this.uptimeReservoirs.put("5m", new Reservoir(300, 5 * 60 * 1000));
     this.uptimeReservoirs.put("1h", new Reservoir(600, 60 * 60 * 1000));
     this.uptimeReservoirs.put("1d", new Reservoir(24 * 60, 24 * 60 * 60 * 1000));
     this.uptimeReservoirs.put("1w", new Reservoir(24 * 7, 7 * 24 * 60 * 60 * 1000));
+  }
+  
+  private void updateMeasurements() {
+    updateQuoteHealthStatus();
+    measureUptime();
+    updateMeasurementsInterval = Js.setTimeout(() -> updateMeasurements(), getRandomTimeout());
   }
   
   /**
@@ -74,7 +73,7 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   }
   
   @Override
-  public CompletableFuture<Void> onSymbolPriceUpdated(int instanceIndex, MetatraderSymbolPrice price) {
+  public CompletableFuture<Void> onSymbolPriceUpdated(String instanceIndex, MetatraderSymbolPrice price) {
     try {
       SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
       long brokerTimestamp = formatter.parse(price.brokerTime).getTime();
@@ -89,13 +88,13 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   }
   
   @Override
-  public CompletableFuture<Void> onHealthStatus(int instanceIndex, HealthStatus status) {
+  public CompletableFuture<Void> onHealthStatus(String instanceIndex, HealthStatus status) {
     serverHealthStatus.put(instanceIndex, status);
     return CompletableFuture.completedFuture(null);
   }
   
   @Override
-  public CompletableFuture<Void> onDisconnected(int instanceIndex) {
+  public CompletableFuture<Void> onDisconnected(String instanceIndex) {
     serverHealthStatus.remove(instanceIndex);
     return CompletableFuture.completedFuture(null);
   }
@@ -247,5 +246,9 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
         break;
     }
     return result != null ? result : new ArrayList<>();
+  }
+  
+  protected int getRandomTimeout() {
+    return (int) (ServiceProvider.getRandom() * 59 * 1000 + minMeasureInterval);
   }
 }

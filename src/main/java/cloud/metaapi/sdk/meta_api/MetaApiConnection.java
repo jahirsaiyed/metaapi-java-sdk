@@ -9,14 +9,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
@@ -26,7 +25,6 @@ import cloud.metaapi.sdk.clients.meta_api.TradeException;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketDataSubscription;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketDataUnsubscription;
 import cloud.metaapi.sdk.clients.meta_api.models.MarketTradeOptions;
-import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountInformation;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderBook;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderCandle;
@@ -40,16 +38,18 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.meta_api.models.PendingTradeOptions;
+import cloud.metaapi.sdk.clients.meta_api.models.StopOptions;
 import cloud.metaapi.sdk.clients.meta_api.models.SynchronizationOptions;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade.ActionType;
 import cloud.metaapi.sdk.clients.models.*;
+import cloud.metaapi.sdk.util.Js;
 
 /**
  * Exposes MetaApi MetaTrader API connection to consumers
  */
 public class MetaApiConnection extends SynchronizationListener implements ReconnectListener {
 
-  private static Logger logger = Logger.getLogger(MetaApiConnection.class);
+  private static Logger logger = LogManager.getLogger(MetaApiConnection.class);
   private MetaApiWebsocketClient websocketClient;
   private MetatraderAccount account;
   private ConnectionRegistry connectionRegistry;
@@ -58,17 +58,12 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   private HistoryStorage historyStorage;
   private ConnectionHealthMonitor healthMonitor;
   private Map<String, Subscriptions> subscriptions = new HashMap<>();
-  private Map<Integer, State> stateByInstanceIndex = new HashMap<>();
-  private boolean isSynchronized = false;
-  private boolean shouldRetrySubscribe = false;
-  private boolean isSubscribing = false;
-  private Timer subscribeTask = null;
-  private CompletableFuture<Boolean> subscribeFuture = null;
-  private long lastAccountReloadTime = 0;
+  private Map<String, State> stateByInstanceIndex = new HashMap<>();
+  private List<SynchronizationListener> synchronizationListeners = new ArrayList<>(); 
   private boolean closed = false;
 
   private static class State {
-    public int instanceIndex;
+    public String instanceIndex;
     public Set<String> ordersSynchronized = new HashSet<>();
     public Set<String> dealsSynchronized = new HashSet<>();
     public String shouldSynchronize = "";
@@ -128,7 +123,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     websocketClient.addSynchronizationListener(account.getId(), this.terminalState);
     websocketClient.addSynchronizationListener(account.getId(), this.historyStorage);
     websocketClient.addSynchronizationListener(account.getId(), this.healthMonitor);
-    websocketClient.addReconnectListener(this);
+    websocketClient.addReconnectListener(this, account.getId());
   }
   
   /**
@@ -288,15 +283,33 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createMarketBuyOrder(
-    String symbol, double volume, Double stopLoss, Double takeProfit, MarketTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createMarketBuyOrder(String symbol,
+    double volume, Double stopLoss, Double takeProfit, MarketTradeOptions options) {
+    return createMarketBuyOrder(symbol, volume, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a market buy order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createMarketBuyOrder(String symbol,
+    double volume, StopOptions stopLoss, StopOptions takeProfit, MarketTradeOptions options) {
+    return createMarketBuyOrder(symbol, volume, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createMarketBuyOrder(String symbol,
+    double volume, Object stopLoss, Object takeProfit, MarketTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_BUY;
     trade.symbol = symbol;
     trade.volume = volume;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -311,15 +324,33 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createMarketSellOrder(
-    String symbol, double volume, Double stopLoss, Double takeProfit, MarketTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createMarketSellOrder(String symbol,
+    double volume, Double stopLoss, Double takeProfit, MarketTradeOptions options) {
+    return createMarketSellOrder(symbol, volume, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a market sell order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createMarketSellOrder(String symbol,
+    double volume, StopOptions stopLoss, StopOptions takeProfit, MarketTradeOptions options) {
+    return createMarketSellOrder(symbol, volume, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createMarketSellOrder(String symbol,
+    double volume, Object stopLoss, Object takeProfit, MarketTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_SELL;
     trade.symbol = symbol;
     trade.volume = volume;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -335,17 +366,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createLimitBuyOrder(
-    String symbol, double volume, double openPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createLimitBuyOrder(String symbol, double volume,
+    double openPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createLimitBuyOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a limit buy order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order limit price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createLimitBuyOrder(String symbol, double volume,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createLimitBuyOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createLimitBuyOrder(String symbol, double volume,
+    double openPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_BUY_LIMIT;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -361,17 +410,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createLimitSellOrder(
-    String symbol, double volume, double openPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createLimitSellOrder(String symbol, double volume,
+    double openPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createLimitSellOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a limit sell order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order limit price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createLimitSellOrder(String symbol, double volume,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createLimitSellOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createLimitSellOrder(String symbol, double volume,
+    double openPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_SELL_LIMIT;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -387,17 +454,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createStopBuyOrder(
-    String symbol, double volume, double openPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createStopBuyOrder(String symbol, double volume,
+    double openPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createStopBuyOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a stop buy order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order stop price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createStopBuyOrder(String symbol, double volume,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createStopBuyOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createStopBuyOrder(String symbol, double volume,
+    double openPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_BUY_STOP;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -413,17 +498,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally
    * with {@link TradeException}, check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createStopSellOrder(
-    String symbol, double volume, double openPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createStopSellOrder(String symbol, double volume,
+    double openPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createStopSellOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a stop sell order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order stop price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @param options optional trade options or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally
+   * with {@link TradeException}, check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createStopSellOrder(String symbol, double volume,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createStopSellOrder(symbol, volume, openPrice, (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createStopSellOrder(String symbol, double volume,
+    double openPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_SELL_STOP;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -440,18 +543,39 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally
    * with {@link TradeException}, check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createStopLimitBuyOrder(
-    String symbol, double volume, double openPrice, double stopLimitPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createStopLimitBuyOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createStopLimitBuyOrder(symbol, volume, openPrice, stopLimitPrice,
+      (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a stop limit buy order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order stop price
+   * @param stopLimitPrice the limit order price for the stop limit order
+   * @param stopLoss stop loss price, or {@code null}
+   * @param takeProfit take profit price, or {@code null}
+   * @param options trade options, or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally
+   * with {@link TradeException}, check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createStopLimitBuyOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createStopLimitBuyOrder(symbol, volume, openPrice, stopLimitPrice,
+      (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createStopLimitBuyOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_BUY_STOP_LIMIT;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
     trade.stopLimitPrice = stopLimitPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -468,18 +592,39 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally
    * with {@link TradeException}, check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> createStopLimitSellOrder(
-    String symbol, double volume, double openPrice, double stopLimitPrice,
-    Double stopLoss, Double takeProfit, PendingTradeOptions options
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> createStopLimitSellOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, Double stopLoss, Double takeProfit, PendingTradeOptions options) {
+    return createStopLimitSellOrder(symbol, volume, openPrice, stopLimitPrice,
+      (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  /**
+   * Creates a stop limit sell order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param symbol symbol to trade
+   * @param volume order volume
+   * @param openPrice order stop price
+   * @param stopLimitPrice the limit order price for the stop limit order
+   * @param stopLoss stop loss price, or {@code null}
+   * @param takeProfit take profit price, or {@code null}
+   * @param options trade options, or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally
+   * with {@link TradeException}, check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> createStopLimitSellOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, StopOptions stopLoss, StopOptions takeProfit, PendingTradeOptions options) {
+    return createStopLimitSellOrder(symbol, volume, openPrice, stopLimitPrice,
+      (Object) stopLoss, (Object) takeProfit, options);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> createStopLimitSellOrder(String symbol, double volume,
+    double openPrice, double stopLimitPrice, Object stopLoss, Object takeProfit, PendingTradeOptions options) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_TYPE_SELL_STOP_LIMIT;
     trade.symbol = symbol;
     trade.volume = volume;
     trade.openPrice = openPrice;
     trade.stopLimitPrice = stopLimitPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     if (options != null) copyModelProperties(options, trade);
     return websocketClient.trade(account.getId(), trade);
   }
@@ -493,13 +638,29 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * check error properties for error code details
    */
   public CompletableFuture<MetatraderTradeResponse> modifyPosition(
-    String positionId, Double stopLoss, Double takeProfit
-  ) {
+    String positionId, Double stopLoss, Double takeProfit) {
+    return modifyPosition(positionId, (Object) stopLoss, (Object) takeProfit);
+  }
+  
+  /**
+   * Modifies a position (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param positionId position id to modify
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> modifyPosition(
+    String positionId, StopOptions stopLoss, StopOptions takeProfit) {
+    return modifyPosition(positionId, (Object) stopLoss, (Object) takeProfit);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> modifyPosition(
+    String positionId, Object stopLoss, Object takeProfit) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.POSITION_MODIFY;
     trade.positionId = positionId;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     return websocketClient.trade(account.getId(), trade);
   }
   
@@ -584,15 +745,32 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
    * check error properties for error code details
    */
-  public CompletableFuture<MetatraderTradeResponse> modifyOrder(
-    String orderId, double openPrice, double stopLoss, double takeProfit
-  ) {
+  public CompletableFuture<MetatraderTradeResponse> modifyOrder(String orderId,
+    double openPrice, Double stopLoss, Double takeProfit) {
+    return modifyOrder(orderId, openPrice, (Object) stopLoss, (Object) takeProfit);
+  }
+  
+  /**
+   * Modifies a pending order (see https://metaapi.cloud/docs/client/websocket/api/trade/).
+   * @param orderId order id (ticket number)
+   * @param openPrice order stop price
+   * @param stopLoss optional stop loss price or {@code null}
+   * @param takeProfit optional take profit price or {@code null}
+   * @return completable future resolving with trade result or completing exceptionally with {@link TradeException},
+   * check error properties for error code details
+   */
+  public CompletableFuture<MetatraderTradeResponse> modifyOrder(String orderId,
+    double openPrice, StopOptions stopLoss, StopOptions takeProfit) {
+    return modifyOrder(orderId, openPrice, (Object) stopLoss, (Object) takeProfit);
+  }
+  
+  private CompletableFuture<MetatraderTradeResponse> modifyOrder(String orderId,
+    double openPrice, Object stopLoss, Object takeProfit) {
     MetatraderTrade trade = new MetatraderTrade();
     trade.actionType = ActionType.ORDER_MODIFY;
     trade.orderId = orderId;
     trade.openPrice = openPrice;
-    trade.stopLoss = stopLoss;
-    trade.takeProfit = takeProfit;
+    generateStopOptions(trade, stopLoss, takeProfit);
     return websocketClient.trade(account.getId(), trade);
   }
   
@@ -623,21 +801,23 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @param instanceIndex instance index
    * @return completable future which resolves when synchronization started
    */
-  public CompletableFuture<Void> synchronize(int instanceIndex) {
-    return CompletableFuture.runAsync(() -> {
-      IsoTime lastHistoryOrderTime = historyStorage.getLastHistoryOrderTime(instanceIndex).join();
+  public CompletableFuture<Boolean> synchronize(String instanceIndex) {
+    return CompletableFuture.supplyAsync(() -> {
+      Integer instance = getInstanceNumber(instanceIndex);
+      String host = getHostName(instanceIndex);
+      IsoTime lastHistoryOrderTime = historyStorage.getLastHistoryOrderTime(instance).join();
       IsoTime startingHistoryOrderTime;
       if (historyStartTime == null || lastHistoryOrderTime.getDate().compareTo(historyStartTime.getDate()) > 0) {
         startingHistoryOrderTime = lastHistoryOrderTime;
       } else startingHistoryOrderTime = historyStartTime;
-      IsoTime lastDealTime = historyStorage.getLastDealTime(instanceIndex).join();
+      IsoTime lastDealTime = historyStorage.getLastDealTime(instance).join();
       IsoTime startingDealTime;
       if (historyStartTime == null || lastDealTime.getDate().compareTo(historyStartTime.getDate()) > 0) {
         startingDealTime = lastDealTime;
       } else startingDealTime = historyStartTime;
       String synchronizationId = RandomStringUtils.randomAlphanumeric(32);
       getState(instanceIndex).lastSynchronizationId = synchronizationId;
-      websocketClient.synchronize(account.getId(), instanceIndex, synchronizationId,
+      return websocketClient.synchronize(account.getId(), instance, host, synchronizationId,
         startingHistoryOrderTime, startingDealTime).join();
     });
   }
@@ -655,39 +835,10 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when subscription is initiated
    */
   public CompletableFuture<Void> subscribe() {
-    if (!isSubscribing) {
-      isSubscribing = true;
-      shouldRetrySubscribe = true;
-      return CompletableFuture.runAsync(() -> {
-        int subscribeRetryIntervalInSeconds = 3;
-        while (shouldRetrySubscribe && !closed && account.getState() == DeploymentState.DEPLOYED) {
-          try {
-            websocketClient.subscribe(account.getId()).join();
-          } catch (Throwable error) {
-            //
-          }
-          int retryInterval = subscribeRetryIntervalInSeconds;
-          subscribeRetryIntervalInSeconds = Math.min(subscribeRetryIntervalInSeconds * 2, 300);
-          CompletableFuture<Boolean> subscribeFuture = new CompletableFuture<>();
-          subscribeTask = new Timer();
-          subscribeTask.schedule(new TimerTask() {
-            @Override
-            public void run() {
-              subscribeFuture.complete(true);
-            }
-          }, retryInterval * 1000);
-          this.subscribeFuture = subscribeFuture;
-          boolean result = this.subscribeFuture.join();
-          this.subscribeFuture = null;
-          if (!result) {
-            break;
-          }
-        }
-        isSubscribing = false;
-      });
-    } else {
-      return CompletableFuture.completedFuture(null);
+    if (!closed) {
+      websocketClient.ensureSubscribe(account.getId(), null);
     }
+    return CompletableFuture.completedFuture(null);
   }
   
   /**
@@ -697,7 +848,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when subscription request was processed
    */
   public CompletableFuture<Void> subscribeToMarketData(String symbol) {
-    return subscribeToMarketData(symbol, new ArrayList<>(), 0);
+    return subscribeToMarketData(symbol, new ArrayList<>(), 0, null);
   }
   
   /**
@@ -710,7 +861,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    */
   public CompletableFuture<Void> subscribeToMarketData(String symbol,
     List<MarketDataSubscription> subscriptions) {
-    return subscribeToMarketData(symbol, subscriptions, 0);
+    return subscribeToMarketData(symbol, subscriptions, 0, null);
   }
   
   /**
@@ -723,11 +874,27 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when subscription request was processed
    */
   public CompletableFuture<Void> subscribeToMarketData(String symbol,
-    List<MarketDataSubscription> subscriptions, int instanceIndex) {
+    List<MarketDataSubscription> subscriptions, Integer instanceIndex) {
+    return subscribeToMarketData(symbol, subscriptions, instanceIndex, null); 
+  }
+  
+  /**
+   * Subscribes on market data of specified symbol (see
+   * https://metaapi.cloud/docs/client/websocket/marketDataStreaming/subscribeToMarketData/).
+   * @param symbol symbol (e.g. currency pair or an index)
+   * @param subscriptions array of market data subscription to create or update. Please
+   * note that this feature is not fully implemented on server-side yet
+   * @param instanceIndex instance index
+   * @param timeoutInSeconds timeout to wait for prices in seconds, or {@code null}. Default is 30
+   * @return completable future which resolves when subscription request was processed
+   */
+  public CompletableFuture<Void> subscribeToMarketData(String symbol,
+    List<MarketDataSubscription> subscriptions, Integer instanceIndex, Long timeoutInSeconds) {
     Subscriptions subscriptionsItem = new Subscriptions();
     subscriptionsItem.subscriptions = subscriptions;
     this.subscriptions.put(symbol, subscriptionsItem);
-    return websocketClient.subscribeToMarketData(account.getId(), instanceIndex, symbol, subscriptions);
+    return websocketClient.subscribeToMarketData(account.getId(), instanceIndex, symbol, subscriptions)
+      .thenApply(res -> terminalState.waitForPrice(symbol, timeoutInSeconds)).thenApply(res -> null);
   }
   
   /**
@@ -776,6 +943,35 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     return websocketClient.unsubscribeFromMarketData(account.getId(), instanceIndex, symbol, subscriptions);
   }
   
+  @Override
+  public CompletableFuture<Void> onSubscriptionDowngraded(String instanceIndex, String symbol,
+    List<MarketDataSubscription> updates, List<MarketDataUnsubscription> unsubscriptions) {
+    List<MarketDataSubscription> subscriptions = this.subscriptions.containsKey(symbol)
+        ? this.subscriptions.get(symbol).subscriptions : new ArrayList<>();
+    if (unsubscriptions.size() != 0) {
+      if (subscriptions.size() != 0) {
+        for (MarketDataUnsubscription subscription : unsubscriptions) {
+          subscriptions = subscriptions.stream().filter(s -> s.type.equals(subscription.type))
+            .collect(Collectors.toList());
+        }
+      }
+      unsubscribeFromMarketData(symbol, unsubscriptions);
+    }
+    if (updates.size() != 0) {
+      if (subscriptions.size() != 0) {
+        for (MarketDataSubscription subscription : updates) {
+          subscriptions.stream().filter(s -> s.type.equals(subscription.type))
+            .forEach(s -> s.intervalInMilliseconds = subscription.intervalInMilliseconds);
+        }
+      }
+      subscribeToMarketData(symbol, updates);
+    }
+    if (subscriptions.size() != 0) {
+      this.subscriptions.remove(symbol);
+    }
+    return CompletableFuture.completedFuture(null);
+  }
+  
   /**
    * Returns list of the symbols connection is subscribed to
    * @return list of the symbols connection is subscribed to
@@ -795,6 +991,15 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     } else {
       return null;
     }
+  }
+  
+  /**
+   * Retrieves available symbols for an account (see
+   * https://metaapi.cloud/docs/client/websocket/api/retrieveMarketData/readSymbols/).
+   * @return completable future which resolves with specification retrieved
+   */
+  public CompletableFuture<List<String>> getSymbols() {
+    return websocketClient.getSymbols(account.getId());
   }
   
   /**
@@ -880,6 +1085,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @param listener synchronization listener to add
    */
   public void addSynchronizationListener(SynchronizationListener listener)  {
+    synchronizationListeners.add(listener);
     websocketClient.addSynchronizationListener(account.getId(), listener);
   }
   
@@ -888,57 +1094,43 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @param listener synchronization listener to remove
    */
   public void removeSynchronizationListener(SynchronizationListener listener) {
+    synchronizationListeners.remove(listener);
     websocketClient.removeSynchronizationListener(account.getId(), listener);
   }
   
   @Override
-  public CompletableFuture<Void> onConnected(int instanceIndex, int replicas) {
-    return CompletableFuture.runAsync(() -> {
-      if (subscribeFuture != null) {
-        subscribeFuture.complete(false);
-        subscribeTask.cancel();
-        subscribeTask = null;
+  public CompletableFuture<Void> onConnected(String instanceIndex, int replicas) {
+    String key = RandomStringUtils.randomAlphanumeric(32);
+    State state = getState(instanceIndex);
+    state.shouldSynchronize = key;
+    state.synchronizationRetryIntervalInSeconds = 1;
+    state.isSynchronized = false;
+    ensureSynchronized(instanceIndex, key);
+    List<Integer> indices = new ArrayList<>(replicas);
+    for (int i = 0; i < replicas; i++) {
+      indices.add(i);
+    }
+    for (Entry<String, State> e : new ArrayList<>(stateByInstanceIndex.entrySet())) {
+      if (indices.indexOf(getInstanceNumber(e.getValue().instanceIndex)) == -1) {
+        stateByInstanceIndex.remove(e.getKey());
       }
-      shouldRetrySubscribe = false;
-      String key = RandomStringUtils.randomAlphanumeric(32);
-      State state = getState(instanceIndex);
-      state.shouldSynchronize = key;
-      state.synchronizationRetryIntervalInSeconds = 1;
-      state.isSynchronized = false;
-      ensureSynchronized(instanceIndex, key);
-      List<Integer> indices = new ArrayList<>(replicas);
-      for (int i = 0; i < replicas; i++) {
-        indices.add(i);
-      }
-      Map<Integer, State> newStateByInstanceIndex = new HashMap<>();
-      for (Entry<Integer, State> e : stateByInstanceIndex.entrySet()) {
-        if (indices.indexOf(e.getValue().instanceIndex) != -1) {
-          newStateByInstanceIndex.put(e.getKey(), e.getValue());
-        }
-      }
-      stateByInstanceIndex = newStateByInstanceIndex;
-    });
+    }
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override
-  public CompletableFuture<Void> onDisconnected(int instanceIndex) {
-    return CompletableFuture.runAsync(() -> {
-      State state = getState(instanceIndex);
-      state.lastDisconnectedSynchronizationId = state.lastSynchronizationId;
-      state.lastSynchronizationId = null;
-      state.shouldSynchronize = null;
-      state.isSynchronized = false;
-      state.disconnected = true;
-      if ((Instant.now().toEpochMilli() - 10 * 60 * 1000) > lastAccountReloadTime) {
-        account.reload().join();
-        lastAccountReloadTime = Instant.now().toEpochMilli();
-      }
-      subscribe();
-    });
+  public CompletableFuture<Void> onDisconnected(String instanceIndex) {
+    State state = getState(instanceIndex);
+    state.lastDisconnectedSynchronizationId = state.lastSynchronizationId;
+    state.lastSynchronizationId = null;
+    state.shouldSynchronize = "";
+    state.isSynchronized = false;
+    state.disconnected = true;
+    return CompletableFuture.completedFuture(null);
   }
   
   @Override
-  public CompletableFuture<Void> onDealSynchronizationFinished(int instanceIndex,
+  public CompletableFuture<Void> onDealSynchronizationFinished(String instanceIndex,
     String synchronizationId) {
     State state = getState(instanceIndex);
     state.dealsSynchronized.add(synchronizationId);
@@ -946,7 +1138,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   }
   
   @Override
-  public CompletableFuture<Void> onOrderSynchronizationFinished(int instanceIndex,
+  public CompletableFuture<Void> onOrderSynchronizationFinished(String instanceIndex,
     String synchronizationId) {
     State state = getState(instanceIndex);
     state.ordersSynchronized.add(synchronizationId);
@@ -954,32 +1146,45 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   }
   
   @Override
+  public CompletableFuture<Void> onAccountInformationUpdated(String instanceIndex,
+    MetatraderAccountInformation accountInformation) {
+    for (String symbol : new ArrayList<>(getSubscribedSymbols())) {
+      if (!terminalState.getPrice(symbol).isPresent()) {
+        Integer instance = getInstanceNumber(instanceIndex);
+        subscribeToMarketData(symbol, subscriptions.get(symbol).subscriptions, instance).exceptionally(err -> {
+          logger.error("[" + new IsoTime() + "] MetaApi websocket client for account " +
+            account.getId() + ":" + instanceIndex + " failed to resubscribe to symbol " + symbol, err);
+          return null;
+        });
+      }
+    }
+    return CompletableFuture.completedFuture(null);
+  }
+  
+  @Override
   public CompletableFuture<Void> onReconnected() {
-    if (subscribeFuture != null) {
-      subscribeFuture.complete(false);
-      subscribeTask.cancel();
-      subscribeTask = null;
-    }
-    try {
-      Thread.sleep(50);
-    } catch (InterruptedException e) {
-      logger.error("Failed to sleep thread", e);
-    }
-    return subscribe();
+    stateByInstanceIndex.clear();
+    return CompletableFuture.completedFuture(null);
+  }
+  
+  @Override
+  public CompletableFuture<Void> onStreamClosed(String instanceIndex) {
+    stateByInstanceIndex.remove(instanceIndex);
+    return CompletableFuture.completedFuture(null);
   }
   
   /**
    * Returns flag indicating status of state synchronization with MetaTrader terminal
-   * @param instanceIndex index of an account instance connected
+   * @param instanceIndex index of an account instance connected, or {@code null}
    * @param synchronizationId optional synchronization request id, last synchronization 
-   * request id will be used by default
+   * request id will be used by default, or {@code null}
    * @return completable future resolving with a flag indicating status of state synchronization
    * with MetaTrader terminal
    */
-  public CompletableFuture<Boolean> isSynchronized(Integer instanceIndex, String synchronizationId) {
+  public CompletableFuture<Boolean> isSynchronized(String instanceIndex, String synchronizationId) {
     boolean result = false;
     for (State s : stateByInstanceIndex.values()) {
-      if (instanceIndex != null && s.instanceIndex != instanceIndex) {
+      if (instanceIndex != null && !s.instanceIndex.equals(instanceIndex)) {
         continue;
       }
       if (synchronizationId == null) {
@@ -1011,7 +1216,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     if (options == null) options = new SynchronizationOptions();
     SynchronizationOptions opts = options;
     return CompletableFuture.runAsync(() -> {
-      Integer instanceIndex = opts.instanceIndex;
+      String instanceIndex = opts.instanceIndex;
       String synchronizationId = opts.synchronizationId;
       int timeoutInSeconds = (opts.timeoutInSeconds != null ? opts.timeoutInSeconds : 300);
       int intervalInMilliseconds = (opts.intervalInMilliseconds != null ? opts.intervalInMilliseconds : 1000);
@@ -1034,20 +1239,21 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
             }
           }
         } else {
-          Integer finalInstanceIndex = instanceIndex;
+          String finalInstanceIndex = instanceIndex;
           state = stateByInstanceIndex.values().stream()
-            .filter(s -> s.instanceIndex == finalInstanceIndex).findFirst().orElse(null);
+            .filter(s -> s.instanceIndex.equals(finalInstanceIndex)).findFirst().orElse(null);
         }
-        if (!isSynchronized) throw new TimeoutException(
-          "Timed out waiting for account MetApi to synchronize to MetaTrader account " 
-          + account.getId() + ", synchronization id " + (
-            synchronizationId != null ? synchronizationId
-            : (state != null && state.lastSynchronizationId != null ? state.lastSynchronizationId 
-              : (state != null && state.lastDisconnectedSynchronizationId != null
-                ? state.lastDisconnectedSynchronizationId : null))
-          )
-        );
-        websocketClient.waitSynchronized(account.getId(), instanceIndex, applicationPattern,
+        if (!isSynchronized) {
+          throw new TimeoutException("Timed out waiting for account MetApi to synchronize to MetaTrader account " 
+            + account.getId() + ", synchronization id " + (
+              synchronizationId != null ? synchronizationId
+              : (state != null && state.lastSynchronizationId != null ? state.lastSynchronizationId 
+                : (state != null && state.lastDisconnectedSynchronizationId != null
+                  ? state.lastDisconnectedSynchronizationId : null))
+            )
+          );
+        }
+        websocketClient.waitSynchronized(account.getId(), getInstanceNumber(instanceIndex), applicationPattern,
           (long) timeoutInSeconds).get();
       } catch (Exception e) {
         throw new CompletionException(e);
@@ -1060,18 +1266,23 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving when connection is closed
    */
   public CompletableFuture<Void> close() {
-    if (!closed) {
-      stateByInstanceIndex.clear();
-      websocketClient.unsubscribe(account.getId()).join();
-      websocketClient.removeSynchronizationListener(account.getId(), this);
-      websocketClient.removeSynchronizationListener(account.getId(), terminalState);
-      websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
-      websocketClient.removeSynchronizationListener(account.getId(), healthMonitor);
-      connectionRegistry.remove(account.getId());
-      healthMonitor.stop();
-      closed = true;
-    }
-    return CompletableFuture.completedFuture(null);
+    return CompletableFuture.runAsync(() -> {
+      if (!closed) {
+        stateByInstanceIndex.clear();
+        websocketClient.unsubscribe(account.getId()).join();
+        websocketClient.removeSynchronizationListener(account.getId(), this);
+        websocketClient.removeSynchronizationListener(account.getId(), terminalState);
+        websocketClient.removeSynchronizationListener(account.getId(), historyStorage);
+        websocketClient.removeSynchronizationListener(account.getId(), healthMonitor);
+        for (SynchronizationListener listener : synchronizationListeners) {
+          websocketClient.removeSynchronizationListener(account.getId(), listener);
+        }
+        websocketClient.removeReconnectListener(this);
+        connectionRegistry.remove(account.getId());
+        healthMonitor.stop();
+        closed = true;
+      }
+    });
   }
   
   /**
@@ -1079,7 +1290,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return synchronization status
    */
   public boolean isSynchronized() {
-    return isSynchronized;
+    return stateByInstanceIndex.values().stream().filter(state -> state.isSynchronized).findFirst().isPresent();
   }
   
   /**
@@ -1098,28 +1309,40 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     return healthMonitor;
   }
   
-  private void ensureSynchronized(int instanceIndex, String key) {
+  private void generateStopOptions(MetatraderTrade trade, Object stopLoss, Object takeProfit) {
+    if (stopLoss != null) {
+      if (stopLoss instanceof Double) {
+        trade.stopLoss = (Double) stopLoss;
+      } else {
+        trade.stopLoss = ((StopOptions) stopLoss).value;
+        trade.stopLossUnits = ((StopOptions) stopLoss).units;
+      }
+    }
+    if (takeProfit != null) {
+      if (takeProfit instanceof Double) {
+        trade.takeProfit = (Double) takeProfit;
+      } else {
+        trade.takeProfit = ((StopOptions) takeProfit).value;
+        trade.takeProfitUnits = ((StopOptions) takeProfit).units;
+      }
+    }
+  }
+  
+  private void ensureSynchronized(String instanceIndex, String key) {
     State state = getState(instanceIndex);
-    if (state != null) {
+    if (state != null && !closed) {
       try {
-        synchronize(instanceIndex).join();
-        for (String symbol : subscriptions.keySet()) {
-          subscribeToMarketData(symbol, subscriptions.get(symbol).subscriptions, instanceIndex);
+        Boolean synchronizationResult = synchronize(instanceIndex).join();
+        if (synchronizationResult != null && synchronizationResult) {
+          state.isSynchronized = true;
+          state.synchronizationRetryIntervalInSeconds = 1;
         }
-        state.isSynchronized = true;
-        state.synchronizationRetryIntervalInSeconds = 1;
       } catch (CompletionException e) {
         logger.error("MetaApi websocket client for account " + account.getId() + ":"
           + instanceIndex + " failed to synchronize", e.getCause());
         if (state.shouldSynchronize.equals(key)) {
-          Timer retryTimer = new Timer();
-          MetaApiConnection self = this;
-          retryTimer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-              self.ensureSynchronized(instanceIndex, key);
-            }
-          }, 1000 * state.synchronizationRetryIntervalInSeconds);
+          Js.setTimeout(() -> ensureSynchronized(instanceIndex, key),
+            1000 * state.synchronizationRetryIntervalInSeconds);
           state.synchronizationRetryIntervalInSeconds = Math.min(
             state.synchronizationRetryIntervalInSeconds * 2, 300);
         }
@@ -1127,9 +1350,9 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
     }
   }
   
-  private State getState(int instanceIndex) {
+  private State getState(String instanceIndex) {
     if (!stateByInstanceIndex.containsKey(instanceIndex)) {
-      int stateInstanceIndex = instanceIndex;
+      String stateInstanceIndex = instanceIndex;
       stateByInstanceIndex.put(instanceIndex, new State() {{
         instanceIndex = stateInstanceIndex;
         synchronizationRetryIntervalInSeconds = 1;

@@ -14,24 +14,24 @@ Please note that this SDK provides an abstraction over REST and websocket API to
 
 For more information about SDK APIs please check esdoc documentation in source codes located inside lib folder of this npm package.
 
-## Installation
-If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
-```xml
-<dependency>
-  <groupId>cloud.metaapi.sdk</groupId>
-  <artifactId>metaapi-java-sdk</artifactId>
-  <version>12.3.1</version>
-</dependency>
-```
-
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/12.3.1/jar).
-
 ## Working code examples
 Please check [this short video](https://youtu.be/dDOUWBjdfA4) to see how you can download samples via our web application.
 
 You can also find code examples at [examples folder of our github repo](https://github.com/agiliumtrade-ai/metaapi-java-client/tree/master/examples) or in the examples folder of the project.
 
 We have composed a [short guide explaining how to use the example code](https://metaapi.cloud/docs/client/usingCodeExamples/)
+
+## Installation
+If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
+```xml
+<dependency>
+  <groupId>cloud.metaapi.sdk</groupId>
+  <artifactId>metaapi-java-sdk</artifactId>
+  <version>13.2.0</version>
+</dependency>
+```
+
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/13.2.0/jar).
 
 ### Running Java SDK examples
 In order to run Java SDK examples, follow these steps:
@@ -175,7 +175,7 @@ account.redeploy().join();
 ```
 
 ### Manage custom experts (EAs)
-Custom expert advisors can only be used for MT4 accounts on g1 infrastructure
+Custom expert advisors can only be used for MT4 accounts on g1 infrastructure. EAs which use DLLs are not supported.
 
 ### Creating an expert advisor via API
 You can use the code below to create an EA. Please note that preset field is a base64-encoded preset file.
@@ -258,10 +258,24 @@ connection.waitSynchronized().join();
 // first, subscribe to market data
 connection.subscribeToMarketData("GBPUSD").join();
 
+// read symbols available
+System.out.println(connection.getSymbols().join());
 // read constract specification
 System.out.println(connection.getSymbolSpecification("GBPUSD").join());
 // read current price
 System.out.println(connection.getSymbolPrice("GBPUSD").join());
+```
+
+### Query historical market data via RPC API
+Currently this API is supported on G1 and MT4 G2 only.
+
+```java
+// retrieve 1000 candles before the specified time
+List<MetatraderCandle> candles = account.getHistoricalCandles("EURUSD", "1m", new IsoTime("2021-05-01T00:00:00.000Z"), 1000).join();
+// retrieve 1000 ticks after the specified time
+List<MetatraderTick> ticks = account.getHistoricalTicks("EURUSD", new IsoTime("2021-05-01T00:00:00.000Z"), 5, 1000).join();
+// retrieve 1000 latest ticks
+List<MetatraderTick> ticks = account.getHistoricalTicks("EURUSD", null, 0, 1000).join();
 ```
 
 ### Use real-time streaming API
@@ -437,10 +451,9 @@ MetatraderDemoAccount demoAccount = api.getMetatraderDemoAccountApi()
 ```
 
 ## Rate limits & quotas
+API calls you make are subject to rate limits. See [MT account management API](https://metaapi.cloud/docs/provisioning/rateLimiting/) and [MetaApi API](https://metaapi.cloud/docs/client/rateLimiting/) for details.
 
-MetaApi applies rate limits to requests. See [MT account management API](https://metaapi.cloud/docs/provisioning/rateLimiting/) and [MetaApi API](https://metaapi.cloud/docs/client/rateLimiting/) for details.
-
-MetaApi applies quotas to limit the number of accounts and provisioning profiles, for more details see the [MT account management API quotas](https://metaapi.cloud/docs/provisioning/userQuota/)
+MetaApi applies quotas to the number of accounts and provisioning profiles, for more details see the [MT account management API quotas](https://metaapi.cloud/docs/provisioning/userQuota/)
 
 ## CopyFactory copy trading API
 
@@ -448,3 +461,9 @@ CopyFactory is a powerful trade copying API which makes developing forex
 trade copying applications as easy as writing few lines of code.
 
 You can find CopyFactory Java SDK documentation here: [https://github.com/agiliumtrade-ai/copyfactory-java-sdk](https://github.com/agiliumtrade-ai/copyfactory-java-sdk)
+
+## MetaStats trading statistics API
+
+MetaStats is a powerful trade statistics API which makes it possible to add forex trading metrics into forex applications.
+
+You can find MetaStats Java SDK documentation here: [https://github.com/agiliumtrade-ai/metastats-java-sdk](https://github.com/agiliumtrade-ai/metastats-java-sdk)

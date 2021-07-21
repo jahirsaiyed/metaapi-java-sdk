@@ -2,6 +2,7 @@ package cloud.metaapi.sdk.clients.meta_api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
@@ -43,6 +44,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import cloud.metaapi.sdk.clients.HttpClient;
 import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.*;
@@ -72,6 +74,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder.*;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderPosition.*;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade.*;
 import cloud.metaapi.sdk.clients.models.*;
+import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.JsonMapper;
 
 import com.corundumstudio.socketio.*;
@@ -82,11 +85,13 @@ import com.corundumstudio.socketio.*;
 class MetaApiWebsocketClientTest {
 
   private static ObjectMapper jsonMapper = JsonMapper.getInstance();
-  private static MetaApiWebsocketClient client;
   private static SocketIOServer server;
   private static SocketIOClient socket;
   private static int initResetDisconnectTimerTimeout;
-  private SynchronizationThrottler clientSyncThrottler;
+  private MetaApiWebsocketClient client;
+  private SubscriptionManager clientSubscriptionManager;
+  private PacketOrderer clientPacketOrderer;
+  private HttpClient httpClient;
   
   // Some variables that cannot be written from request callbacks 
   // if they are local test variables
@@ -99,6 +104,7 @@ class MetaApiWebsocketClientTest {
   
   @BeforeAll
   static void setUpBeforeClass() throws IOException, IllegalAccessException {
+    initResetDisconnectTimerTimeout = MetaApiWebsocketClient.resetDisconnectTimerTimeout;
     Configuration serverConfiguration = new Configuration();
     serverConfiguration.setPort(6784);
     serverConfiguration.setContext("/ws");
@@ -114,15 +120,6 @@ class MetaApiWebsocketClientTest {
       }
     });
     server.start();
-    client = new MetaApiWebsocketClient("token", new MetaApiWebsocketClient.ClientOptions() {{
-      application = "application";
-      domain = "project-stock.agiliumlabs.cloud";
-      requestTimeout = 6000L;
-      connectTimeout = 6000L;
-      retryOpts = new RetryOptions() {{ retries = 3; }};
-    }});
-    client.setUrl("http://localhost:6784");
-    initResetDisconnectTimerTimeout = MetaApiWebsocketClient.resetDisconnectTimerTimeout;
   }
   
   @AfterAll
@@ -132,13 +129,35 @@ class MetaApiWebsocketClientTest {
 
   @BeforeEach
   void setUp() throws Throwable {
-    clientSyncThrottler = (SynchronizationThrottler) FieldUtils.readField(client,
-      "synchronizationThrottler", true);
-    clientSyncThrottler = Mockito.spy(clientSyncThrottler);
-    Mockito.when(clientSyncThrottler.getActiveSynchronizationIds()).thenReturn(Lists.emptyList());
-    FieldUtils.writeField(client, "synchronizationThrottler", clientSyncThrottler, true);
     MetaApiWebsocketClient.resetDisconnectTimerTimeout = initResetDisconnectTimerTimeout;
-    client.connect().get();
+    httpClient = Mockito.mock(HttpClient.class);
+    client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+      application = "application";
+      domain = "project-stock.agiliumlabs.cloud";
+      requestTimeout = 6000L;
+      connectTimeout = 6000L;
+      retryOpts = new RetryOptions() {{
+        retries = 3;
+        minDelayInSeconds = 1;
+        maxDelayInSeconds = 3;
+      }};
+      useSharedClientApi = true;
+    }});
+    client.setUrl("http://localhost:6784");
+    client.socketInstancesByAccounts = Maps.newHashMap("accountId", 0);
+    client.connect().join();
+    SynchronizationThrottler clientSyncThrottler = Mockito
+      .spy(client.socketInstances.get(0).synchronizationThrottler);
+    Mockito.doReturn(Lists.emptyList()).when(clientSyncThrottler).getActiveSynchronizationIds();
+    client.socketInstances.get(0).synchronizationThrottler = clientSyncThrottler;
+    
+    clientSubscriptionManager = (SubscriptionManager) FieldUtils.readField(client, "subscriptionManager", true);
+    clientSubscriptionManager = Mockito.spy(clientSubscriptionManager);
+    FieldUtils.writeField(client, "subscriptionManager", clientSubscriptionManager, true);
+    
+    clientPacketOrderer = (PacketOrderer) FieldUtils.readField(client, "packetOrderer", true);
+    clientPacketOrderer = Mockito.spy(clientPacketOrderer);
+    FieldUtils.writeField(client, "packetOrderer", clientPacketOrderer, true);
   }
 
   @AfterEach
@@ -159,34 +178,78 @@ class MetaApiWebsocketClientTest {
     assertTrue(Double.valueOf(clientId) >= 0 && Double.valueOf(clientId) < 1);
   }
   
-  /**
-   * Tests {@link MetaApiWebsocketClient#tryReconnect()}
-   */
-  @Test
-  void testChangesClientIdOnReconnect() throws InterruptedException {
-    clientId = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
-    connectAmount = 0;
-    client.close();
-    server.addConnectListener(new ConnectListener() {
-      @Override
-      public void onConnect(SocketIOClient connected) {
-        socket = connected;
-        connectAmount++;
-        double headerClientId = Double.valueOf(socket.getHandshakeData().getHttpHeaders().get("client-id"));
-        double queryClientId = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
-        assertEquals(headerClientId, queryClientId);
-        assertNotEquals(clientId, headerClientId);
-        assertNotEquals(clientId, queryClientId);
-        clientId = queryClientId;
-        if (connectAmount == 1) {
-          socket.disconnect();
-        }
-      }
-    });
-    client.connect().join();
-    Thread.sleep(2000);
-    assertTrue(connectAmount >= 2);
-  }
+ /**
+  * Tests {@link MetaApiWebsocketClient#tryReconnect()}
+  */
+ @Test
+ void testChangesClientIdOnReconnect() throws InterruptedException {
+   clientId = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
+   connectAmount = 0;
+   client.close();
+   server.addConnectListener(new ConnectListener() {
+     @Override
+     public void onConnect(SocketIOClient connected) {
+       socket = connected;
+       connectAmount++;
+       double headerClientId = Double.valueOf(socket.getHandshakeData().getHttpHeaders().get("client-id"));
+       double queryClientId = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
+       assertEquals(headerClientId, queryClientId);
+       assertNotEquals(clientId, headerClientId);
+       assertNotEquals(clientId, queryClientId);
+       clientId = queryClientId;
+       if (connectAmount == 1) {
+         socket.disconnect();
+       }
+     }
+   });
+   client.connect().join();
+   Thread.sleep(2000);
+   assertTrue(connectAmount >= 2);
+ }
+ 
+ /**
+  * Tests {@link MetaApiWebsocketClient#getServerUrl}
+  */
+ @ParameterizedTest
+ @MethodSource("provideMetatraderPosition")
+ void testConnectsToDedicatedServer(MetatraderPosition position) throws Exception {
+   Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any())).thenReturn(CompletableFuture
+     .completedFuture(new MetaApiWebsocketClient.ServerUrl() {{url = "http://localhost:6784";}}));
+   List<MetatraderPosition> positions = Arrays.asList(position);
+   socket.disconnect();
+   client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+     application = "application";
+     domain = "project-stock.agiliumlabs.cloud";
+     requestTimeout = 15000L;
+     connectTimeout = 15000L;
+     useSharedClientApi = false;
+     retryOpts = new RetryOptions() {{
+       retries = 3;
+       minDelayInSeconds = 1;
+       maxDelayInSeconds = 3;
+     }};
+   }});
+   server.addEventListener("request", Object.class, new DataListener<Object>() {
+     @Override
+     public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+       JsonNode request = jsonMapper.valueToTree(data);
+       if (  request.get("type").asText().equals("getPositions") 
+          && request.get("accountId").asText().equals("accountId")
+          && request.get("application").asText().equals("RPC")
+        ) {
+         ObjectNode response = jsonMapper.createObjectNode();
+         response.put("type", "response");
+         response.set("accountId", request.get("accountId"));
+         response.set("requestId", request.get("requestId"));
+         response.set("positions", jsonMapper.valueToTree(positions));
+         client.sendEvent("response", response.toString());
+       }
+     }
+   });
+   List<MetatraderPosition> actual = client.getPositions("accountId").join();
+   assertThat(actual).usingRecursiveComparison().isEqualTo(positions);
+   Mockito.verify(httpClient).requestJson(Mockito.any(), Mockito.any());
+ }
 
   /**
    * Tests {@link MetaApiWebsocketClient#getAccountInformation(String)}
@@ -682,6 +745,38 @@ class MetaApiWebsocketClientTest {
    * Tests {@link MetaApiWebsocketClient#subscribe(String)}
    */
   @Test
+  void testCreatesNewInstanceWhenAccountLimitIsReached() throws Exception {
+    assertEquals(1, client.getSocketInstances().size());
+    for (int i = 0; i < 100; i++) {
+      client.socketInstancesByAccounts.put("accountId" + i, 0);
+    }
+
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (  request.get("type").asText().equals("subscribe")
+           && request.get("accountId").asText().equals("accountId101")
+           && request.get("application").asText().equals("application")
+           && request.get("instanceIndex").asInt() == 1
+        ) {
+          ObjectNode response = jsonMapper.createObjectNode();
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          client.sendEvent("response", response.toString());
+        }
+      }
+    });
+    client.subscribe("accountId101", 1).join();
+    Thread.sleep(200);
+    assertEquals(2, client.getSocketInstances().size());
+  }
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#subscribe(String)}
+   */
+  @Test
   void testReturnsErrorIfConnectToMetatarderTerminalFailed() throws Exception {
     requestReceived = false;
     server.addEventListener("request", Object.class, new DataListener<Object>() {
@@ -738,6 +833,33 @@ class MetaApiWebsocketClientTest {
     });
     client.reconnect("accountId").get();
     assertTrue(requestReceived);
+  }
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#getSymbols}
+   */
+  @Test
+  void testRetrievesSymbolsFromApi() {
+    List<String> symbols = Arrays.asList("EURUSD");
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (  request.get("type").asText().equals("getSymbols")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("application").asText().equals("RPC")
+        ) {
+          ObjectNode response = jsonMapper.createObjectNode();
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("symbols", jsonMapper.valueToTree(symbols));
+          client.sendEvent("response", response.toString());
+        }
+      }
+    });
+    List<String> actual = client.getSymbols("accountId").join();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(symbols);
   }
   
   /**
@@ -946,6 +1068,7 @@ class MetaApiWebsocketClientTest {
    */
   @Test
   void testUnsubscribesFromAccountData() {
+    requestReceived = false;
     ObjectNode response = jsonMapper.createObjectNode();
     response.put("type", "response");
     response.put("accountId", "accountId");
@@ -956,13 +1079,63 @@ class MetaApiWebsocketClientTest {
         if (  request.get("type").asText().equals("unsubscribe")
            && request.get("accountId").asText().equals("accountId")
         ) {
+          requestReceived = true;
           response.set("requestId", request.get("requestId"));
           client.sendEvent("response", response.toString());
         }
       }
     });
-    JsonNode actual = client.unsubscribe("accountId").join();
-    assertThat(actual).usingRecursiveComparison().isEqualTo(response);
+    client.unsubscribe("accountId").join();
+    assertTrue(requestReceived);
+    assertFalse(client.socketInstancesByAccounts.containsKey("accountId"));
+  }
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#unsubscribe(String)}
+   */
+  @Test
+  void testIgnoresNotFoundExceptionOnUnsubscribe() {
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        ObjectNode response = jsonMapper.createObjectNode();
+        response.put("id", 1);
+        response.put("error", "ValidationError");
+        response.put("message", "Validation failed");
+        ObjectNode details = jsonMapper.createObjectNode();
+        details.put("parameter", "volume");
+        details.put("message", "Required value.");
+        response.set("details", jsonMapper.valueToTree(Arrays.asList(details)));
+        response.set("requestId", request.get("requestId"));
+        client.sendEvent("processingError", response.toString());
+      }
+    });
+    try {
+      client.unsubscribe("accountId").join();
+      throw new Exception("ValidationException extected");
+    } catch (Throwable err) {
+      assertTrue(err.getCause().getCause() instanceof ValidationException);
+      Map<String, String> details = new HashMap<>();
+      details.put("parameter", "volume");
+      details.put("message", "Required value.");
+      assertThat(((ValidationException) err.getCause().getCause()).details)
+        .usingRecursiveComparison().isEqualTo(Arrays.asList(details));
+    }
+    server.removeAllListeners("request");
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        ObjectNode response = jsonMapper.createObjectNode();
+        response.put("id", 1);
+        response.put("error", "NotFoundError");
+        response.put("message", "Account not found");
+        response.set("requestId", request.get("requestId"));
+        client.sendEvent("processingError", response.toString());
+      }
+    });
+    client.unsubscribe("accountId").join();
   }
   
   /**
@@ -1116,7 +1289,7 @@ class MetaApiWebsocketClientTest {
       assertTrue(error.getCause() instanceof NotConnectedException);
     }
   }
-  
+ 
   /**
    * Tests {@link MetaApiWebsocketClient#getPosition(String, String)}
    */
@@ -1141,22 +1314,24 @@ class MetaApiWebsocketClientTest {
       assertTrue(error.getCause() instanceof InternalException);
     }
   }
-  
+   
   /**
    * Tests {@link MetaApiWebsocketClient#addSynchronizationListener(String, SynchronizationListener)}
    */
   @Test
   void testProcessesAuthenticatedSynchronizationEvent() throws Exception {
     SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
+    Mockito.when(listener.onDisconnected(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
     client.addSynchronizationListener("accountId", listener);
     ObjectNode packet = jsonMapper.createObjectNode();
     packet.put("type", "authenticated");
     packet.put("accountId", "accountId");
+    packet.put("host", "ps-mpa-1");
     packet.put("instanceIndex", 1);
     packet.put("replicas", 2);
     socket.sendEvent("synchronization", packet.toString());
     Thread.sleep(200);
-    Mockito.verify(listener).onConnected(1, 2);
+    Mockito.verify(listener).onConnected("1:ps-mpa-1", 2);
   }
   
   /**
@@ -1165,10 +1340,12 @@ class MetaApiWebsocketClientTest {
   @Test
   void testProcessesAuthenticatedSynchronizationEventWithSessionId() throws Exception {
     SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
+    Mockito.when(listener.onDisconnected(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
     client.addSynchronizationListener("accountId", listener);
     ObjectNode packet1 = jsonMapper.createObjectNode();
     packet1.put("type", "authenticated");
     packet1.put("accountId", "accountId");
+    packet1.put("host", "ps-mpa-1");
     packet1.put("instanceIndex", 2);
     packet1.put("replicas", 4);
     packet1.put("sessionId", "wrong");
@@ -1176,12 +1353,13 @@ class MetaApiWebsocketClientTest {
     ObjectNode packet2 = jsonMapper.createObjectNode();
     packet2.put("type", "authenticated");
     packet2.put("accountId", "accountId");
+    packet2.put("host", "ps-mpa-1");
     packet2.put("instanceIndex", 1);
     packet2.put("replicas", 2);
-    packet2.put("sessionId", (String) FieldUtils.readField(client, "sessionId", true));
+    packet2.put("sessionId", client.socketInstances.get(0).sessionId);
     socket.sendEvent("synchronization", packet2.toString());
     Thread.sleep(200);
-    Mockito.verify(listener, Mockito.times(1)).onConnected(1, 2);
+    Mockito.verify(listener, Mockito.times(1)).onConnected("1:ps-mpa-1", 2);
   }
   
   /**
@@ -1190,8 +1368,9 @@ class MetaApiWebsocketClientTest {
   @Test
   void testProcessesBrokerConnectionStatusEvent() throws Exception {
     SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
+    Mockito.when(listener.onDisconnected(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
     CompletableFuture<Void> connectedFuture = new CompletableFuture<>();
-    Mockito.when(listener.onConnected(Mockito.anyInt(), Mockito.anyInt()))
+    Mockito.when(listener.onConnected(Mockito.anyString(), Mockito.anyInt()))
       .thenAnswer(new Answer<CompletableFuture<Void>>() {
         @Override
         public CompletableFuture<Void> answer(InvocationOnMock invocation) throws Throwable {
@@ -1200,7 +1379,7 @@ class MetaApiWebsocketClientTest {
         }
       });
     CompletableFuture<Void> statusChangedFuture = new CompletableFuture<>();
-    Mockito.when(listener.onBrokerConnectionStatusChanged(Mockito.anyInt(), Mockito.anyBoolean()))
+    Mockito.when(listener.onBrokerConnectionStatusChanged(Mockito.anyString(), Mockito.anyBoolean()))
       .thenAnswer(new Answer<CompletableFuture<Void>>() {
         @Override
         public CompletableFuture<Void> answer(InvocationOnMock invocation) throws Throwable {
@@ -1227,7 +1406,7 @@ class MetaApiWebsocketClientTest {
     socket.sendEvent("synchronization", statusPacket.toString());
     statusChangedFuture.join();
     Thread.sleep(200);
-    Mockito.verify(listener).onBrokerConnectionStatusChanged(1, true);
+    Mockito.verify(listener).onBrokerConnectionStatusChanged("1:ps-mpa-1", true);
   }
   
   /**
@@ -1236,7 +1415,7 @@ class MetaApiWebsocketClientTest {
   @Test
   void testCallsOnDisconnectIfThereWasNoSignalForALongTime() throws Exception {
     SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
-    Mockito.when(listener.onDisconnected(Mockito.anyInt()))
+    Mockito.when(listener.onDisconnected(Mockito.anyString()))
       .thenReturn(CompletableFuture.completedFuture(null));
     MetaApiWebsocketClient.resetDisconnectTimerTimeout = 10000;
     client.addSynchronizationListener("accountId", listener);
@@ -1257,13 +1436,66 @@ class MetaApiWebsocketClientTest {
     Thread.sleep(2000);
     socket.sendEvent("synchronization", statusPacket.toString());
     Thread.sleep(5000);
-    Mockito.verify(listener, Mockito.never()).onDisconnected(Mockito.anyInt());
+    Mockito.verify(listener, Mockito.never()).onDisconnected(Mockito.anyString());
     socket.sendEvent("synchronization", authPacket.toString());
     Thread.sleep(2000);
-    Mockito.verify(listener, Mockito.never()).onDisconnected(Mockito.anyInt());
+    Mockito.verify(listener, Mockito.never()).onDisconnected(Mockito.anyString());
     Thread.sleep(10000);
-    Mockito.verify(listener).onDisconnected(1);
+    Mockito.verify(listener).onDisconnected("1:ps-mpa-1");
   }
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#addSynchronizationListener}
+   */
+  @Test
+  void testClosesStreamOnTimeoutIfAnotherStreamExists() throws Exception {
+    MetaApiWebsocketClient.resetDisconnectTimerTimeout = 15000;
+    SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
+    Mockito.doNothing().when(clientSubscriptionManager).onTimeout(Mockito.anyString(), Mockito.anyInt());
+    Mockito.when(listener.onStreamClosed(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(listener.onDisconnected(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.doReturn(CompletableFuture.completedFuture(null)).when(clientSubscriptionManager)
+      .onDisconnected(Mockito.anyString(), Mockito.anyInt());
+    client.addSynchronizationListener("accountId", listener);
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "authenticated",
+      "accountId", "accountId", "host", "ps-mpa-1", "instanceIndex", 1, "replicas", 2)));
+    Thread.sleep(50);
+    Thread.sleep(3750);
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "authenticated",
+      "accountId", "accountId", "host", "ps-mpa-2", "instanceIndex", 1, "replicas", 2)));
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "status",
+      "accountId", "accountId", "host", "ps-mpa-1", "connected", true, "instanceIndex", 1)));
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "status",
+      "accountId", "accountId", "host", "ps-mpa-2", "connected", true, "instanceIndex", 1)));
+    Thread.sleep(50);
+    Thread.sleep(3750);
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "status",
+      "accountId", "accountId", "host", "ps-mpa-1", "connected", true, "instanceIndex", 1)));
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "status",
+      "accountId", "accountId", "host", "ps-mpa-2", "connected", true, "instanceIndex", 1)));
+    Thread.sleep(50);
+    Thread.sleep(13750);
+    Mockito.verify(listener, Mockito.never()).onDisconnected(Mockito.anyString());
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "status",
+      "accountId", "accountId", "host", "ps-mpa-1", "connected", true, "instanceIndex", 1)));
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "status",
+      "accountId", "accountId", "host", "ps-mpa-2", "connected", true, "instanceIndex", 1)));
+    Thread.sleep(50);
+    Thread.sleep(3750);
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "status",
+      "accountId", "accountId", "host", "ps-mpa-2", "connected", true, "instanceIndex", 1)));
+    Mockito.verify(listener, Mockito.never()).onDisconnected(Mockito.anyString());
+    Thread.sleep(50);
+    Thread.sleep(13750);
+    Mockito.verify(listener).onStreamClosed("1:ps-mpa-1");
+    Mockito.verify(listener, Mockito.never()).onDisconnected(Mockito.anyString());
+    Mockito.verify(clientSubscriptionManager, Mockito.never()).onTimeout(Mockito.anyString(), Mockito.anyInt());
+    Thread.sleep(50);
+    Thread.sleep(3750);
+    Mockito.verify(listener).onDisconnected("1:ps-mpa-2");
+    Mockito.verify(clientSubscriptionManager, Mockito.never()).onDisconnected(Mockito.anyString(), Mockito.anyInt());
+    Mockito.verify(clientSubscriptionManager).onTimeout("accountId", 1);
+  };
   
   /**
    * Tests {@link MetaApiWebsocketClient#addSynchronizationListener(String, SynchronizationListener)}
@@ -1271,10 +1503,19 @@ class MetaApiWebsocketClientTest {
   @Test
   void testProcessesServerSideHealthStatusEvent() throws Exception {
     SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
-    Mockito.when(listener.onConnected(Mockito.anyInt(), Mockito.anyInt()))
+    Mockito.when(listener.onConnected(Mockito.anyString(), Mockito.anyInt()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    Mockito.when(listener.onBrokerConnectionStatusChanged(Mockito.anyInt(), Mockito.anyBoolean()))
+    Mockito.when(listener.onBrokerConnectionStatusChanged(Mockito.anyString(), Mockito.anyBoolean()))
       .thenReturn(CompletableFuture.completedFuture(null));
+    CompletableFuture<Void> onHealthStatusFuture = new CompletableFuture<>();
+    Mockito.when(listener.onHealthStatus(Mockito.anyString(), Mockito.any()))
+      .thenAnswer(new Answer<CompletableFuture<Void>>() {
+        @Override
+        public CompletableFuture<Void> answer(InvocationOnMock invocation) {
+          onHealthStatusFuture.complete(null);
+          return onHealthStatusFuture;
+        }
+      });
     client.addSynchronizationListener("accountId", listener);
     ObjectNode authPacket = jsonMapper.createObjectNode();
     authPacket.put("type", "authenticated");
@@ -1283,6 +1524,7 @@ class MetaApiWebsocketClientTest {
     authPacket.put("host", "ps-mpa-1");
     authPacket.put("instanceIndex", 1);
     socket.sendEvent("synchronization", authPacket.toString());
+    Thread.sleep(200);
     ObjectNode statusPacket = jsonMapper.createObjectNode();
     statusPacket.put("type", "status");
     statusPacket.put("accountId", "accountId");
@@ -1293,7 +1535,8 @@ class MetaApiWebsocketClientTest {
     statusPacket.put("instanceIndex", 1);
     socket.sendEvent("synchronization", statusPacket.toString());
     Thread.sleep(200);
-    Mockito.verify(listener).onHealthStatus(Mockito.eq(1), Mockito.argThat(arg -> {
+    onHealthStatusFuture.join();
+    Mockito.verify(listener).onHealthStatus(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(healthStatus);
       return true;
     }));
@@ -1313,32 +1556,72 @@ class MetaApiWebsocketClientTest {
     authPacket.put("host", "ps-mpa-1");
     authPacket.put("instanceIndex", 1);
     socket.sendEvent("synchronization", authPacket.toString());
+    Thread.sleep(400);
     ObjectNode disconnectPacket = jsonMapper.createObjectNode();
     disconnectPacket.put("type", "disconnected");
     disconnectPacket.put("accountId", "accountId");
     disconnectPacket.put("host", "ps-mpa-1");
     disconnectPacket.put("instanceIndex", 1);
     socket.sendEvent("synchronization", disconnectPacket.toString());
-    Thread.sleep(200);
-    Mockito.verify(listener).onDisconnected(1);
+    Thread.sleep(400);
+    Mockito.verify(listener).onDisconnected("1:ps-mpa-1");
   }
+  
+  @Test
+  void testClosesTheStreamIfHostNameDisconnectedAndAnotherStreamExists() throws Exception {
+    SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
+    Mockito.when(listener.onConnected(Mockito.anyString(), Mockito.anyInt()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(listener.onDisconnected(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(listener.onStreamClosed(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.doReturn(CompletableFuture.completedFuture(null)).when(clientSubscriptionManager)
+      .onDisconnected(Mockito.anyString(), Mockito.anyInt());
+    client.addSynchronizationListener("accountId", listener);
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "authenticated",
+      "accountId", "accountId", "host", "ps-mpa-1", "instanceIndex", 1, "replicas", 2)));
+    Thread.sleep(200);
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "authenticated",
+      "accountId", "accountId", "host", "ps-mpa-2", "instanceIndex", 1, "replicas", 2)));
+    Thread.sleep(200);
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
+      "accountId", "accountId", "host", "ps-mpa-1", "instanceIndex", 1)));
+    Thread.sleep(200);
+    Mockito.verify(listener).onStreamClosed("1:ps-mpa-1");
+    Mockito.verify(listener, Mockito.never()).onDisconnected(Mockito.anyString());
+    Mockito.verify(clientSubscriptionManager, Mockito.never()).onDisconnected(Mockito.anyString(), Mockito.anyInt());
+    socket.sendEvent("synchronization", jsonMapper.writeValueAsString(Js.asMap("type", "disconnected",
+      "accountId", "accountId", "host", "ps-mpa-2", "instanceIndex", 1)));
+    Thread.sleep(200);
+    Mockito.verify(listener).onDisconnected(Mockito.anyString());
+    Mockito.verify(clientSubscriptionManager).onDisconnected("accountId", 1);
+  };
   
   @Test
   void testOnlyAcceptsPacketsWithOwnSynchronizationIds() throws InterruptedException {
     SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
-    Mockito.when(listener.onAccountInformationUpdated(Mockito.anyInt(), Mockito.any()))
+    Mockito.when(listener.onAccountInformationUpdated(Mockito.anyString(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
     client.addSynchronizationListener("accountId", listener);
-    Mockito.when(clientSyncThrottler.getActiveSynchronizationIds())
+    Mockito.when(client.socketInstances.get(0).synchronizationThrottler.getActiveSynchronizationIds())
       .thenReturn(Lists.list("synchronizationId"));
+    CompletableFuture<Void> onAccountInformationUpdatedFuture = new CompletableFuture<>();
+    Mockito.when(listener.onAccountInformationUpdated(Mockito.anyString(), Mockito.any()))
+      .thenAnswer(new Answer<CompletableFuture<Void>>() {
+      @Override
+      public CompletableFuture<Void> answer(InvocationOnMock invocation) {
+        onAccountInformationUpdatedFuture.complete(null);
+        return onAccountInformationUpdatedFuture;
+      }
+    });
+    Mockito.when(listener.onDisconnected(Mockito.anyString())).thenReturn(CompletableFuture.completedFuture(null));
     ObjectNode packet1 = jsonMapper.createObjectNode();
     packet1.put("type", "accountInformation");
     packet1.put("accountId", "accountId");
     packet1.set("accountInformation", jsonMapper.createObjectNode());
     packet1.put("instanceIndex", 1);
     socket.sendEvent("synchronization", packet1.toString());
-    Thread.sleep(200);
-    Mockito.verify(listener, Mockito.times(1)).onAccountInformationUpdated(Mockito.anyInt(), Mockito.any());
+    onAccountInformationUpdatedFuture.join();
+    Mockito.verify(listener, Mockito.times(1)).onAccountInformationUpdated(Mockito.anyString(), Mockito.any());
     ObjectNode packet2 = jsonMapper.createObjectNode();
     packet2.put("type", "accountInformation");
     packet2.put("accountId", "accountId");
@@ -1347,7 +1630,16 @@ class MetaApiWebsocketClientTest {
     packet2.put("synchronizationId", "wrong");
     socket.sendEvent("synchronization", packet2.toString());
     Thread.sleep(200);
-    Mockito.verify(listener, Mockito.times(1)).onAccountInformationUpdated(Mockito.anyInt(), Mockito.any());
+    Mockito.verify(listener, Mockito.times(1)).onAccountInformationUpdated(Mockito.anyString(), Mockito.any());
+    CompletableFuture<Void> onAccountInformationUpdatedFuture2 = new CompletableFuture<>();
+    Mockito.when(listener.onAccountInformationUpdated(Mockito.anyString(), Mockito.any()))
+      .thenAnswer(new Answer<CompletableFuture<Void>>() {
+      @Override
+      public CompletableFuture<Void> answer(InvocationOnMock invocation) {
+        onAccountInformationUpdatedFuture2.complete(null);
+        return onAccountInformationUpdatedFuture2;
+      }
+    });
     ObjectNode packet3 = jsonMapper.createObjectNode();
     packet3.put("type", "accountInformation");
     packet3.put("accountId", "accountId");
@@ -1355,8 +1647,8 @@ class MetaApiWebsocketClientTest {
     packet3.put("instanceIndex", 1);
     packet3.put("synchronizationId", "synchronizationId");
     socket.sendEvent("synchronization", packet3.toString());
-    Thread.sleep(200);
-    Mockito.verify(listener, Mockito.times(2)).onAccountInformationUpdated(Mockito.anyInt(), Mockito.any());
+    onAccountInformationUpdatedFuture2.join();
+    Mockito.verify(listener, Mockito.times(2)).onAccountInformationUpdated(Mockito.anyString(), Mockito.any());
   }
   
   /**
@@ -1371,6 +1663,7 @@ class MetaApiWebsocketClientTest {
         JsonNode request = jsonMapper.valueToTree(data);
         if (  request.get("type").asText().equals("synchronize")
            && request.get("accountId").asText().equals("accountId")
+           && request.get("host").asText().equals("ps-mpa-1")
            && request.get("startingHistoryOrderTime").asText().equals("2020-01-01T00:00:00Z")
            && request.get("startingDealTime").asText().equals("2020-01-02T00:00:00Z")
            && request.get("requestId").asText().equals("synchronizationId")
@@ -1386,7 +1679,7 @@ class MetaApiWebsocketClientTest {
         }
       }
     });
-    client.synchronize("accountId", 1, "synchronizationId", 
+    client.synchronize("accountId", 1, "ps-mpa-1", "synchronizationId", 
       new IsoTime("2020-01-01T00:00:00.000Z"),
       new IsoTime("2020-01-02T00:00:00.000Z")).get();
     assertTimeoutPreemptively(Duration.ofSeconds(7), () -> {
@@ -1406,9 +1699,10 @@ class MetaApiWebsocketClientTest {
     packet.put("type", "synchronizationStarted");
     packet.put("accountId", "accountId");
     packet.put("instanceIndex", 1);
+    packet.put("host", "ps-mpa-1");
     socket.sendEvent("synchronization", packet.toString());
     Thread.sleep(200);
-    Mockito.verify(listener).onSynchronizationStarted(1);
+    Mockito.verify(listener).onSynchronizationStarted("1:ps-mpa-1");
   }
   
   /**
@@ -1422,11 +1716,12 @@ class MetaApiWebsocketClientTest {
     ObjectNode packet = jsonMapper.createObjectNode();
     packet.put("type", "accountInformation");
     packet.put("accountId", "accountId");
+    packet.put("host", "ps-mpa-1");
     packet.set("accountInformation", jsonMapper.valueToTree(expected));
     packet.put("instanceIndex", 1);
     socket.sendEvent("synchronization", packet.toString());
     Thread.sleep(200);
-    Mockito.verify(listener).onAccountInformationUpdated(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onAccountInformationUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(expected);
       return true;
     }));
@@ -1445,9 +1740,10 @@ class MetaApiWebsocketClientTest {
     packet.put("accountId", "accountId");
     packet.set("positions", jsonMapper.valueToTree(Lists.list(expected)));
     packet.put("instanceIndex", 1);
+    packet.put("host", "ps-mpa-1");
     socket.sendEvent("synchronization", packet.toString());
     Thread.sleep(200);
-    Mockito.verify(listener).onPositionsReplaced(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onPositionsReplaced(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(Lists.list(expected));
       return true;
     }));
@@ -1466,9 +1762,10 @@ class MetaApiWebsocketClientTest {
     packet.put("accountId", "accountId");
     packet.set("orders", jsonMapper.valueToTree(Lists.list(expected)));
     packet.put("instanceIndex", 1);
+    packet.put("host", "ps-mpa-1");
     socket.sendEvent("synchronization", packet.toString());
     Thread.sleep(200);
-    Mockito.verify(listener).onOrdersReplaced(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onOrdersReplaced(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(Lists.list(expected));
       return true;
     }));
@@ -1487,9 +1784,10 @@ class MetaApiWebsocketClientTest {
     packet.put("accountId", "accountId");
     packet.set("historyOrders", jsonMapper.valueToTree(expected.historyOrders));
     packet.put("instanceIndex", 1);
+    packet.put("host", "ps-mpa-1");
     socket.sendEvent("synchronization", packet.toString());
     Thread.sleep(200);
-    Mockito.verify(listener).onHistoryOrderAdded(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onHistoryOrderAdded(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(expected.historyOrders.get(0));
       return true;
     }));
@@ -1508,9 +1806,10 @@ class MetaApiWebsocketClientTest {
     packet.put("accountId", "accountId");
     packet.set("deals", jsonMapper.valueToTree(expected.deals));
     packet.put("instanceIndex", 1);
+    packet.put("host", "ps-mpa-1");
     socket.sendEvent("synchronization", packet.toString());
     Thread.sleep(200);
-    Mockito.verify(listener).onDealAdded(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onDealAdded(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(expected.deals.get(0));
       return true;
     }));
@@ -1527,7 +1826,7 @@ class MetaApiWebsocketClientTest {
   ) throws Exception {
     SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
     CompletableFuture<Void> onAccountInformationUpdatedFuture = new CompletableFuture<>();
-    Mockito.when(listener.onAccountInformationUpdated(Mockito.anyInt(), Mockito.any()))
+    Mockito.when(listener.onAccountInformationUpdated(Mockito.anyString(), Mockito.any()))
       .thenAnswer(new Answer<CompletableFuture<Void>>() {
         @Override
         public CompletableFuture<Void> answer(InvocationOnMock invocation) {
@@ -1536,7 +1835,7 @@ class MetaApiWebsocketClientTest {
         }
       });
     CompletableFuture<Void> onPositionUpdatedFuture = new CompletableFuture<>();
-    Mockito.when(listener.onPositionUpdated(Mockito.anyInt(), Mockito.any()))
+    Mockito.when(listener.onPositionUpdated(Mockito.anyString(), Mockito.any()))
       .thenAnswer(new Answer<CompletableFuture<Void>>() {
         @Override
         public CompletableFuture<Void> answer(InvocationOnMock invocation) throws Throwable {
@@ -1545,7 +1844,7 @@ class MetaApiWebsocketClientTest {
         }
       });
     CompletableFuture<Void> onPositionRemovedFuture = new CompletableFuture<>();
-    Mockito.when(listener.onPositionRemoved(Mockito.anyInt(), Mockito.anyString()))
+    Mockito.when(listener.onPositionRemoved(Mockito.anyString(), Mockito.anyString()))
       .thenAnswer(new Answer<CompletableFuture<Void>>() {
         @Override
         public CompletableFuture<Void> answer(InvocationOnMock invocation) throws Throwable {
@@ -1553,10 +1852,10 @@ class MetaApiWebsocketClientTest {
           return onPositionRemovedFuture;
         }
       });
-    Mockito.when(listener.onOrderUpdated(Mockito.anyInt(), Mockito.any()))
+    Mockito.when(listener.onOrderUpdated(Mockito.anyString(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
     CompletableFuture<Void> onOrderCompletedFuture = new CompletableFuture<>();
-    Mockito.when(listener.onOrderCompleted(Mockito.anyInt(), Mockito.anyString()))
+    Mockito.when(listener.onOrderCompleted(Mockito.anyString(), Mockito.anyString()))
       .thenAnswer(new Answer<CompletableFuture<Void>>() {
         @Override
         public CompletableFuture<Void> answer(InvocationOnMock invocation) throws Throwable {
@@ -1564,10 +1863,10 @@ class MetaApiWebsocketClientTest {
           return onOrderCompletedFuture;
         }
       });
-    Mockito.when(listener.onHistoryOrderAdded(Mockito.anyInt(), Mockito.any()))
+    Mockito.when(listener.onHistoryOrderAdded(Mockito.anyString(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
     CompletableFuture<Void> onDealAddedFuture = new CompletableFuture<>();
-    Mockito.when(listener.onDealAdded(Mockito.anyInt(), Mockito.any()))
+    Mockito.when(listener.onDealAdded(Mockito.anyString(), Mockito.any()))
       .thenAnswer(new Answer<CompletableFuture<Void>>() {
         @Override
         public CompletableFuture<Void> answer(InvocationOnMock invocation) throws Throwable {
@@ -1580,6 +1879,7 @@ class MetaApiWebsocketClientTest {
     packet.put("type", "update");
     packet.put("accountId", "accountId");
     packet.put("instanceIndex", 1);
+    packet.put("host", "ps-mpa-1");
     packet.set("accountInformation", jsonMapper.valueToTree(accountInformation));
     packet.set("updatedPositions", jsonMapper.valueToTree(Lists.list(position)));
     packet.set("removedPositionIds", jsonMapper.valueToTree(Lists.list("1234")));
@@ -1594,25 +1894,25 @@ class MetaApiWebsocketClientTest {
     onOrderCompletedFuture.join();
     onDealAddedFuture.join();
     Thread.sleep(200);
-    Mockito.verify(listener).onAccountInformationUpdated(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onAccountInformationUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(accountInformation);
       return true;
     }));
-    Mockito.verify(listener).onPositionUpdated(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onPositionUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(position);
       return true;
     }));
-    Mockito.verify(listener).onPositionRemoved(1, "1234");
-    Mockito.verify(listener).onOrderUpdated(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onPositionRemoved("1:ps-mpa-1", "1234");
+    Mockito.verify(listener).onOrderUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(order);
       return true;
     }));
-    Mockito.verify(listener).onOrderCompleted(1, "2345");
-    Mockito.verify(listener).onHistoryOrderAdded(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onOrderCompleted("1:ps-mpa-1", "2345");
+    Mockito.verify(listener).onHistoryOrderAdded(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(historyOrders.historyOrders.get(0));
       return true;
     }));
-    Mockito.verify(listener).onDealAdded(Mockito.eq(1), Mockito.argThat(arg -> {
+    Mockito.verify(listener).onDealAdded(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
       assertThat(arg).usingRecursiveComparison().isEqualTo(deals.deals.get(0));
       return true;
     }));
@@ -1657,6 +1957,121 @@ class MetaApiWebsocketClientTest {
     });
     MetatraderOrder actual = client.getOrder("accountId", "46871284").join();
     assertThat(actual).usingRecursiveComparison().isEqualTo(order);
+  }
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#rpcRequest}
+   */
+  @Test
+  void testWaitsSpecifiedAmountOfTimeOnTooManyRequestsError() {
+    requestCounter = 0;
+    MetatraderOrder order = new MetatraderOrder() {{
+      id = "46871284";
+      type = MetatraderOrder.OrderType.ORDER_TYPE_BUY_LIMIT;
+      state = MetatraderOrder.OrderState.ORDER_STATE_PLACED;
+      symbol = "AUDNZD";
+      magic = 123456;
+      platform = "mt5";
+      time = new IsoTime("2020-04-20T08:38:58.270Z");
+      openPrice = 1.03;
+      currentPrice = 1.05206;
+      volume = 0.01;
+      currentVolume = 0.01;
+      comment = "COMMENT2";
+    }};
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        ObjectNode response = jsonMapper.createObjectNode();
+        if (requestCounter > 0 && request.get("type").asText().equals("getOrder")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("orderId").asText().equals("46871284")
+           && request.get("application").asText().equals("RPC")) {
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("order", jsonMapper.valueToTree(order));
+          client.sendEvent("response", response.toString());
+        } else {
+          response.put("id", 1);
+          response.put("error", "TooManyRequestsError");
+          response.set("requestId", request.get("requestId"));
+          response.put("message", "The API allows 10000 requests per 60 minutes to avoid overloading our servers.");
+          response.put("status_code", 429);
+          ObjectNode metadata = jsonMapper.createObjectNode();
+          metadata.put("periodInMinutes", 60);
+          metadata.put("maxRequestsForPeriod", 10000);
+          metadata.put("recommendedRetryTime", new IsoTime(Date.from(Instant.now().plusMillis(1000))).toString());
+          response.set("metadata", metadata);
+          client.sendEvent("processingError", response.toString());
+        }
+        requestCounter++;
+      }
+    });
+    long startTime = Date.from(Instant.now()).getTime();
+    MetatraderOrder actual = client.getOrder("accountId", "46871284").join();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(order);
+    long timeDiff = Date.from(Instant.now()).getTime() - startTime;
+    assertTrue((timeDiff >= 1000) && (timeDiff <= 2000));
+  };
+ 
+  /**
+   * Tests {@link MetaApiWebsocketClient#rpcRequest}
+   */
+  @Test
+  void testReturnsTooManyRequestsExceptionIfRecommendedTimeIsBeyondMaxRequestTime() {
+    requestCounter = 0;
+    MetatraderOrder order = new MetatraderOrder() {{
+      id = "46871284";
+      type = MetatraderOrder.OrderType.ORDER_TYPE_BUY_LIMIT;
+      state = MetatraderOrder.OrderState.ORDER_STATE_PLACED;
+      symbol = "AUDNZD";
+      magic = 123456;
+      platform = "mt5";
+      time = new IsoTime("2020-04-20T08:38:58.270Z");
+      openPrice = 1.03;
+      currentPrice = 1.05206;
+      volume = 0.01;
+      currentVolume = 0.01;
+      comment = "COMMENT2";
+    }};
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        ObjectNode response = jsonMapper.createObjectNode();
+        if (requestCounter > 0 && request.get("type").asText().equals("getOrder")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("orderId").asText().equals("46871284")
+           && request.get("application").asText().equals("RPC")) {
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("order", jsonMapper.valueToTree(order));
+          client.sendEvent("response", response.toString());
+        } else {
+          response.put("id", 1);
+          response.put("error", "TooManyRequestsError");
+          response.set("requestId", request.get("requestId"));
+          response.put("message", "The API allows 10000 requests per 60 minutes to avoid overloading our servers.");
+          response.put("status_code", 429);
+          ObjectNode metadata = jsonMapper.createObjectNode();
+          metadata.put("periodInMinutes", 60);
+          metadata.put("maxRequestsForPeriod", 10000);
+          metadata.put("recommendedRetryTime", new IsoTime(Date.from(Instant.now().plusMillis(60000))).toString());
+          response.set("metadata", metadata);
+          client.sendEvent("processingError", response.toString());
+        }
+        requestCounter++;
+      }
+    });
+    try {
+      client.getOrder("accountId", "46871284").join();
+      throw new CompletionException(new Exception("TooManyRequestsError expected"));
+    } catch (Throwable err) {
+      assertTrue(err.getCause() instanceof TooManyRequestsException);
+    }
   }
   
   /**
@@ -1712,10 +2127,15 @@ class MetaApiWebsocketClientTest {
     server.addEventListener("request", Object.class, new DataListener<Object>() {
       @Override
       public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
-        if (requestCounter > 0) {
-          fail();
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (request.get("type").asText().equals("trade")
+          && request.get("accountId").asText().equals("accountId")
+          && request.get("application").asText().equals("application")) {
+          if (requestCounter > 0) {
+            fail();
+          }
+          requestCounter++;
         }
-        requestCounter++;
       }
     });
     try {
@@ -1724,6 +2144,43 @@ class MetaApiWebsocketClientTest {
     } catch (CompletionException err) {
       assertTrue(err.getCause() instanceof TimeoutException);
     }
+  }
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#rpcRequest}
+   */
+  @Test
+  void testDoesNotRetryRequestIfConnectionClosedBetweenRetries() throws Exception {
+    requestCounter = 0;
+    JsonNode response = jsonMapper.valueToTree(Js.asMap("type", "response", "accountId", "accountId"));
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (request.get("type").asText().equals("unsubscribe")
+          && request.get("accountId").asText().equals("accountId")) {
+          ObjectNode r = response.deepCopy();
+          r.put("requestId", request.get("requestId").asText());
+          client.sendEvent("response", r.toString());
+        }
+        if (request.get("type").asText().equals("getOrders")
+          && request.get("accountId").asText().equals("accountId")
+          && request.get("application").asText().equals("RPC")) {
+          requestCounter++;
+          client.sendEvent("processingError", Js.asJson("id", 1, "error", "NotSynchronizedError",
+            "message", "Error message", "requestId", request.get("requestId").asText()).toString());
+        }
+      }
+    });
+    client.unsubscribe("accountId");
+    try {
+      client.getOrders("accountId").join();
+      throw new CompletionException(new Exception("NotSynchronizedException expected"));
+    } catch (Throwable err) {
+      assertTrue(err.getCause() instanceof NotSynchronizedException);
+    }
+    assertEquals(1, requestCounter);
+    assertFalse(client.socketInstancesByAccounts.containsKey("accountId"));
   }
   
   /**
@@ -1824,18 +2281,30 @@ class MetaApiWebsocketClientTest {
   @MethodSource("provideSymbolSpecification")
   void testSynchronizesSymbolSpecifications(MetatraderSymbolSpecification expected) throws Exception {
     SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
+    Mockito.when(listener.onSymbolSpecificationsUpdated(Mockito.anyString(), Mockito.anyList(), Mockito.anyList()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(listener.onSymbolSpecificationUpdated(Mockito.anyString(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(listener.onSymbolSpecificationRemoved(Mockito.anyString(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
     client.addSynchronizationListener("accountId", listener);
     ObjectNode packet = jsonMapper.createObjectNode();
     packet.put("type", "specifications");
     packet.put("accountId", "accountId");
     packet.set("specifications", jsonMapper.valueToTree(Lists.list(expected)));
     packet.put("instanceIndex", 1);
+    packet.put("host", "ps-mpa-1");
+    packet.set("removedSymbols", jsonMapper.valueToTree(Lists.list("AUDNZD")));
     socket.sendEvent("synchronization", packet.toString());
-    Thread.sleep(50);
-    Mockito.verify(listener).onSymbolSpecificationUpdated(Mockito.eq(1), Mockito.argThat(arg -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(expected);
+    Thread.sleep(200);
+    Mockito.verify(listener).onSymbolSpecificationsUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
+      assertThat(arg).usingRecursiveComparison().isEqualTo(Arrays.asList(expected));
+      return true;
+    }), Mockito.argThat(arg -> {
+      assertThat(arg).usingRecursiveComparison().isEqualTo(Arrays.asList("AUDNZD"));
       return true;
     }));
+    Mockito.verify(listener).onSymbolSpecificationRemoved(Mockito.eq("1:ps-mpa-1"), Mockito.eq("AUDNZD"));
   }
   
   /**
@@ -1843,32 +2312,100 @@ class MetaApiWebsocketClientTest {
    */
   @ParameterizedTest
   @MethodSource("provideSymbolPrice")
-  void testSynchronizesSymbolPrices(MetatraderSymbolPrice expected) throws Exception {
+  void testSynchronizesSymbolPrices(MetatraderSymbolPrice price) throws Exception {
+    List<MetatraderSymbolPrice> prices = Arrays.asList(price);
+    List<MetatraderTick> ticks = Arrays.asList(new MetatraderTick() {{
+      symbol = "AUDNZD";
+      time = new IsoTime("2020-04-07T03:45:00.000Z");
+      brokerTime = "2020-04-07 06:45:00.000";
+      bid = 1.05297;
+      ask = 1.05309;
+      last = 0.5298;
+      volume = 0.13;
+      side = "buy";
+    }});
+    List<MetatraderCandle> candles = Arrays.asList(new MetatraderCandle() {{
+      symbol = "AUDNZD";
+      timeframe = "15m";
+      time = new IsoTime("2020-04-07T03:45:00.000Z");
+      brokerTime = "2020-04-07 06:45:00.000";
+      open = 1.03297;
+      high = 1.06309;
+      low = 1.02705;
+      close = 1.043;
+      tickVolume = 1435;
+      spread = 17;
+      volume = 345;
+    }});
+    List<MetatraderBook> books = Arrays.asList(new MetatraderBook() {{
+      symbol = "AUDNZD";
+      time = new IsoTime("2020-04-07T03:45:00.000Z");
+      brokerTime = "2020-04-07 06:45:00.000";
+      book = Arrays.asList(
+        new MetatraderBookEntry() {{
+          type = MetatraderBookEntry.BookType.BOOK_TYPE_SELL;
+          price = 1.05309;
+          volume = 5.67;
+        }},
+        new MetatraderBookEntry() {{
+          type = MetatraderBookEntry.BookType.BOOK_TYPE_SELL;
+          price = 1.05297;
+          volume = 3.45;
+        }}
+      );
+    }});
     SynchronizationListener listener = Mockito.mock(SynchronizationListener.class);
-    Mockito.when(listener.onSymbolPricesUpdated(Mockito.anyInt(), Mockito.anyList(), Mockito.anyDouble(),
+    Mockito.when(listener.onSymbolPriceUpdated(Mockito.anyString(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(listener.onSymbolPricesUpdated(Mockito.anyString(), Mockito.anyList(), Mockito.anyDouble(),
       Mockito.anyDouble(), Mockito.anyDouble(), Mockito.anyDouble(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(listener.onCandlesUpdated(Mockito.anyString(), Mockito.anyList(),
+      Mockito.anyDouble(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(listener.onTicksUpdated(Mockito.anyString(), Mockito.anyList(),
+      Mockito.anyDouble(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.when(listener.onBooksUpdated(Mockito.anyString(), Mockito.anyList(),
+      Mockito.anyDouble(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
     client.addSynchronizationListener("accountId", listener);
     ObjectNode packet = jsonMapper.createObjectNode();
     packet.put("type", "prices");
     packet.put("accountId", "accountId");
-    packet.set("prices", jsonMapper.valueToTree(Lists.list(expected)));
+    packet.put("host", "ps-mpa-1");
+    packet.set("prices", jsonMapper.valueToTree(prices));
+    packet.set("ticks", jsonMapper.valueToTree(ticks));
+    packet.set("candles", jsonMapper.valueToTree(candles));
+    packet.set("books", jsonMapper.valueToTree(books));
     packet.put("equity", 100);
     packet.put("margin", 200);
     packet.put("freeMargin", 400);
     packet.put("marginLevel", 40000);
     packet.put("instanceIndex", 1);
+    packet.put("host", "ps-mpa-1");
     socket.sendEvent("synchronization", packet.toString());
     Thread.sleep(50);
-    Mockito.verify(listener).onSymbolPriceUpdated(Mockito.eq(1), Mockito.argThat(arg -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(expected);
+    Mockito.verify(listener).onSymbolPricesUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
+      assertThat(arg).usingRecursiveComparison().isEqualTo(prices);
+      return true;
+    }), Mockito.eq(100.0), Mockito.eq(200.0), Mockito.eq(400.0), Mockito.eq(40000.0), Mockito.any());
+    Mockito.verify(listener).onCandlesUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
+      assertThat(arg).usingRecursiveComparison().isEqualTo(candles);
+      return true;
+    }), Mockito.eq(100.0), Mockito.eq(200.0), Mockito.eq(400.0), Mockito.eq(40000.0), Mockito.any());
+    Mockito.verify(listener).onTicksUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
+      assertThat(arg).usingRecursiveComparison().isEqualTo(ticks);
+      return true;
+    }), Mockito.eq(100.0), Mockito.eq(200.0), Mockito.eq(400.0), Mockito.eq(40000.0), Mockito.any());
+    Mockito.verify(listener).onBooksUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
+      assertThat(arg).usingRecursiveComparison().isEqualTo(books);
+      return true;
+    }), Mockito.eq(100.0), Mockito.eq(200.0), Mockito.eq(400.0), Mockito.eq(40000.0), Mockito.any());
+    Mockito.verify(listener).onSymbolPriceUpdated(Mockito.eq("1:ps-mpa-1"), Mockito.argThat(arg -> {
+      assertThat(arg).usingRecursiveComparison().isEqualTo(prices.get(0));
       return true;
     }));
-    Mockito.verify(listener).onSymbolPricesUpdated(Mockito.eq(1), Mockito.argThat(arg -> {
-      assertThat(arg).usingRecursiveComparison().isEqualTo(Arrays.asList(expected));
-      return true;
-    }), Mockito.eq(100.0), Mockito.eq(200.0), Mockito.eq(400.0), Mockito.eq(40000.0),
-      Mockito.any());
   }
   
   /**
@@ -1926,7 +2463,9 @@ class MetaApiWebsocketClientTest {
       @Override
       public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
         JsonNode request = jsonMapper.valueToTree(data);
-        timestamps = jsonMapper.treeToValue(request.get("timestamps"), ResponseTimestamps.class);
+        if (timestamps == null) {
+          timestamps = jsonMapper.treeToValue(request.get("timestamps"), ResponseTimestamps.class);
+        }
         if (  request.get("type").asText().equals("getSymbolPrice")
            && request.get("accountId").asText().equals("accountId")
            && request.get("symbol").asText().equals("AUDNZD")
@@ -2094,6 +2633,203 @@ class MetaApiWebsocketClientTest {
     assertThat(listener.actualTimestamps).usingRecursiveComparison().isEqualTo(timestamps);
   }
   
+  @Test
+  void testReconnectsToServerOnDisconnect() throws InterruptedException {
+    MetatraderTrade trade = new MetatraderTrade() {{
+      actionType = MetatraderTrade.ActionType.ORDER_TYPE_SELL;
+      symbol = "AUDNZD";
+      volume = 0.07;
+    }};
+    MetatraderTradeResponse response = new MetatraderTradeResponse() {{
+      numericCode = 10009;
+      stringCode = "TRADE_RETCODE_DONE";
+      message = "Request completed";
+      orderId = "46870472";
+    }};
+    ReconnectListener listener = Mockito.mock(ReconnectListener.class);
+    Mockito.when(listener.onReconnected()).thenReturn(CompletableFuture.completedFuture(null));
+    Mockito.doNothing().when(clientPacketOrderer).onReconnected(Mockito.anyList());
+    Mockito.doNothing().when(clientSubscriptionManager).onReconnected(Mockito.anyInt(), Mockito.anyList());
+    client.addReconnectListener(listener, "accountId");
+    requestCounter = 0;
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (  request.get("type").asText().equals("trade")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("application").asText().equals("application")
+        ) {
+          requestCounter++;
+          ObjectNode res = jsonMapper.createObjectNode();
+          res.put("type", "response");
+          res.set("accountId", request.get("accountId"));
+          res.set("requestId", request.get("requestId"));
+          res.set("response", jsonMapper.valueToTree(response));
+          client.sendEvent("response", jsonMapper.writeValueAsString(res));
+        }
+        client.disconnect();
+      }
+    });
+
+    client.trade("accountId", trade);
+    Thread.sleep(50);
+    Thread.sleep(1500);
+    Thread.sleep(50);
+    Mockito.verify(listener).onReconnected();
+    Mockito.verify(clientSubscriptionManager).onReconnected(0, Arrays.asList("accountId"));
+    Mockito.verify(clientPacketOrderer).onReconnected(Arrays.asList("accountId"));
+
+    client.trade("accountId", trade);
+    Thread.sleep(50);
+    Thread.sleep(1500);
+    Thread.sleep(50);
+    assertEquals(2, requestCounter);
+  };
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#rpcRequest}
+   */
+  @Test
+  void testRemovesReconnectListener() throws InterruptedException {
+    MetatraderTrade trade = new MetatraderTrade() {{
+      actionType = ActionType.ORDER_TYPE_SELL;
+      symbol = "AUDNZD";
+      volume = 0.07;
+    }};
+    MetatraderTradeResponse tradeResponse = new MetatraderTradeResponse() {{
+      numericCode = 10009;
+      stringCode = "TRADE_RETCODE_DONE";
+      message = "Request completed";
+      orderId = "46870472";
+    }};
+    ReconnectListener listener = Mockito.mock(ReconnectListener.class);
+    client.addReconnectListener(listener, "accountId");
+    Mockito.doNothing().when(clientSubscriptionManager).onReconnected(Mockito.anyInt(), Mockito.anyList());
+    requestCounter = 0;
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        assertTrue(request.get("trade").equals(jsonMapper.valueToTree(trade)));
+        requestCounter++;
+        if (  request.get("type").asText().equals("trade")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("application").asText().equals("application")
+        ) {
+          ObjectNode response = jsonMapper.createObjectNode();
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("response", jsonMapper.valueToTree(tradeResponse));
+          client.sendEvent("response", response.toString());
+        }
+        client.disconnect();
+      }
+    });
+    client.trade("accountId", trade).join();
+    Thread.sleep(50);
+    Thread.sleep(1100);
+    Thread.sleep(50);
+    Mockito.verify(listener).onReconnected();
+    client.removeReconnectListener(listener);
+
+    client.trade("accountId", trade).join();
+    Thread.sleep(50);
+    Thread.sleep(1100);
+    Thread.sleep(50);
+    Mockito.verify(listener, Mockito.times(1)).onReconnected();
+    assertEquals(2, requestCounter);
+  };
+  
+  long ordersCallTime;
+  long positionsCallTime;
+  long disconnectedCallTime;
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#queuePacket}
+   */
+  @Test
+  void testProcessesPacketsInOrder() throws Exception {
+    MetaApiWebsocketClient.resetDisconnectTimerTimeout = 7500;
+    ordersCallTime = 0;
+    positionsCallTime = 0;
+    disconnectedCallTime = 0;
+    SynchronizationListener listener = new SynchronizationListener() {
+      @Override
+      public CompletableFuture<Void> onDisconnected(String instanceIndex) {
+        return CompletableFuture.runAsync(() -> {
+          System.out.println("onDisconnected");
+          Js.sleep(625);
+          disconnectedCallTime = Date.from(Instant.now()).getTime();
+        });
+      }
+      @Override
+      public CompletableFuture<Void> onOrdersReplaced(String instanceIndex, List<MetatraderOrder> orders) {
+        return CompletableFuture.runAsync(() -> {
+          System.out.println("onOrdersReplaced");
+          Js.sleep(1250);
+          ordersCallTime = Date.from(Instant.now()).getTime();
+        });
+      }
+      @Override
+      public CompletableFuture<Void> onPositionsReplaced(String instanceIndex, List<MetatraderPosition> positions) {
+        return CompletableFuture.runAsync(() -> {
+          System.out.println("onPositionsReplaced");
+          Js.sleep(125);
+          positionsCallTime = Date.from(Instant.now()).getTime();
+        });
+      }
+    };
+    client.close();
+    socket.disconnect();
+    Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any())).thenReturn(CompletableFuture
+      .completedFuture(new MetaApiWebsocketClient.ServerUrl() {{url = "http://localhost:6784";}}));
+    client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+      application = "application";
+      domain = "project-stock.agiliumlabs.cloud";
+      requestTimeout = 6000L;
+      connectTimeout = 6000L;
+      useSharedClientApi = false;
+      retryOpts = new RetryOptions() {{retries = 3; minDelayInSeconds = 1; maxDelayInSeconds = 3;}};
+      eventProcessing = new MetaApiWebsocketClient.EventProcessingOptions() {{sequentialProcessing = true;}};
+    }});
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (  request.get("type").asText().equals("getPositions")
+           && request.get("accountId").asText().equals("accountId")
+           && request.get("application").asText().equals("RPC")
+        ) {
+          ObjectNode response = jsonMapper.createObjectNode();
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("positions", jsonMapper.valueToTree(Arrays.asList()));
+          client.sendEvent("response", response.toString());
+        }
+      }
+    });
+    client.getPositions("accountId").join();
+    client.addSynchronizationListener("accountId", listener);
+    socket.sendEvent("synchronization", Js.asJson("type", "authenticated",  "accountId", "accountId", 
+      "host", "ps-mpa-1", "instanceIndex", 1, "replicas", 2).toString());
+    Thread.sleep(50);
+    Thread.sleep(7375);
+    socket.sendEvent("synchronization", Js.asJson("type", "orders", "accountId", "accountId",
+      "orders", Arrays.asList(), "instanceIndex", 1, "host", "ps-mpa-1").toString());
+    Thread.sleep(50);
+    Thread.sleep(375);
+    socket.sendEvent("synchronization", Js.asJson("type", "positions", "accountId", "accountId",
+      "positions", Arrays.asList(), "instanceIndex", 1, "host", "ps-mpa-1").toString());
+    Thread.sleep(50);
+    Thread.sleep(2500);
+    Thread.sleep(50);
+    assertTrue(disconnectedCallTime > ordersCallTime);
+    assertTrue(positionsCallTime > disconnectedCallTime);
+  }
+  
   private static Stream<Arguments> provideAccountInformation() throws Exception {
     MetatraderAccountInformation accountInformation = new MetatraderAccountInformation();
     accountInformation.broker = "True ECN Trading Ltd";
@@ -2121,7 +2857,7 @@ class MetaApiWebsocketClientTest {
     position.currentPrice = 1.24883;
     position.currentTickValue = 1;
     position.volume = 0.07;
-    position.swap = 0;
+    position.swap = 0.0;
     position.profit = -85.25999999999966;
     position.commission = -0.25;
     position.clientId = "TE_GBPUSD_7hyINWqAlE";

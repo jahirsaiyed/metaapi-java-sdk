@@ -6,6 +6,7 @@ import java.util.function.Function;
 import cloud.metaapi.sdk.clients.HttpClient;
 import cloud.metaapi.sdk.clients.HttpRequestOptions;
 import cloud.metaapi.sdk.clients.RetryOptions;
+import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 
 /**
  * HTTP client service mock for tests
@@ -18,7 +19,7 @@ public class HttpClientMock extends HttpClient {
    * Constructs HTTP client mock
    * @param requestMock mocked request function which must return CompletableFuture with response body string
    */
-  public HttpClientMock(Function<HttpRequestOptions, CompletableFuture<String>> requestMock) {
+  public HttpClientMock(Function<HttpRequestOptions, CompletableFuture<String>> requestMock) throws ValidationException {
     this(requestMock, 60000, 60000);
   }
   
@@ -29,7 +30,7 @@ public class HttpClientMock extends HttpClient {
    * @param connectTimeout connect timeout in milliseconds
    */
   public HttpClientMock(Function<HttpRequestOptions, CompletableFuture<String>> requestMock, int requestTimeout,
-    int connectTimeout) {
+    int connectTimeout) throws ValidationException {
     this(requestMock, requestTimeout, connectTimeout, new RetryOptions());
   }
   
@@ -41,7 +42,7 @@ public class HttpClientMock extends HttpClient {
    * @param retryOpts retry options
    */
   public HttpClientMock(Function<HttpRequestOptions, CompletableFuture<String>> requestMock, int requestTimeout,
-    int connectTimeout, RetryOptions retryOpts) {
+    int connectTimeout, RetryOptions retryOpts) throws ValidationException {
     super(requestTimeout, connectTimeout, retryOpts);
     this.requestMock = requestMock;
   }

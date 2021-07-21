@@ -35,95 +35,95 @@ import io.github.cdimascio.dotenv.Dotenv;
  */
 class DoubleSynchronizationTest {
 
-    private Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
-    private String token = dotenv.get("TOKEN");
-    private String login = dotenv.get("LOGIN");
-    private String password = dotenv.get("PASSWORD");
-    private String serverName = dotenv.get("SERVER");
-    private String serverDatFile = dotenv.get("PATH_TO_SERVERS_DAT");
-    
-    @BeforeAll
-    static void setUpBeforeClass() throws IOException {
-        Files.createDirectories(FileSystems.getDefault().getPath(".", ".metaapi"));
-    }
+  private Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
+  private String token = dotenv.get("TOKEN");
+  private String login = dotenv.get("LOGIN");
+  private String password = dotenv.get("PASSWORD");
+  private String serverName = dotenv.get("SERVER");
+  private String serverDatFile = dotenv.get("PATH_TO_SERVERS_DAT");
+  
+  @BeforeAll
+  static void setUpBeforeClass() throws IOException {
+    Files.createDirectories(FileSystems.getDefault().getPath(".", ".metaapi"));
+  }
 
-    @AfterEach
-    void tearDown() throws IOException {
-        FileUtils.cleanDirectory(new File("./.metaapi"));
-    }
+  @AfterEach
+  void tearDown() throws IOException {
+    FileUtils.cleanDirectory(new File("./.metaapi"));
+  }
 
-    @Test
-    void testDoesNotCorruptFilesAfterSimultaneousSynchronization() throws ValidationException, IOException {
-        MetaApi api = new MetaApi(token, new MetaApi.Options() {{
-            domain = "project-stock.v3.agiliumlabs.cloud";
-        }});
-        final ProvisioningProfileApi profileApi = api.getProvisioningProfileApi();
-        final MetatraderAccountApi accountApi = api.getMetatraderAccountApi();
-        if (token != null) {
-            List<ProvisioningProfile> profiles = profileApi.getProvisioningProfiles().join();
-            assertTimeoutPreemptively(Duration.ofMinutes(10), () -> {
-                ProvisioningProfile profile = profiles.stream()
-                    .filter(p -> p.getName().equals(serverName))
-                    .findFirst().orElseGet(() -> {
-                        return profileApi.createProvisioningProfile(new NewProvisioningProfileDto() {{
-                            name = serverName;
-                            version = 5;
-                        }}).thenApply(p -> {
-                            p.uploadFile("servers.dat", serverDatFile);
-                            return p;
-                        }).join();
-                    });
-                if (profile.getStatus().equals("new")) {
-                    profile.uploadFile("servers.dat", serverDatFile).join();
-                }
-                List<MetatraderAccount> accounts = accountApi.getAccounts().join();
-                MetatraderAccount account = accounts.stream()
-                    .filter(a -> a.getLogin().equals(login) && a.getType().startsWith("cloud"))
-                    .findFirst().orElseGet(() -> {
-                        String envLogin = login;
-                        String envPassword = password;
-                        return accountApi.createAccount(new NewMetatraderAccountDto() {{
-                            name = "Test account";
-                            type = "cloud";
-                            login = envLogin;
-                            password = envPassword;
-                            server = serverName;
-                            provisioningProfileId = profile.getId();
-                            application = "MetaApi";
-                            magic = 1000;
-                        }}).join();
-                    });
-                MetatraderAccount accountCopy = accountApi.getAccount(account.getId()).join();
-                CompletableFuture.allOf(
-                    account.deploy(),
-                    accountCopy.deploy()
-                ).join();
-                CompletableFuture.allOf(
-                    account.waitConnected(),
-                    accountCopy.waitConnected()
-                ).join();
-                MetaApiConnection connection = account.connect().join();
-                MetaApiConnection connectionCopy = accountCopy.connect().join();
-                CompletableFuture.allOf(
-                    connection.waitSynchronized(new SynchronizationOptions() {{
-                        this.timeoutInSeconds = 600;
-                    }}),
-                    connectionCopy.waitSynchronized(new SynchronizationOptions() {{
-                        this.timeoutInSeconds = 600;
-                    }})
-                ).join();
-                account.undeploy().join();
-                accountCopy.undeploy().join();
-                MetaApiWebsocketClient websocketClient = ((MetaApiWebsocketClient) FieldUtils
-                    .readField(api, "metaApiWebsocketClient", true));
-                websocketClient.removeAllListeners();
-                if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-MetaApi-deals.bin"))) {
-                    JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-MetaApi-deals.bin"));
-                }
-                if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-MetaApi-historyOrders.bin"))) {
-                    JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-MetaApi-historyOrders.bin"));
-                }
-            });
+  @Test
+  void testDoesNotCorruptFilesAfterSimultaneousSynchronization() throws ValidationException, IOException {
+    MetaApi api = new MetaApi(token, new MetaApi.Options() {{
+      domain = "project-stock.v3.agiliumlabs.cloud";
+    }});
+    final ProvisioningProfileApi profileApi = api.getProvisioningProfileApi();
+    final MetatraderAccountApi accountApi = api.getMetatraderAccountApi();
+    if (token != null) {
+      List<ProvisioningProfile> profiles = profileApi.getProvisioningProfiles().join();
+      assertTimeoutPreemptively(Duration.ofMinutes(10), () -> {
+        ProvisioningProfile profile = profiles.stream()
+          .filter(p -> p.getName().equals(serverName))
+          .findFirst().orElseGet(() -> {
+            return profileApi.createProvisioningProfile(new NewProvisioningProfileDto() {{
+              name = serverName;
+              version = 5;
+            }}).thenApply(p -> {
+              p.uploadFile("servers.dat", serverDatFile);
+              return p;
+            }).join();
+          });
+        if (profile.getStatus().equals("new")) {
+          profile.uploadFile("servers.dat", serverDatFile).join();
         }
+        List<MetatraderAccount> accounts = accountApi.getAccounts().join();
+        MetatraderAccount account = accounts.stream()
+          .filter(a -> a.getLogin().equals(login) && a.getType().startsWith("cloud"))
+          .findFirst().orElseGet(() -> {
+            String envLogin = login;
+            String envPassword = password;
+            return accountApi.createAccount(new NewMetatraderAccountDto() {{
+              name = "Test account";
+              type = "cloud";
+              login = envLogin;
+              password = envPassword;
+              server = serverName;
+              provisioningProfileId = profile.getId();
+              application = "MetaApi";
+              magic = 1000;
+            }}).join();
+          });
+        MetatraderAccount accountCopy = accountApi.getAccount(account.getId()).join();
+        CompletableFuture.allOf(
+          account.deploy(),
+          accountCopy.deploy()
+        ).join();
+        CompletableFuture.allOf(
+          account.waitConnected(),
+          accountCopy.waitConnected()
+        ).join();
+        MetaApiConnection connection = account.connect().join();
+        MetaApiConnection connectionCopy = accountCopy.connect().join();
+        CompletableFuture.allOf(
+          connection.waitSynchronized(new SynchronizationOptions() {{
+            this.timeoutInSeconds = 600;
+          }}),
+          connectionCopy.waitSynchronized(new SynchronizationOptions() {{
+            this.timeoutInSeconds = 600;
+          }})
+        ).join();
+        account.undeploy().join();
+        accountCopy.undeploy().join();
+        MetaApiWebsocketClient websocketClient = ((MetaApiWebsocketClient) FieldUtils
+          .readField(api, "metaApiWebsocketClient", true));
+        websocketClient.removeAllListeners();
+        if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-MetaApi-deals.bin"))) {
+          JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-MetaApi-deals.bin"));
+        }
+        if (Files.exists(FileSystems.getDefault().getPath(".", ".metaapi", account.getId() + "-MetaApi-historyOrders.bin"))) {
+          JsonMapper.getInstance().readTree(new File("./.metaapi/" + account.getId() + "-MetaApi-historyOrders.bin"));
+        }
+      });
     }
+  }
 }

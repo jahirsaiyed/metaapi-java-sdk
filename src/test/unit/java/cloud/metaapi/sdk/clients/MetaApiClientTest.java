@@ -9,6 +9,7 @@ import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.mocks.HttpClientMock;
 
 /**
@@ -16,11 +17,12 @@ import cloud.metaapi.sdk.clients.mocks.HttpClientMock;
  */
 public class MetaApiClientTest {
     
-    private static HttpClient httpClient = new HttpClientMock((options) -> CompletableFuture.completedFuture("empty"));
+    private static HttpClient httpClient;
     private MetaApiClient apiClient;
     
     @BeforeEach
-    void setUp() {
+    void setUp() throws ValidationException {
+        httpClient = new HttpClientMock((options) -> CompletableFuture.completedFuture("empty"));
         apiClient = new MetaApiClient(httpClient, "token");
     }
     

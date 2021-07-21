@@ -74,11 +74,11 @@ public class MetatraderPosition {
     /**
      * Position cumulative swap
      */
-    public double swap;
+    public Double swap;
     /**
      * Position cumulative profit
      */
-    public double profit;
+    public Double profit;
     /**
      * Position comment or {@code null}. The sum of the line lengths of the comment and 
      * the clientId must be less than or equal to 26. For more information see
@@ -110,7 +110,8 @@ public class MetatraderPosition {
      */
     public PositionReason reason;
     /**
-     * Current exchange rate of account currency into USD, or {@code null}
+     * Current exchange rate of account currency into account base currency (USD if you
+     * did not override it), or {@code null}
      */
     public Double accountCurrencyExchangeRate;
     /**

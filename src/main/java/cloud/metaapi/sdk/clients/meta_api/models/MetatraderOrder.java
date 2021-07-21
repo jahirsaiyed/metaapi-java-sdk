@@ -149,7 +149,8 @@ public class MetatraderOrder {
      */
     public IsoTime expirationTime;
     /**
-     * Current exchange rate of account currency into USD, or {@code null}
+     * Current exchange rate of account currency into account base currency (USD if you
+     * did not override it), or {@code null}
      */
     public Double accountCurrencyExchangeRate;
     /**

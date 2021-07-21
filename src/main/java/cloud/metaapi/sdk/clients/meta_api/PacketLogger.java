@@ -21,11 +21,14 @@ import java.util.TimerTask;
 import java.util.concurrent.CompletionException;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import cloud.metaapi.sdk.clients.OptionsValidator;
+import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.util.JsonMapper;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
@@ -36,7 +39,7 @@ public class PacketLogger {
 
   private static SimpleDateFormat longDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
   private static SimpleDateFormat shortDateFormat = new SimpleDateFormat("yyyy-MM-dd");
-  private static Logger logger = Logger.getLogger(PacketLogger.class);
+  private static Logger logger = LogManager.getLogger(PacketLogger.class);
   private int fileNumberLimit;
   private int logFileSizeInHours;
   private boolean compressSpecifications;
@@ -93,19 +96,16 @@ public class PacketLogger {
   }
   
   /**
-   * Constructs the class with default options
-   * @throws IOException if log directory cannot be created
-   */
-  public PacketLogger() throws IOException {
-    this(new LoggerOptions());
-  }
-  
-  /**
    * Constructs the class
    * @param opts packet logger options
    * @throws IOException if log directory cannot be created
+   * @throws ValidationException if specified opts are invalid
    */
-  public PacketLogger(LoggerOptions opts) throws IOException {
+  public PacketLogger(LoggerOptions opts) throws IOException, ValidationException {
+    OptionsValidator validator = new OptionsValidator();
+    validator.validateNonZeroInt(opts.fileNumberLimit, "packetLogger.fileNumberLimit");
+    validator.validateNonZeroInt(opts.logFileSizeInHours, "packetLogger.logFileSizeInHours");
+    
     this.fileNumberLimit = opts.fileNumberLimit;
     this.logFileSizeInHours = opts.logFileSizeInHours;
     this.compressSpecifications = opts.compressSpecifications;
@@ -302,8 +302,8 @@ public class PacketLogger {
    * Records price packet messages to log files
    * @param accountId account id
    */
-  private void recordPrices(String accountId, int instanceIndex) {
-    PreviousPrice prevPrice = previousPrices.get(accountId).get(instanceIndex);
+  private void recordPrices(String accountId, int instanceNumber) {
+    PreviousPrice prevPrice = previousPrices.get(accountId).get(instanceNumber);
     if (prevPrice == null) {
       prevPrice = new PreviousPrice() {{
         first = JsonMapper.getInstance().createObjectNode();
@@ -311,7 +311,7 @@ public class PacketLogger {
       }};
     }
     List<String> queue = writeQueue.get(accountId).queue;
-    previousPrices.get(accountId).remove(instanceIndex);
+    previousPrices.get(accountId).remove(instanceNumber);
     if (previousPrices.get(accountId).size() == 0) {
       previousPrices.remove(accountId);
     }
@@ -320,7 +320,7 @@ public class PacketLogger {
     if (firstSequenceNumber != lastSequenceNumber) {
       queue.add(prevPrice.last.toString());
       queue.add("Recorded price packets " + firstSequenceNumber + "-" + lastSequenceNumber
-        + ", instanceIndex: " + instanceIndex);
+        + ", instanceIndex: " + instanceNumber);
     }
   }
   

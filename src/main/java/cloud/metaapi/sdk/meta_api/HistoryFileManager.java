@@ -20,7 +20,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,7 +38,7 @@ import cloud.metaapi.sdk.util.JsonMapper;
 public class HistoryFileManager {
   
   private static ObjectMapper jsonMapper = JsonMapper.getInstance();
-  private static Logger logger = Logger.getLogger(HistoryFileManager.class);
+  private static Logger logger = LogManager.getLogger(HistoryFileManager.class);
   
   private String accountId;
   private String application;
@@ -69,11 +70,11 @@ public class HistoryFileManager {
     /**
      * Last deal time by instance index
      */
-    public Map<Integer, Long> lastDealTimeByInstanceIndex = new HashMap<>();
+    public Map<String, Long> lastDealTimeByInstanceIndex = new HashMap<>();
     /**
      * Last history order time by instance index
      */
-    public Map<Integer, Long> lastHistoryOrderTimeByInstanceIndex = new HashMap<>();
+    public Map<String, Long> lastHistoryOrderTimeByInstanceIndex = new HashMap<>();
   }
   
   /**

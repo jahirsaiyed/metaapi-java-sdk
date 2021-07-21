@@ -1,5 +1,7 @@
 package cloud.metaapi.sdk.clients.meta_api.models;
 
+import cloud.metaapi.sdk.clients.meta_api.models.StopOptions.StopUnits;
+
 /**
  * MetaTrader trade (see https://metaapi.cloud/docs/client/models/metatraderTrade/)
  */
@@ -35,9 +37,17 @@ public class MetatraderTrade {
      */
     public Double stopLoss;
     /**
+     * Stop loss units, or {@code null}. Default is ABSOLUTE_PRICE
+     */
+    public StopUnits stopLossUnits;
+    /**
      * Take profit price or {@code null}
      */
     public Double takeProfit;
+    /**
+     * Take profit units, or {@code null}. Default is ABSOLUTE_PRICE
+     */
+    public StopUnits takeProfitUnits;
     /**
      * Order id or {@code null}, must be specified for order modification commands
      */

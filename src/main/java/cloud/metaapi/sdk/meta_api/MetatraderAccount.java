@@ -1,7 +1,6 @@
 package cloud.metaapi.sdk.meta_api;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -11,6 +10,7 @@ import java.util.stream.Collectors;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.NotFoundException;
+import cloud.metaapi.sdk.clients.meta_api.HistoricalMarketDataClient;
 import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient;
 import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient.ExpertAdvisorDto;
@@ -19,8 +19,11 @@ import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountUpdateDto;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderCandle;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.ConnectionStatus;
+import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.CopyFactoryRole;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.Extension;
 import cloud.metaapi.sdk.util.ServiceProvider;
@@ -33,6 +36,7 @@ public class MetatraderAccount {
   private MetatraderAccountDto data;
   private MetatraderAccountClient metatraderAccountClient;
   private ConnectionRegistry connectionRegistry;
+  private HistoricalMarketDataClient historicalMarketDataClient;
   private ExpertAdvisorClient expertAdvisorClient;
   
   /**
@@ -42,14 +46,16 @@ public class MetatraderAccount {
    * @param metaApiWebsocketClient MetaApi websocket client
    * @param connectionRegistry metatrader account connection registry
    * @param expertAdvisorClient expert advisor REST API client
+   * @param historicalMarketDataClient historical market data REST API client
    */
   public MetatraderAccount(MetatraderAccountDto data, MetatraderAccountClient metatraderAccountClient,
     MetaApiWebsocketClient metaApiWebsocketClient, ConnectionRegistry connectionRegistry,
-    ExpertAdvisorClient expertAdvisorClient) {
+    ExpertAdvisorClient expertAdvisorClient, HistoricalMarketDataClient historicalMarketDataClient) {
     this.data = data;
     this.metatraderAccountClient = metatraderAccountClient;
     this.connectionRegistry = connectionRegistry;
     this.expertAdvisorClient = expertAdvisorClient;
+    this.historicalMarketDataClient = historicalMarketDataClient;
   }
   
   /**
@@ -166,11 +172,56 @@ public class MetatraderAccount {
   }
   
   /**
+   * Returns user-defined account tags
+   * @return user-defined account tags
+   */
+  public List<String> getTags() {
+    return data.tags;
+  }
+
+  /**
+   * Returns account roles for CopyFactory2 application
+   * @return account roles for CopyFactory2 application
+   */
+  public List<CopyFactoryRole> getCopyFactoryRoles() {
+    return data.copyFactoryRoles;
+  }
+
+  /**
+   * Returns number of resource slots to allocate to account. Allocating extra resource slots
+   * results in better account performance under load which is useful for some applications. E.g. if you have many
+   * accounts copying the same strategy via CopyFactory API, then you can increase resourceSlots to get a lower trade
+   * copying latency. Please note that allocating extra resource slots is a paid option. Default is 1
+   * @return number of resource slots to allocate to account
+   */
+  public int getResourceSlots() {
+    return data.resourceSlots;
+  }
+
+  /**
+   * Returns 3-character ISO currency code of the account base currency. Default value is USD. The setting is to be used
+   * for copy trading accounts which use national currencies only, such as some Brazilian brokers. You should not alter
+   * this setting unless you understand what you are doing.
+   * @return 3-character ISO currency code of the account base currency
+   */
+  public String getBaseCurrency() {
+    return data.baseCurrency;
+  }
+  
+  /**
    * Returns reliability value. Possible values are regular and high
    * @return account reliability value
    */
   public String getReliability() {
     return data.reliability;
+  }
+  
+  /**
+   * Returns version value. Possible values are 4 and 5
+   * @return account version value
+   */
+  public int getVersion() {
+    return data.version;
   }
   
   /**
@@ -438,10 +489,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<List<ExpertAdvisor>> getExpertAdvisors() {
     return CompletableFuture.supplyAsync(() -> {
-      if (!getType().equals("cloud-g1")) {
-        throw new CompletionException(new ValidationException(
-          "Custom expert advisor is available only for cloud-g1 accounts", new HashMap<>()));
-      }
+      checkExpertAdvisorAllowed();
       List<ExpertAdvisorDto> advisors = expertAdvisorClient.getExpertAdvisors(getId()).join();
       return advisors.stream().map(e -> new ExpertAdvisor(e, getId(), expertAdvisorClient))
         .collect(Collectors.toList());
@@ -455,10 +503,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<ExpertAdvisor> getExpertAdvisor(String expertId) {
     return CompletableFuture.supplyAsync(() -> {
-      if (!getType().equals("cloud-g1")) {
-        throw new CompletionException(new ValidationException(
-          "Custom expert advisor is available only for cloud-g1 accounts", new HashMap<>()));
-      }
+      checkExpertAdvisorAllowed();
       ExpertAdvisorDto advisor = expertAdvisorClient.getExpertAdvisor(getId(), expertId).join();
       return new ExpertAdvisor(advisor, getId(), expertAdvisorClient);
     });
@@ -472,12 +517,100 @@ public class MetatraderAccount {
    */
   public CompletableFuture<ExpertAdvisor> createExpertAdvisor(String expertId, NewExpertAdvisorDto expert) {
     return CompletableFuture.supplyAsync(() -> {
-      if (!getType().equals("cloud-g1")) {
-        throw new CompletionException(new ValidationException(
-          "Custom expert advisor is available only for cloud-g1 accounts", new HashMap<>()));
-      }
+      checkExpertAdvisorAllowed();
       expertAdvisorClient.updateExpertAdvisor(getId(), expertId, expert).join();
       return getExpertAdvisor(expertId).join();
     });
+  }
+
+  /**
+   * Returns historical candles for a specific symbol and timeframe from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalCandles/
+   * @param symbol symbol to retrieve candles for (e.g. a currency pair or an index)
+   * @param timeframe defines the timeframe according to which the candles must be generated.
+   * Allowed values for MT5 are 1m, 2m, 3m, 4m, 5m, 6m, 10m, 12m, 15m, 20m, 30m, 1h, 2h, 3h, 4h,
+   * 6h, 8h, 12h, 1d, 1w, 1mn. Allowed values for MT4 are 1m, 5m, 15m 30m, 1h, 4h, 1d, 1w, 1mn
+   * @return completable future promise resolving with historical candles downloaded
+   */
+  public CompletableFuture<List<MetatraderCandle>> getHistoricalCandles(String symbol, String timeframe) {
+    return historicalMarketDataClient.getHistoricalCandles(getId(), symbol, timeframe, null, null);
+  }
+  
+  /**
+   * Returns historical candles for a specific symbol and timeframe from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalCandles/
+   * @param symbol symbol to retrieve candles for (e.g. a currency pair or an index)
+   * @param timeframe defines the timeframe according to which the candles must be generated.
+   * Allowed values for MT5 are 1m, 2m, 3m, 4m, 5m, 6m, 10m, 12m, 15m, 20m, 30m, 1h, 2h, 3h, 4h,
+   * 6h, 8h, 12h, 1d, 1w, 1mn. Allowed values for MT4 are 1m, 5m, 15m 30m, 1h, 4h, 1d, 1w, 1mn
+   * @param startTime time to start loading candles from. Note that candles are loaded in backwards
+   * direction, so this should be the latest time. Leave {@code null} to request latest candles.
+   * @return completable future promise resolving with historical candles downloaded
+   */
+  public CompletableFuture<List<MetatraderCandle>> getHistoricalCandles(String symbol,
+    String timeframe, IsoTime startTime) {
+    return historicalMarketDataClient.getHistoricalCandles(getId(), symbol, timeframe, startTime, null);
+  }
+  
+  /**
+   * Returns historical candles for a specific symbol and timeframe from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalCandles/
+   * @param symbol symbol to retrieve candles for (e.g. a currency pair or an index)
+   * @param timeframe defines the timeframe according to which the candles must be generated.
+   * Allowed values for MT5 are 1m, 2m, 3m, 4m, 5m, 6m, 10m, 12m, 15m, 20m, 30m, 1h, 2h, 3h, 4h,
+   * 6h, 8h, 12h, 1d, 1w, 1mn. Allowed values for MT4 are 1m, 5m, 15m 30m, 1h, 4h, 1d, 1w, 1mn
+   * @param startTime time to start loading candles from. Note that candles are loaded in backwards
+   * direction, so this should be the latest time. Leave {@code null} to request latest candles.
+   * @param limit maximum number of candles to retrieve, or {@code null}. Must be less or equal to 1000
+   * @return completable future resolving with historical candles downloaded
+   */
+  public CompletableFuture<List<MetatraderCandle>> getHistoricalCandles(String symbol,
+    String timeframe, IsoTime startTime, Integer limit) {
+    return historicalMarketDataClient.getHistoricalCandles(getId(), symbol, timeframe, startTime, limit);
+  }
+
+  /**
+   * Returns historical ticks for a specific symbol from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalTicks/
+   * @param symbol symbol to retrieve ticks for (e.g. a currency pair or an index)
+   * @return completable future resolving with historical ticks downloaded
+   */
+  public CompletableFuture<List<MetatraderTick>> getHistoricalTicks(String symbol) {
+    return historicalMarketDataClient.getHistoricalTicks(getId(), symbol, null, null, null);
+  }
+  
+  /**
+   * Returns historical ticks for a specific symbol from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalTicks/
+   * @param symbol symbol to retrieve ticks for (e.g. a currency pair or an index)
+   * @param startTime time to start loading ticks from. Note that ticks are loaded in forward
+   * direction, so this should be the earliest time. Leave {@code null} to request latest candles.
+   * @return completable future resolving with historical ticks downloaded
+   */
+  public CompletableFuture<List<MetatraderTick>> getHistoricalTicks(String symbol, IsoTime startTime) {
+    return historicalMarketDataClient.getHistoricalTicks(getId(), symbol, startTime, null, null);
+  }
+  
+  /**
+   * Returns historical ticks for a specific symbol from the MetaTrader account.
+   * See https://metaapi.cloud/docs/client/restApi/api/retrieveMarketData/readHistoricalTicks/
+   * @param symbol symbol to retrieve ticks for (e.g. a currency pair or an index)
+   * @param startTime time to start loading ticks from. Note that ticks are loaded in forward
+   * direction, so this should be the earliest time. Leave {@code null} to request latest candles.
+   * @param offset number of ticks to skip, or {@code null} (you can use it to avoid requesting
+   * ticks from previous request twice)
+   * @param limit maximum number of ticks to retrieve, or {@code null}. Must be less or equal to 1000
+   * @return completable future resolving with historical ticks downloaded
+   */
+  public CompletableFuture<List<MetatraderTick>> getHistoricalTicks(String symbol,
+    IsoTime startTime, Integer offset, Integer limit) {
+    return historicalMarketDataClient.getHistoricalTicks(getId(), symbol, startTime, offset, limit);
+  }
+  
+  private void checkExpertAdvisorAllowed() throws CompletionException {
+    if (getVersion() != 4 || !getType().equals("cloud-g1")) {
+      throw new CompletionException(new ValidationException(
+        "Custom expert advisor is available only for MT4 G1 accounts", null));
+    }
   }
 }

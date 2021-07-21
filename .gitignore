@@ -10,3 +10,4 @@ servers.dat
 .metaapi
 !/src/test/resources/servers.dat
 .docker
+/_*

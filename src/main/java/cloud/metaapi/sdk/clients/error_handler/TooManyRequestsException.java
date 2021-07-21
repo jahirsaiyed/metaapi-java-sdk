@@ -25,6 +25,10 @@ public class TooManyRequestsException extends ApiException {
      * Recommended date to retry request
      */
     public IsoTime recommendedRetryTime;
+    /**
+     * Error type
+     */
+    public String type;
   }
   
   public TooManyRequestsExceptionMetadata metadata;

@@ -8,11 +8,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
 import cloud.metaapi.sdk.clients.models.IsoTime;
+import cloud.metaapi.sdk.util.Js;
 
 /**
  * Class which orders the synchronization packets
@@ -31,6 +31,10 @@ public class PacketOrderer {
      * Account id from packet
      */
     public String accountId;
+    /**
+     * Host
+     */
+    public String host;
     /**
      * Instance index
      */
@@ -51,10 +55,10 @@ public class PacketOrderer {
   
   private OutOfOrderListener outOfOrderListener;
   private int orderingTimeoutInSeconds;
-  private Map<String, Boolean> isOutOfOrderEmitted;
-  private Map<String, AtomicLong> sequenceNumberByInstance;
-  private Map<String, Integer> lastSessionStartTimestamp;
-  private Map<String, List<Packet>> packetsByInstance;
+  private Map<String, Boolean> isOutOfOrderEmitted = new HashMap<>();
+  private Map<String, Long> sequenceNumberByInstance = new HashMap<>();
+  private Map<String, Integer> lastSessionStartTimestamp = new HashMap<>();
+  private Map<String, List<Packet>> packetsByInstance = new HashMap<>();
   private int waitListSizeLimit = 100;
   private Timer outOfOrderJob;
   
@@ -66,7 +70,6 @@ public class PacketOrderer {
   public PacketOrderer(OutOfOrderListener outOfOrderListener, int orderingTimeoutInSeconds) {
     this.outOfOrderListener = outOfOrderListener;
     this.orderingTimeoutInSeconds = orderingTimeoutInSeconds;
-    this.isOutOfOrderEmitted = new HashMap<>();
   }
   
   /**
@@ -112,11 +115,12 @@ public class PacketOrderer {
     }
     String accountId = packet.get("accountId").asText();
     int instanceIndex = packet.has("instanceIndex") ? packet.get("instanceIndex").asInt() : 0;
-    String instanceId = accountId + ":" + instanceIndex;
+    String host = packet.hasNonNull("host") ? packet.get("host").asText() : null;
+    String instanceId = accountId + ":" + instanceIndex + ":" + (Js.or(host, 0));
     if (packet.get("type").asText().equals("synchronizationStarted") && packet.has("synchronizationId")) {
       // synchronization packet sequence just started
       isOutOfOrderEmitted.put(instanceId, false);
-      sequenceNumberByInstance.put(instanceId, new AtomicLong(sequenceNumber));
+      sequenceNumberByInstance.put(instanceId, sequenceNumber);
       lastSessionStartTimestamp.put(instanceId, packet.get("sequenceTimestamp").asInt());
       if (packetsByInstance.containsKey(instanceId)) {
         packetsByInstance.get(instanceId).removeIf(waitPacket -> 
@@ -130,14 +134,14 @@ public class PacketOrderer {
       // filter out previous packets
       return result;
     } else if (sequenceNumberByInstance.containsKey(instanceId)
-      && sequenceNumber == sequenceNumberByInstance.get(instanceId).get()) {
+      && sequenceNumber == sequenceNumberByInstance.get(instanceId)) {
       // let the duplicate s/n packet to pass through
       result.add(packet);
       return result;
     } else if (sequenceNumberByInstance.containsKey(instanceId)
-      && sequenceNumber == sequenceNumberByInstance.get(instanceId).get() + 1) {
+      && sequenceNumber == sequenceNumberByInstance.get(instanceId) + 1) {
       // in-order packet was received
-      sequenceNumberByInstance.get(instanceId).incrementAndGet();
+      sequenceNumberByInstance.put(instanceId, sequenceNumberByInstance.get(instanceId) + 1);
       result.add(packet);
       result.addAll(findNextPacketsFromWaitList(instanceId));
       return result;
@@ -160,16 +164,52 @@ public class PacketOrderer {
     }
   }
   
+  /**
+   * Resets state for instance id
+   * @param instanceId instance id to reset state for
+   */
+  public void onStreamClosed(String instanceId) {
+    packetsByInstance.remove(instanceId);
+    lastSessionStartTimestamp.remove(instanceId);
+    sequenceNumberByInstance.remove(instanceId);
+  }
+
+  /**
+   * Resets state for specified accounts on reconnect
+   * @param reconnectAccountIds reconnected account ids
+   */
+  public void onReconnected(List<String> reconnectAccountIds) {
+    new ArrayList<>(packetsByInstance.keySet()).forEach(instanceId -> {
+      if (reconnectAccountIds.contains(getAccountIdFromInstance(instanceId))) {
+        packetsByInstance.remove(instanceId);
+      }
+    });
+    new ArrayList<>(lastSessionStartTimestamp.keySet()).forEach(instanceId -> {
+      if (reconnectAccountIds.contains(getAccountIdFromInstance(instanceId))) {
+        lastSessionStartTimestamp.remove(instanceId);
+      }
+    });
+    new ArrayList<>(sequenceNumberByInstance.keySet()).forEach(instanceId -> {
+      if (reconnectAccountIds.contains(getAccountIdFromInstance(instanceId))) {
+        sequenceNumberByInstance.remove(instanceId);
+      }
+    });
+  }
+
+  private String getAccountIdFromInstance(String instanceId) {
+    return instanceId.split(":")[0];
+  }
+  
   private List<JsonNode> findNextPacketsFromWaitList(String instanceId) {
     List<JsonNode> result = new ArrayList<>();
     List<Packet> waitList = packetsByInstance.getOrDefault(instanceId, new ArrayList<>());
     while (!waitList.isEmpty() 
-      && (waitList.get(0).sequenceNumber == sequenceNumberByInstance.get(instanceId).get()
-        || waitList.get(0).sequenceNumber == sequenceNumberByInstance.get(instanceId).get() + 1)
+      && (waitList.get(0).sequenceNumber == sequenceNumberByInstance.get(instanceId)
+        || waitList.get(0).sequenceNumber == sequenceNumberByInstance.get(instanceId) + 1)
     ) {
       result.add(waitList.get(0).packet);
-      if (waitList.get(0).sequenceNumber == sequenceNumberByInstance.get(instanceId).get() + 1) {
-        sequenceNumberByInstance.get(instanceId).getAndIncrement();
+      if (waitList.get(0).sequenceNumber == sequenceNumberByInstance.get(instanceId) + 1) {
+        sequenceNumberByInstance.put(instanceId, sequenceNumberByInstance.get(instanceId) + 1);
       }
       waitList.remove(0);
     }
@@ -193,7 +233,7 @@ public class PacketOrderer {
             // Do not emit onOutOfOrderPacket for packets that come before synchronizationStarted
             if (sequenceNumberByInstance.containsKey(instanceId)) {
               outOfOrderListener.onOutOfOrderPacket(packet.accountId, packet.instanceIndex,
-                sequenceNumberByInstance.get(instanceId).get() + 1, packet.sequenceNumber,
+                sequenceNumberByInstance.get(instanceId) + 1, packet.sequenceNumber,
                 packet.packet, packet.receivedAt);
             }
           }

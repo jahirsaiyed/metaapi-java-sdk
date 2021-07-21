@@ -1,4 +1,4 @@
-12.4.0
+13.2.0
   - added clientId to query websocket url
   - added equity curve filter to CopyFactory
   - fixed health state tracking for multiple replicas
@@ -7,6 +7,36 @@
   - increase socket connection stability
   - added API for advanced market data subscriptions
   - added API to increase account reliability
+  - added subscription manager to handle account subscription process
+  - fixed error on socket reconnect
+  - improved handling of too many requests error
+  - added getSymbols RPC API
+  - added baseCurrency field to the MetaTraderAccount model
+  - handle TooManyRequestsError in HTTP client
+  - limit max concurrent synchronizations based on the number of subscribed accounts
+  - implement proper rounding for position profits and account equity
+  - breaking change: refactored specifications updated events
+  - fix equity calculation
+  - implemented API to retrieve historical market data
+  - do not query specification fields until it is received in TerminalState
+  - upgraded CopyFactory API to 2.1.1
+  - increased default demo account request timeout to 240 seconds
+  - swapRollover3Days can take value of NONE for some brokers
+  - added MetaStats SDK
+  - fixed deal sorting in memory history store
+  - improve stability for connection host migration
+  - disable synchronization after connection is closed
+  - make it possible to specify relative SL/TP
+  - fixed synchronization queue
+  - breaking change: added sequential packet processing
+  - increased health status tracking interval to decrease CPU load
+  - added copyFactoryRoles field to MetatraderAccount entity
+  - added resourceSlots field to MetatraderAccount model so that user can request extra resource allocation for specific accounts for an extra fee
+  - added logging URL on websocket connection
+  - fixed initializing websocket connection for multiple accounts
+  - remove synchronization listeners on connection close
+  - added options validation
+  - added waitForPrice method into TerminalState class to make it possible to wait for price to arrive
 
 12.3.1
   - added feature to unsubscribe from market data (remove symbol from market watch)
@@ -20,16 +50,14 @@
   - removed maximum reliability value
 
 12.1.0
-  - add name and login to account information
-  - add a feature to select trade scaling mode in CopyFactory (i.e. if we want the trade size to be preserved or scaled according to balance when copying)
-
-12.1.0
   - added API to retrieve CopyFactory slave trading log
   - fixed race condition when orders are being added and completed fast
   - breaking change: changed signatures of SynchronizationListener methods
   - add reliability field
   - add symbol mapping setting to CopyFactory
   - fix quote health check logic
+  - add name and login to account information
+  - add a feature to select trade scaling mode in CopyFactory (i.e. if we want the trade size to be preserved or scaled according to balance when copying)
 
 11.0.0
   - breaking change: MetaApi options are now specified via an object

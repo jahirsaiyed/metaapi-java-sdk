@@ -7,7 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.HttpClient;
 import cloud.metaapi.sdk.clients.HttpRequestOptions;
@@ -20,7 +21,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.*;
  */
 public class MetatraderAccountClient extends MetaApiClient {
 
-  private static Logger logger = Logger.getLogger(MetatraderAccountClient.class);
+  private static Logger logger = LogManager.getLogger(MetatraderAccountClient.class);
   
   /**
    * Constructs MetaTrader account API client instance with default domain agiliumtrade.agiliumtrade.ai
