@@ -10,10 +10,8 @@ public class OptionsValidator {
   /**
    * Validates a number parameter to be above zero
    * @param value value to validate
-   * @param defaultValue default value for an option
    * @param name option name
-   * @returns validated value
-   * @throws ValidationError if value is invalid
+   * @throws ValidationException if value is invalid
    */
   public void validateNonZeroInt(int value, String name) throws ValidationException {
     if (value <= 0) {
@@ -24,10 +22,8 @@ public class OptionsValidator {
   /**
    * Validates a number parameter to be above zero
    * @param value value to validate
-   * @param defaultValue default value for an option
    * @param name option name
-   * @returns validated value
-   * @throws ValidationError if value is invalid
+   * @throws ValidationException if value is invalid
    */
   public void validateNonZeroLong(long value, String name) throws ValidationException {
     if (value <= 0) {

@@ -13,6 +13,7 @@ public abstract class SynchronizationListener {
   /**
    * Returns instance number of instance index
    * @param instanceIndex instance index
+   * @return instance number or {@code null}
    */
   public Integer getInstanceNumber(String instanceIndex) {
     if (instanceIndex == null) {
@@ -24,6 +25,7 @@ public abstract class SynchronizationListener {
   /**
    * Returns host name of instance index
    * @param instanceIndex instance index
+   * @return host name or {@code null}
    */
   public String getHostName(String instanceIndex) {
     if (instanceIndex == null) {

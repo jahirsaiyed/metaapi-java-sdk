@@ -153,6 +153,7 @@ public class SynchronizationThrottler {
   
   /**
    * Returns the list of currently synchronizing account ids
+   * @return the list of currently synchronizing account ids
    */
   public List<String> getSynchronizingAccounts() {
     List<String> synchronizingAccounts = new ArrayList<>();

@@ -96,14 +96,6 @@ public class PacketLogger {
   }
   
   /**
-   * Constructs the class with default options
-   * @throws IOException if log directory cannot be created
-   */
-  public PacketLogger() throws IOException, ValidationException {
-    this(new LoggerOptions());
-  }
-  
-  /**
    * Constructs the class
    * @param opts packet logger options
    * @throws IOException if log directory cannot be created

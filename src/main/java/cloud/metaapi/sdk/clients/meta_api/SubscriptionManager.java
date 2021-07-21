@@ -88,6 +88,7 @@ public class SubscriptionManager {
    * @param instanceNumber instance index number
    * @param isDisconnectedRetryMode whether to start subscription in disconnected retry mode.
    * Subscription task in disconnected mode will be immediately replaced when the status packet is received
+   * @return completable future when the operation is completed
    */
   public CompletableFuture<Void> subscribe(String accountId, Integer instanceNumber,
     boolean isDisconnectedRetryMode) {
@@ -207,6 +208,7 @@ public class SubscriptionManager {
    * Invoked when connection to MetaTrader terminal terminated
    * @param accountId id of the MetaTrader account
    * @param instanceNumber instance index number
+   * @return completable future when the operation is completed
    */
   public CompletableFuture<Void> onDisconnected(String accountId, int instanceNumber) {
     return CompletableFuture.runAsync(() -> {

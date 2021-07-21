@@ -29,6 +29,7 @@ public class MetatraderAccountApi {
    * @param metaApiWebsocketClient MetaApi websocket client
    * @param connectionRegistry metatrader account connection registry
    * @param expertAdvisorClient expert advisor REST API client
+   * @param historicalMarketDataClient historical market data REST API client
    */
   public MetatraderAccountApi(MetatraderAccountClient metatraderAccountClient,
     MetaApiWebsocketClient metaApiWebsocketClient, ConnectionRegistry connectionRegistry,

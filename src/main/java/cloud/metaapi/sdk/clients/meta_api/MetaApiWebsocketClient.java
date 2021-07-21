@@ -180,6 +180,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @param token authorization token
    * @param opts websocket client options
    * @throws IOException if packet logger is enabled and failed to create the log directory
+   * @throws ValidationException if options are invalid
    */
   public MetaApiWebsocketClient(HttpClient httpClient, String token, ClientOptions opts)
     throws IOException, ValidationException {
@@ -317,6 +318,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * Locks subscription for a socket instance based on TooManyRequestsError metadata
    * @param socketInstanceIndex socket instance index
    * @param metadata TooManyRequestsException metadata
+   * @return completable future resolving when the operation is completed
    */
   public CompletableFuture<Void> lockSocketInstance(int socketInstanceIndex,
     TooManyRequestsExceptionMetadata metadata) {
@@ -966,6 +968,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * Creates a task that ensures the account gets subscribed to the server
    * @param accountId account id to subscribe
    * @param instanceNumber instance index number, or {@code null}
+   * @return completable future resolving when the operation is completed
    */
   public CompletableFuture<Void> ensureSubscribe(String accountId, Integer instanceNumber) {
     return subscriptionManager.subscribe(accountId, instanceNumber, false);
