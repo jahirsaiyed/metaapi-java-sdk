@@ -2,7 +2,8 @@ package cloud.metaapi.sdk.meta_api;
 
 import java.io.IOException;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.HttpClient;
 import cloud.metaapi.sdk.clients.OptionsValidator;
@@ -22,7 +23,7 @@ import cloud.metaapi.sdk.clients.meta_api.SynchronizationThrottler;
  */
 public class MetaApi {
   
-  private static Logger logger = Logger.getLogger(MetaApi.class);
+  private static Logger logger = LogManager.getLogger(MetaApi.class);
   private MetaApiWebsocketClient metaApiWebsocketClient;
   private ProvisioningProfileApi provisioningProfileApi;
   private MetatraderAccountApi metatraderAccountApi;

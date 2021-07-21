@@ -10,7 +10,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -27,7 +28,7 @@ import cloud.metaapi.sdk.util.ServiceProvider;
  */
 public class SynchronizationThrottler {
   
-  private static Logger logger = Logger.getLogger(SynchronizationThrottler.class);
+  private static Logger logger = LogManager.getLogger(SynchronizationThrottler.class);
   private int maxConcurrentSynchronizations;
   private int queueTimeoutInSeconds;
   private int synchronizationTimeoutInSeconds;

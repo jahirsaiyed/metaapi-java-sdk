@@ -12,7 +12,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException;
 import cloud.metaapi.sdk.clients.models.IsoTime;
@@ -24,7 +25,7 @@ import cloud.metaapi.sdk.util.ServiceProvider;
  */
 public class SubscriptionManager {
   
-  private static Logger logger = Logger.getLogger(SubscriptionManager.class);
+  private static Logger logger = LogManager.getLogger(SubscriptionManager.class);
   private MetaApiWebsocketClient websocketClient;
   private Map<String, Subscription> subscriptions = new HashMap<>();
   private Set<String> awaitingResubscribe = new HashSet<>();

@@ -15,7 +15,8 @@ import java.util.Optional;
 import java.util.Timer;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
 import cloud.metaapi.sdk.clients.meta_api.models.ConnectionHealthStatus;
@@ -34,7 +35,7 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
 
   protected static int minMeasureInterval = 1000;
   protected static int minQuoteInterval = 60000;
-  private static Logger logger = Logger.getLogger(ConnectionHealthMonitor.class);
+  private static Logger logger = LogManager.getLogger(ConnectionHealthMonitor.class);
   private MetaApiConnection connection;
   private Map<String, Reservoir> uptimeReservoirs;
   private Date priceUpdatedAt;

@@ -14,7 +14,8 @@ import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
@@ -48,7 +49,7 @@ import cloud.metaapi.sdk.util.Js;
  */
 public class MetaApiConnection extends SynchronizationListener implements ReconnectListener {
 
-  private static Logger logger = Logger.getLogger(MetaApiConnection.class);
+  private static Logger logger = LogManager.getLogger(MetaApiConnection.class);
   private MetaApiWebsocketClient websocketClient;
   private MetatraderAccount account;
   private ConnectionRegistry connectionRegistry;

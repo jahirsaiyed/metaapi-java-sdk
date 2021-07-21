@@ -21,7 +21,8 @@ import java.util.TimerTask;
 import java.util.concurrent.CompletionException;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -38,7 +39,7 @@ public class PacketLogger {
 
   private static SimpleDateFormat longDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
   private static SimpleDateFormat shortDateFormat = new SimpleDateFormat("yyyy-MM-dd");
-  private static Logger logger = Logger.getLogger(PacketLogger.class);
+  private static Logger logger = LogManager.getLogger(PacketLogger.class);
   private int fileNumberLimit;
   private int logFileSizeInHours;
   private boolean compressSpecifications;

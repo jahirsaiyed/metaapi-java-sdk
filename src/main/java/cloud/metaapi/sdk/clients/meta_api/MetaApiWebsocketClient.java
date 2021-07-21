@@ -21,7 +21,8 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -70,7 +71,7 @@ import io.socket.engineio.client.transports.WebSocket;
  */
 public class MetaApiWebsocketClient implements OutOfOrderListener {
 
-  private static Logger logger = Logger.getLogger(MetaApiWebsocketClient.class);
+  private static Logger logger = LogManager.getLogger(MetaApiWebsocketClient.class);
   protected static int resetDisconnectTimerTimeout = 60000;
   
   private String domain;
