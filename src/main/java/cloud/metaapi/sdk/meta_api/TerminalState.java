@@ -3,7 +3,7 @@ package cloud.metaapi.sdk.meta_api;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -31,8 +31,8 @@ public class TerminalState extends SynchronizationListener {
    */
   protected int statusTimerTimeoutInMilliseconds = 60000;
   
-  private Map<String, State> stateByInstanceIndex = new HashMap<>();
-  private Map<String, List<CompletableFuture<Void>>> waitForPriceResolves = new HashMap<>(); 
+  private Map<String, State> stateByInstanceIndex = new ConcurrentHashMap<>();
+  private Map<String, List<CompletableFuture<Void>>> waitForPriceResolves = new ConcurrentHashMap<>(); 
   
   private static class State {
     public boolean connected = false;
@@ -41,10 +41,10 @@ public class TerminalState extends SynchronizationListener {
     public List<MetatraderPosition> positions = new ArrayList<>();
     public List<MetatraderOrder> orders = new ArrayList<>();
     public List<MetatraderSymbolSpecification> specifications = new ArrayList<>();
-    public Map<String, MetatraderSymbolSpecification> specificationsBySymbol = new HashMap<>();
-    public Map<String, MetatraderSymbolPrice> pricesBySymbol = new HashMap<>();
-    public Map<String, Date> completedOrders = new HashMap<>();
-    public Map<String, Date> removedPositions = new HashMap<>();
+    public Map<String, MetatraderSymbolSpecification> specificationsBySymbol = new ConcurrentHashMap<>();
+    public Map<String, MetatraderSymbolPrice> pricesBySymbol = new ConcurrentHashMap<>();
+    public Map<String, Date> completedOrders = new ConcurrentHashMap<>();
+    public Map<String, Date> removedPositions = new ConcurrentHashMap<>();
     public boolean positionsInitialized = false;
     public long lastUpdateTime = 0;
   }

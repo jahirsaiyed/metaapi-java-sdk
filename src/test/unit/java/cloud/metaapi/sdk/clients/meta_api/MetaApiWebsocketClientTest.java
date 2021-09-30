@@ -15,7 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -1116,7 +1116,7 @@ class MetaApiWebsocketClientTest {
       throw new Exception("ValidationException extected");
     } catch (Throwable err) {
       assertTrue(err.getCause().getCause() instanceof ValidationException);
-      Map<String, String> details = new HashMap<>();
+      Map<String, String> details = new ConcurrentHashMap<>();
       details.put("parameter", "volume");
       details.put("message", "Required value.");
       assertThat(((ValidationException) err.getCause().getCause()).details)
@@ -1171,7 +1171,7 @@ class MetaApiWebsocketClientTest {
       assertTrue(error.getCause() instanceof ValidationException);
       ValidationException validationError = (ValidationException) error.getCause();
       List<Map<String, String>> expectedDetails = new ArrayList<>();
-      Map<String, String> expectedDetail = new HashMap<>();
+      Map<String, String> expectedDetail = new ConcurrentHashMap<>();
       expectedDetail.put("parameter", "volume");
       expectedDetail.put("message", "Required value");
       expectedDetails.add(expectedDetail);
@@ -1207,7 +1207,7 @@ class MetaApiWebsocketClientTest {
       assertTrue(error.getCause() instanceof ValidationException);
       ValidationException validationError = (ValidationException) error.getCause();
       List<Map<String, String>> expectedDetails = new ArrayList<>();
-      Map<String, String> expectedDetail = new HashMap<>();
+      Map<String, String> expectedDetail = new ConcurrentHashMap<>();
       expectedDetail.put("parameter", "volume");
       expectedDetail.put("message", "Required value");
       expectedDetails.add(expectedDetail);

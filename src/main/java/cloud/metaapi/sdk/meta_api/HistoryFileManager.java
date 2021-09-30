@@ -9,7 +9,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
@@ -70,11 +70,11 @@ public class HistoryFileManager {
     /**
      * Last deal time by instance index
      */
-    public Map<String, Long> lastDealTimeByInstanceIndex = new HashMap<>();
+    public Map<String, Long> lastDealTimeByInstanceIndex = new ConcurrentHashMap<>();
     /**
      * Last history order time by instance index
      */
-    public Map<String, Long> lastHistoryOrderTimeByInstanceIndex = new HashMap<>();
+    public Map<String, Long> lastHistoryOrderTimeByInstanceIndex = new ConcurrentHashMap<>();
   }
   
   /**

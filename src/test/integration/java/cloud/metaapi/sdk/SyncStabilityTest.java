@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -120,7 +120,7 @@ class SyncStabilityTest {
   }
   
   static class Socket {
-    public static Map<SocketIOClient, Socket> sockets = new HashMap<>();
+    public static Map<SocketIOClient, Socket> sockets = new ConcurrentHashMap<>();
     public SocketIOClient socket;
     public Consumer<JsonNode> requestListener = null;
     
@@ -131,7 +131,7 @@ class SyncStabilityTest {
   
   static class FakeServer {
     
-    public Map<String, Timer> statusTasks = new HashMap<>();
+    public Map<String, Timer> statusTasks = new ConcurrentHashMap<>();
     public Consumer<Socket> connectListener = null;
     private boolean enableStatusTask = true;
     
@@ -817,7 +817,7 @@ class SyncStabilityTest {
   void testWaitsForRetryTimeAfterPerServer429Error(Runnable beforeEach) throws InterruptedException {
     beforeEach.run();
     requestTimestamp = 0;
-    Map<String, String> sidByAccounts = new HashMap<>();
+    Map<String, String> sidByAccounts = new ConcurrentHashMap<>();
 
     fakeServer.enableSyncMethod = (socket) -> {
       socket.requestListener = (data) -> {
@@ -916,7 +916,7 @@ class SyncStabilityTest {
   @MethodSource("provideBeforeEach")
   void testFreesASubscribeSlotOnUnsubscribeAfterPerServer429Error(Runnable beforeEach) throws InterruptedException {
     beforeEach.run();
-    Map<String, String> sidByAccounts = new HashMap<>();
+    Map<String, String> sidByAccounts = new ConcurrentHashMap<>();
     fakeServer.enableSyncMethod = (socket) -> {
       socket.requestListener = (data) -> {
         try {
@@ -974,7 +974,7 @@ class SyncStabilityTest {
   void testWaitsForRetryTimeAfterPerServerPerUser429error(Runnable beforeEach) throws InterruptedException {
     beforeEach.run();
     requestTimestamp = 0;
-    Map<String, String> sidByAccounts = new HashMap<>();
+    Map<String, String> sidByAccounts = new ConcurrentHashMap<>();
     fakeServer.enableSyncMethod = (socket) -> {
       socket.requestListener = (data) -> {
         try {

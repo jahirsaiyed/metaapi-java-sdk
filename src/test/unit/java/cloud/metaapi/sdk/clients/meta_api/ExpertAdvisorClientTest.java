@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -140,7 +140,7 @@ class ExpertAdvisorClientTest {
     httpClient.setRequestMock((actualOptions) -> {
       HttpRequestOptions expectedOptions = new HttpRequestOptions(provisioningApiUrl
         + "/users/current/accounts/id/expert-advisors/my-ea/file", Method.PUT);
-      Map<String, Object> formData = new HashMap<>();
+      Map<String, Object> formData = new ConcurrentHashMap<>();
       formData.put("file", new FileStreamField(file, "file"));
       expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
       expectedOptions.setBody(formData);

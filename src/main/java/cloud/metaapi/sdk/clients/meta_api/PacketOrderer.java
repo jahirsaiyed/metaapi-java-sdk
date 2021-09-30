@@ -3,7 +3,7 @@ package cloud.metaapi.sdk.clients.meta_api;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
@@ -55,10 +55,10 @@ public class PacketOrderer {
   
   private OutOfOrderListener outOfOrderListener;
   private int orderingTimeoutInSeconds;
-  private Map<String, Boolean> isOutOfOrderEmitted = new HashMap<>();
-  private Map<String, Long> sequenceNumberByInstance = new HashMap<>();
-  private Map<String, Integer> lastSessionStartTimestamp = new HashMap<>();
-  private Map<String, List<Packet>> packetsByInstance = new HashMap<>();
+  private Map<String, Boolean> isOutOfOrderEmitted = new ConcurrentHashMap<>();
+  private Map<String, Long> sequenceNumberByInstance = new ConcurrentHashMap<>();
+  private Map<String, Integer> lastSessionStartTimestamp = new ConcurrentHashMap<>();
+  private Map<String, List<Packet>> packetsByInstance = new ConcurrentHashMap<>();
   private int waitListSizeLimit = 100;
   private Timer outOfOrderJob;
   
@@ -77,9 +77,9 @@ public class PacketOrderer {
    */
   public void start() {
     final PacketOrderer self = this;
-    sequenceNumberByInstance = new HashMap<>();
-    lastSessionStartTimestamp = new HashMap<>();
-    packetsByInstance = new HashMap<>();
+    sequenceNumberByInstance = new ConcurrentHashMap<>();
+    lastSessionStartTimestamp = new ConcurrentHashMap<>();
+    packetsByInstance = new ConcurrentHashMap<>();
     if (outOfOrderJob == null) {
       outOfOrderJob = new Timer();
       outOfOrderJob.schedule(new TimerTask() {
@@ -228,7 +228,7 @@ public class PacketOrderer {
           .toInstant().plusSeconds(orderingTimeoutInSeconds);
         if (receivedAtPlusTimeout.compareTo(Instant.now()) < 0) {
           String instanceId = packet.instanceId;
-          if (!isOutOfOrderEmitted.getOrDefault(instanceId, false)) {
+          if (instanceId != null && !isOutOfOrderEmitted.getOrDefault(instanceId, false)) {
             isOutOfOrderEmitted.put(instanceId, true);
             // Do not emit onOutOfOrderPacket for packets that come before synchronizationStarted
             if (sequenceNumberByInstance.containsKey(instanceId)) {

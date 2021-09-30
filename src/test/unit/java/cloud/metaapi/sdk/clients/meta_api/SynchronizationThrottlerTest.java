@@ -2,7 +2,7 @@ package cloud.metaapi.sdk.clients.meta_api;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -61,7 +61,7 @@ class SynchronizationThrottlerTest {
     throttler.removeSynchronizationId("test");
     Mockito.verify(websocketClient).rpcRequest("accountId", provideRequest("test"), null);
     Assertions.assertThat(throttler.synchronizationIds).usingRecursiveComparison()
-      .isEqualTo(new HashMap<>());
+      .isEqualTo(new ConcurrentHashMap<>());
   }
   
   /**
@@ -71,7 +71,7 @@ class SynchronizationThrottlerTest {
   void testDoesNotRemovesSyncIfDifferentInstanceIndex() {
     throttler.scheduleSynchronize("accountId", provideRequest("test", 0)).join();
     throttler.scheduleSynchronize("accountId", provideRequest("test1", 1)).join();
-    Map<String, Long> expectedSynchronizationIds = new HashMap<>();
+    Map<String, Long> expectedSynchronizationIds = new ConcurrentHashMap<>();
     expectedSynchronizationIds.put("test", 1601892000000L);
     expectedSynchronizationIds.put("test1", 1601892000000L);
     Assertions.assertThat(throttler.synchronizationIds).usingRecursiveComparison()

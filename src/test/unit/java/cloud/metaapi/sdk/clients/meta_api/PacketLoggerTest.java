@@ -10,7 +10,7 @@ import java.text.Collator;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -50,7 +50,7 @@ class PacketLoggerTest {
         }});
         packetLogger.start();
         FileUtils.cleanDirectory(new File(folder));
-        packets = new HashMap<>();
+        packets = new ConcurrentHashMap<>();
         ObjectNode accountInformationPacket = jsonMapper.createObjectNode();
         ObjectNode accountInformation = jsonMapper.createObjectNode();
         accountInformationPacket.put("type", "accountInformation");

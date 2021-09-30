@@ -1,6 +1,6 @@
 package cloud.metaapi.sdk.meta_api;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -34,8 +34,8 @@ public class ConnectionRegistry {
   public ConnectionRegistry(MetaApiWebsocketClient metaApiWebsocketClient, String application) {
     this.metaApiWebsocketClient = metaApiWebsocketClient;
     this.application = (application != null ? application : "MetaApi");
-    this.connections = new HashMap<>();
-    this.connectionLocks = new HashMap<>();
+    this.connections = new ConcurrentHashMap<>();
+    this.connectionLocks = new ConcurrentHashMap<>();
   }
   
   /**

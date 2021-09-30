@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -140,7 +140,7 @@ class SubscriptionManagerTest {
   void testCancelsAllSubscriptionsOnReconnect() throws InterruptedException {
     Mockito.when(client.subscribe(Mockito.any(), Mockito.any()))
       .thenReturn(CompletableFuture.completedFuture(null));
-    Map<String, Integer> socketInstancesByAccounts = new HashMap<>();
+    Map<String, Integer> socketInstancesByAccounts = new ConcurrentHashMap<>();
     socketInstancesByAccounts.put("accountId", 0);
     socketInstancesByAccounts.put("accountId2", 0);
     socketInstancesByAccounts.put("accountId3", 1);

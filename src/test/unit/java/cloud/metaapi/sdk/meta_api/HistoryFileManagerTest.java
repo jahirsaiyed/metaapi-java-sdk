@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -91,17 +91,17 @@ public class HistoryFileManagerTest {
       state = OrderState.ORDER_STATE_FILLED; symbol = "AUDNZD"; magic = 1; time = new IsoTime(new Date(100));
       doneTime = new IsoTime(new Date(300)); currentPrice = 1; volume = 0.01; currentVolume = 0;
       positionId = "61206631"; platform = "mt5"; comment = "AS_AUDNZD_5YyM6KS7Fv:"; }};
-    Map<String, Long> testLastDealTimeByInstanceIndex = new HashMap<>();
+    Map<String, Long> testLastDealTimeByInstanceIndex = new ConcurrentHashMap<>();
     testLastDealTimeByInstanceIndex.put("0", 1000000000000L);
-    Map<String, Long> testLastHistoryOrderTimeByInstanceIndex = new HashMap<>();
+    Map<String, Long> testLastHistoryOrderTimeByInstanceIndex = new ConcurrentHashMap<>();
     testLastHistoryOrderTimeByInstanceIndex.put("0", 1000000000010L);
     testConfig = new History() {{
        lastDealTimeByInstanceIndex = testLastDealTimeByInstanceIndex;
        lastHistoryOrderTimeByInstanceIndex = testLastHistoryOrderTimeByInstanceIndex;
      }};
-   Map<Integer, Long> testLastDealTimeByInstanceIndex2 = new HashMap<>();
+   Map<Integer, Long> testLastDealTimeByInstanceIndex2 = new ConcurrentHashMap<>();
    testLastDealTimeByInstanceIndex2.put(0, 1000000000000L);
-   Map<Integer, Long> testLastHistoryOrderTimeByInstanceIndex2 = new HashMap<>();
+   Map<Integer, Long> testLastHistoryOrderTimeByInstanceIndex2 = new ConcurrentHashMap<>();
    testLastHistoryOrderTimeByInstanceIndex2.put(0, 1000000000010L);
    testConfig2 = new History() {{
       lastDealTimeByInstanceIndex = testLastDealTimeByInstanceIndex;

@@ -2,7 +2,7 @@ package cloud.metaapi.sdk.clients.meta_api;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -187,7 +187,7 @@ public class MetatraderAccountClient extends MetaApiClient {
   }
   
   private Map<String, Object> transformModelToMap(Object model) {
-    Map<String, Object> result = new HashMap<>();
+    Map<String, Object> result = new ConcurrentHashMap<>();
     Field[] publicFields = model.getClass().getFields();
     for (int i = 0; i < publicFields.length; ++i) {
       Field field = publicFields[i];

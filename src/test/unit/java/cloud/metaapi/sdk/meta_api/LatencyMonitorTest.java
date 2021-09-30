@@ -1,6 +1,6 @@
 package cloud.metaapi.sdk.meta_api;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,7 +41,7 @@ class LatencyMonitorTest {
       tradeStarted = new IsoTime("2020-12-07T13:22:51.000Z");
       tradeExecuted = new IsoTime("2020-12-07T13:22:54.000Z");
     }});
-    Map<String, Latencies> expectedClientLatencies = new HashMap<>();
+    Map<String, Latencies> expectedClientLatencies = new ConcurrentHashMap<>();
     expectedClientLatencies.put("1h", new Latencies() {{
       p50 = 1000;
       p75 = 1000;
@@ -75,7 +75,7 @@ class LatencyMonitorTest {
       min = 1000;
       max = 1000;
     }});
-    Map<String, Latencies> expectedServerLatencies = new HashMap<>();
+    Map<String, Latencies> expectedServerLatencies = new ConcurrentHashMap<>();
     expectedServerLatencies.put("1h", new Latencies() {{
       p50 = 2000;
       p75 = 2000;
@@ -109,7 +109,7 @@ class LatencyMonitorTest {
       min = 2000;
       max = 2000;
     }});
-    Map<String, Latencies> expectedBrokerLatencies = new HashMap<>();
+    Map<String, Latencies> expectedBrokerLatencies = new ConcurrentHashMap<>();
     expectedBrokerLatencies.put("1h", new Latencies() {{
       p50 = 3000;
       p75 = 3000;
@@ -163,7 +163,7 @@ class LatencyMonitorTest {
       serverProcessingFinished = new IsoTime("2020-12-07T13:22:51.000Z");
       clientProcessingFinished = new IsoTime("2020-12-07T13:22:54.000Z");
     }});
-    Map<String, Latencies> expectedBrokerLatencies = new HashMap<>();
+    Map<String, Latencies> expectedBrokerLatencies = new ConcurrentHashMap<>();
     expectedBrokerLatencies.put("1h", new Latencies() {{
       p50 = 1000;
       p75 = 1000;
@@ -197,7 +197,7 @@ class LatencyMonitorTest {
       min = 1000;
       max = 1000;
     }});
-    Map<String, Latencies> expectedServerLatencies = new HashMap<>();
+    Map<String, Latencies> expectedServerLatencies = new ConcurrentHashMap<>();
     expectedServerLatencies.put("1h", new Latencies() {{
       p50 = 2000;
       p75 = 2000;
@@ -231,7 +231,7 @@ class LatencyMonitorTest {
       min = 2000;
       max = 2000;
     }});
-    Map<String, Latencies> expectedClientLatencies = new HashMap<>();
+    Map<String, Latencies> expectedClientLatencies = new ConcurrentHashMap<>();
     expectedClientLatencies.put("1h", new Latencies() {{
       p50 = 3000;
       p75 = 3000;
@@ -285,7 +285,7 @@ class LatencyMonitorTest {
       serverProcessingFinished = new IsoTime("2020-12-07T13:22:51.000Z");
       clientProcessingFinished = new IsoTime("2020-12-07T13:22:54.000Z");
     }});
-    Map<String, Latencies> expectedBrokerLatencies = new HashMap<>();
+    Map<String, Latencies> expectedBrokerLatencies = new ConcurrentHashMap<>();
     expectedBrokerLatencies.put("1h", new Latencies() {{
       p50 = 1000;
       p75 = 1000;
@@ -319,7 +319,7 @@ class LatencyMonitorTest {
       min = 1000;
       max = 1000;
     }});
-    Map<String, Latencies> expectedServerLatencies = new HashMap<>();
+    Map<String, Latencies> expectedServerLatencies = new ConcurrentHashMap<>();
     expectedServerLatencies.put("1h", new Latencies() {{
       p50 = 2000;
       p75 = 2000;
@@ -353,7 +353,7 @@ class LatencyMonitorTest {
       min = 2000;
       max = 2000;
     }});
-    Map<String, Latencies> expectedClientLatencies = new HashMap<>();
+    Map<String, Latencies> expectedClientLatencies = new ConcurrentHashMap<>();
     expectedClientLatencies.put("1h", new Latencies() {{
       p50 = 3000;
       p75 = 3000;
@@ -407,7 +407,7 @@ class LatencyMonitorTest {
       serverProcessingFinished = new IsoTime("2020-12-07T13:22:51.000Z");
       clientProcessingFinished = new IsoTime("2020-12-07T13:22:51.500Z");
     }});
-    Map<String, Latencies> expectedClientLatencies = new HashMap<>();
+    Map<String, Latencies> expectedClientLatencies = new ConcurrentHashMap<>();
     expectedClientLatencies.put("1h", new Latencies() {{
       p50 = 1000;
       p75 = 1000;
@@ -441,7 +441,7 @@ class LatencyMonitorTest {
       min = 1000;
       max = 1000;
     }});
-    Map<String, Latencies> expectedServerLatencies = new HashMap<>();
+    Map<String, Latencies> expectedServerLatencies = new ConcurrentHashMap<>();
     expectedServerLatencies.put("1h", new Latencies() {{
       p50 = 2000;
       p75 = 2000;
@@ -475,7 +475,7 @@ class LatencyMonitorTest {
       min = 2000;
       max = 2000;
     }});
-    Map<String, MonitorLatencies> expected = new HashMap<>();
+    Map<String, MonitorLatencies> expected = new ConcurrentHashMap<>();
     expected.put("getSymbolPrice", new MonitorLatencies() {{
       clientLatency = expectedClientLatencies;
       serverLatency = expectedServerLatencies;
