@@ -3,7 +3,7 @@ package cloud.metaapi.sdk.meta_api;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -23,8 +23,8 @@ public class MemoryHistoryStorage extends HistoryStorage {
   private HistoryFileManager fileManager;
   private List<MetatraderDeal> deals = new ArrayList<>();
   private List<MetatraderOrder> historyOrders = new ArrayList<>();
-  private Map<String, Long> lastDealTimeByInstanceIndex = new HashMap<>();
-  private Map<String, Long> lastHistoryOrderTimeByInstanceIndex = new HashMap<>();
+  private Map<String, Long> lastDealTimeByInstanceIndex = new ConcurrentHashMap<>();
+  private Map<String, Long> lastHistoryOrderTimeByInstanceIndex = new ConcurrentHashMap<>();
   
   /**
    * Constructs the in-memory history store instance with default parameters
@@ -96,9 +96,9 @@ public class MemoryHistoryStorage extends HistoryStorage {
       deals = new ArrayList<>(history.deals);
       historyOrders = new ArrayList<>(history.historyOrders);
       lastDealTimeByInstanceIndex = history.lastDealTimeByInstanceIndex != null
-        ? history.lastDealTimeByInstanceIndex : new HashMap<>();
+        ? history.lastDealTimeByInstanceIndex : new ConcurrentHashMap<>();
       lastHistoryOrderTimeByInstanceIndex = history.lastHistoryOrderTimeByInstanceIndex != null
-        ? history.lastHistoryOrderTimeByInstanceIndex : new HashMap<>();
+        ? history.lastHistoryOrderTimeByInstanceIndex : new ConcurrentHashMap<>();
     });
   }
   

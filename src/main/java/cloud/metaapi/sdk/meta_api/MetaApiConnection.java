@@ -3,7 +3,7 @@ package cloud.metaapi.sdk.meta_api;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -57,8 +57,8 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   private TerminalState terminalState;
   private HistoryStorage historyStorage;
   private ConnectionHealthMonitor healthMonitor;
-  private Map<String, Subscriptions> subscriptions = new HashMap<>();
-  private Map<String, State> stateByInstanceIndex = new HashMap<>();
+  private Map<String, Subscriptions> subscriptions = new ConcurrentHashMap<>();
+  private Map<String, State> stateByInstanceIndex = new ConcurrentHashMap<>();
   private List<SynchronizationListener> synchronizationListeners = new ArrayList<>(); 
   private boolean closed = false;
 

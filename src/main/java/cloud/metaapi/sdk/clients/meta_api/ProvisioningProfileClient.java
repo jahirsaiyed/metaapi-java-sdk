@@ -4,7 +4,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -141,7 +141,7 @@ public class ProvisioningProfileClient extends MetaApiClient {
     HttpRequestOptions opts = new HttpRequestOptions(
       host + "/users/current/provisioning-profiles/" + provisioningProfileId + "/" + file.getFileName(),
       Method.PUT);
-    Map<String, Object> formData = new HashMap<>();
+    Map<String, Object> formData = new ConcurrentHashMap<>();
     formData.put("file", file);
     opts.setBody(formData);
     opts.getHeaders().put("auth-token", token);

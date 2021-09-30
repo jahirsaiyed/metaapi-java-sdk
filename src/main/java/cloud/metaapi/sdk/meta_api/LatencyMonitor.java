@@ -1,7 +1,7 @@
 package cloud.metaapi.sdk.meta_api;
 
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -94,7 +94,7 @@ public class LatencyMonitor extends LatencyListener {
      * @param reservoirs Initial reservoirs, or {@code null}
      */
     public MapReservoirs(Map<String, T> reservoirs) {
-      this.reservoirs = reservoirs != null ? reservoirs : new HashMap<>(); 
+      this.reservoirs = reservoirs != null ? reservoirs : new ConcurrentHashMap<>(); 
     }
     
     /**
@@ -143,17 +143,17 @@ public class LatencyMonitor extends LatencyListener {
    */
   public LatencyMonitor() {
     super();
-    Map<String, MapReservoirs<MonitorReservoir>> tradeReservoirMap = new HashMap<>();
+    Map<String, MapReservoirs<MonitorReservoir>> tradeReservoirMap = new ConcurrentHashMap<>();
     tradeReservoirMap.put("clientLatency", initializeReservoirs());
     tradeReservoirMap.put("serverLatency", initializeReservoirs());
     tradeReservoirMap.put("brokerLatency", initializeReservoirs());
     tradeReservoirs = new MapReservoirs<>(tradeReservoirMap);
-    Map<String, MapReservoirs<MonitorReservoir>> updateReservoirMap = new HashMap<>();
+    Map<String, MapReservoirs<MonitorReservoir>> updateReservoirMap = new ConcurrentHashMap<>();
     updateReservoirMap.put("clientLatency", initializeReservoirs());
     updateReservoirMap.put("serverLatency", initializeReservoirs());
     updateReservoirMap.put("brokerLatency", initializeReservoirs());
     updateReservoirs = new MapReservoirs<>(updateReservoirMap);
-    Map<String, MapReservoirs<MonitorReservoir>> priceReservoirMap = new HashMap<>();
+    Map<String, MapReservoirs<MonitorReservoir>> priceReservoirMap = new ConcurrentHashMap<>();
     priceReservoirMap.put("clientLatency", initializeReservoirs());
     priceReservoirMap.put("serverLatency", initializeReservoirs());
     priceReservoirMap.put("brokerLatency", initializeReservoirs());
@@ -191,7 +191,7 @@ public class LatencyMonitor extends LatencyListener {
    */
   @SuppressWarnings("unchecked")
   public Map<String, MonitorLatencies> getRequestLatencies() {
-    Map<String, MonitorLatencies> result = new HashMap<>();
+    Map<String, MonitorLatencies> result = new ConcurrentHashMap<>();
     Map<String, Object> latencyMap = constructLatenciesRecursively(requestReservoirs);
     for (Entry<String, Object> entry : latencyMap.entrySet()) {
       result.put(entry.getKey(), constructMonitorLatencies((Map<String, Object>) entry.getValue()));
@@ -291,7 +291,7 @@ public class LatencyMonitor extends LatencyListener {
   }
   
   private Map<String, Object> constructLatenciesRecursively(MapReservoirs<?> reservoirs) {
-    Map<String, Object> result = new HashMap<>();
+    Map<String, Object> result = new ConcurrentHashMap<>();
     for (Entry<String, ?> entry : reservoirs.getEntries()) {
       if (entry.getValue() instanceof MapReservoirs) {
         result.put(entry.getKey(), constructLatenciesRecursively((MapReservoirs<?>) entry.getValue()));
@@ -326,7 +326,7 @@ public class LatencyMonitor extends LatencyListener {
   }
   
   private MapReservoirs<MonitorReservoir> initializeReservoirs() {
-    Map<String, MonitorReservoir> reservoirs = new HashMap<>();
+    Map<String, MonitorReservoir> reservoirs = new ConcurrentHashMap<>();
     reservoirs.put("1h", new MonitorReservoir() {{
       percentiles = new StatisticalReservoir(1000, 60 * 60 * 1000L);
       reservoir = new Reservoir(60, 60 * 60 * 1000);

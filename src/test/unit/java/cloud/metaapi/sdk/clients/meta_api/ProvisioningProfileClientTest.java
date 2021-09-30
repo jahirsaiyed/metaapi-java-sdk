@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -179,7 +179,7 @@ class ProvisioningProfileClientTest {
     httpClient.setRequestMock((actualOptions) -> {
       HttpRequestOptions expectedOptions = new HttpRequestOptions(
         provisioningApiUrl + "/users/current/provisioning-profiles/id/servers.dat", Method.PUT);
-      Map<String, Object> formData = new HashMap<>();
+      Map<String, Object> formData = new ConcurrentHashMap<>();
       formData.put("file", new FileStreamField(file, "servers.dat"));
       expectedOptions.getHeaders().put("auth-token", "header.payload.sign");
       expectedOptions.setBody(formData);

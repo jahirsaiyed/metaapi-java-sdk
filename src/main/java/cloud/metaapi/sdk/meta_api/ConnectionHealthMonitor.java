@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +42,7 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
   private long offset;
   private boolean quotesHealthy = false;
   private Timer updateMeasurementsInterval;
-  private Map<String, HealthStatus> serverHealthStatus = new HashMap<>();
+  private Map<String, HealthStatus> serverHealthStatus = new ConcurrentHashMap<>();
   
   /**
    * Constructs the listener
@@ -52,7 +52,7 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
     super();
     this.connection = connection;
     this.updateMeasurementsInterval = Js.setTimeout(() -> updateMeasurements(), getRandomTimeout());
-    this.uptimeReservoirs = new HashMap<>();
+    this.uptimeReservoirs = new ConcurrentHashMap<>();
     this.uptimeReservoirs.put("5m", new Reservoir(300, 5 * 60 * 1000));
     this.uptimeReservoirs.put("1h", new Reservoir(600, 60 * 60 * 1000));
     this.uptimeReservoirs.put("1d", new Reservoir(24 * 60, 24 * 60 * 60 * 1000));
@@ -163,7 +163,7 @@ public class ConnectionHealthMonitor extends SynchronizationListener {
    * @return uptime in percents measured over specific periods of time
    */
   public Map<String, Double> getUptime() {
-    Map<String, Double> uptime = new HashMap<>();
+    Map<String, Double> uptime = new ConcurrentHashMap<>();
     for (Map.Entry<String, Reservoir> entry : uptimeReservoirs.entrySet()) {
       uptime.put(entry.getKey(), entry.getValue().getStatistics().average);
     }

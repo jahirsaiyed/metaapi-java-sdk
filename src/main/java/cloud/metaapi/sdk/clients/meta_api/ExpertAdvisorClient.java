@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -166,7 +166,7 @@ public class ExpertAdvisorClient extends MetaApiClient {
     if (isNotJwtToken()) return handleNoAccessError("uploadExpertAdvisorFile");
     HttpRequestOptions opts = new HttpRequestOptions(host + "/users/current/accounts/"
       + accountId + "/expert-advisors/" + expertId + "/file", Method.PUT);
-    Map<String, Object> formData = new HashMap<>();
+    Map<String, Object> formData = new ConcurrentHashMap<>();
     formData.put("file", file);
     opts.setBody(formData);
     opts.getHeaders().put("auth-token", token);

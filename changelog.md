@@ -1,3 +1,7 @@
+13.2.1
+  - fixed dependency vulnerabilities
+  - use ConcurrentHashMap instead HashMap in order to increase thread safety 
+
 13.2.0
   - added clientId to query websocket url
   - added equity curve filter to CopyFactory

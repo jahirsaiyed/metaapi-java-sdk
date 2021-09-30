@@ -1,7 +1,7 @@
 package cloud.metaapi.sdk.util;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
@@ -62,7 +62,7 @@ public class Js {
    */
   @SafeVarargs
   public static <T, U> Map<T, U> asMap(Pair<T, U>... pairs) {
-    Map<T, U> result = new HashMap<>();
+    Map<T, U> result = new ConcurrentHashMap<>();
     for (Pair<T, U> pair : pairs) {
       result.put(pair.getLeft(), pair.getRight());
     }
@@ -77,7 +77,7 @@ public class Js {
    */
   @SafeVarargs
   public static <T> Map<T, T> asMap(T... pairs) {
-    Map<T, T> result = new HashMap<>();
+    Map<T, T> result = new ConcurrentHashMap<>();
     for (int i = 0; i < pairs.length; i = i + 2) {
       result.put(pairs[i], pairs[i + 1]);
     }

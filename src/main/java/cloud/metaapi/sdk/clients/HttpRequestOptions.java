@@ -5,7 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -84,8 +84,8 @@ public class HttpRequestOptions {
     
     private String url;
     private HttpRequestOptions.Method method;
-    private Map<String, Object> queryParameters = new HashMap<>();
-    private Map<String, String> headers = new HashMap<>();
+    private Map<String, Object> queryParameters = new ConcurrentHashMap<>();
+    private Map<String, String> headers = new ConcurrentHashMap<>();
     private Optional<Map<String, Object>> bodyFields = Optional.empty();
     private Optional<Object> bodyJson = Optional.empty();
     

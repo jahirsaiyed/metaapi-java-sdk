@@ -1,7 +1,7 @@
 package cloud.metaapi.sdk.clients.meta_api;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
@@ -34,8 +34,8 @@ public class SynchronizationThrottler {
   private int synchronizationTimeoutInSeconds;
   private MetaApiWebsocketClient client;
   private int socketInstanceIndex;
-  protected Map<String, Long> synchronizationIds = new HashMap<>();
-  private Map<String, AccountData> accountsBySynchronizationIds = new HashMap<>();
+  protected Map<String, Long> synchronizationIds = new ConcurrentHashMap<>();
+  private Map<String, AccountData> accountsBySynchronizationIds = new ConcurrentHashMap<>();
   private List<SynchronizationQueueItem> synchronizationQueue = new ArrayList<>();
   private Timer removeOldSyncIdsTimer = null;
   private Timer processQueueTimer = null;

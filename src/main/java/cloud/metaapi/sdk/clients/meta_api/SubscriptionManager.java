@@ -2,7 +2,7 @@ package cloud.metaapi.sdk.clients.meta_api;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +27,7 @@ public class SubscriptionManager {
   
   private static Logger logger = LogManager.getLogger(SubscriptionManager.class);
   private MetaApiWebsocketClient websocketClient;
-  private Map<String, Subscription> subscriptions = new HashMap<>();
+  private Map<String, Subscription> subscriptions = new ConcurrentHashMap<>();
   private Set<String> awaitingResubscribe = new HashSet<>();
   
   private static class Subscription {

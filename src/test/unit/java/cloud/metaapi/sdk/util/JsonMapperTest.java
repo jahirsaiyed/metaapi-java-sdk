@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -128,10 +128,10 @@ public class JsonMapperTest {
   @Test
   void testInfersMapValueTypesAutomatically() throws JsonProcessingException {
     MapModel object = new MapModel();
-    object.data = new HashMap<>();
+    object.data = new ConcurrentHashMap<>();
     object.data.put("a", 42);
     object.data.put("b", "Hello");
-    Map<String, Object> child = new HashMap<>();
+    Map<String, Object> child = new ConcurrentHashMap<>();
     child.put("c", 3000);
     object.data.put("children", Arrays.asList(child));
     String json = JsonMapper.getInstance().writeValueAsString(object); 

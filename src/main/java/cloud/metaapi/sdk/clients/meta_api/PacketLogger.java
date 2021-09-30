@@ -13,7 +13,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
@@ -44,9 +44,9 @@ public class PacketLogger {
   private int logFileSizeInHours;
   private boolean compressSpecifications;
   private boolean compressPrices;
-  private Map<String, Map<Integer, PreviousPrice>> previousPrices = new HashMap<>();
-  private Map<String, Map<Integer, JsonNode>> lastSNPacket = new HashMap<>();
-  private Map<String, WriteQueueItem> writeQueue = new HashMap<>();
+  private Map<String, Map<Integer, PreviousPrice>> previousPrices = new ConcurrentHashMap<>();
+  private Map<String, Map<Integer, JsonNode>> lastSNPacket = new ConcurrentHashMap<>();
+  private Map<String, WriteQueueItem> writeQueue = new ConcurrentHashMap<>();
   private Timer recordInterval;
   private Timer deleteOldLogsInterval;
   private String root;
@@ -133,7 +133,7 @@ public class PacketLogger {
       return;
     }
     if (!lastSNPacket.containsKey(packetAccountId)) {
-      lastSNPacket.put(packetAccountId, new HashMap<>());
+      lastSNPacket.put(packetAccountId, new ConcurrentHashMap<>());
     }
     if (packetType.equals("keepalive") || packetType.equals("noop")) {
       lastSNPacket.get(packetAccountId).put(instanceIndex, packet);
@@ -141,7 +141,7 @@ public class PacketLogger {
     }
     List<String> queue = writeQueue.get(packetAccountId).queue;
     if (!previousPrices.containsKey(packetAccountId)) {
-      previousPrices.put(packetAccountId, new HashMap<>());
+      previousPrices.put(packetAccountId, new ConcurrentHashMap<>());
     }
     PreviousPrice prevPrice = previousPrices.get(packetAccountId).get(instanceIndex);
     if (!packetType.equals("prices")) {
@@ -367,7 +367,7 @@ public class PacketLogger {
   
   private void ensurePreviousPriceObject(String accountId) {
     if (!previousPrices.containsKey(accountId)) {
-      previousPrices.put(accountId, new HashMap<>());
+      previousPrices.put(accountId, new ConcurrentHashMap<>());
     }
   }
 }
