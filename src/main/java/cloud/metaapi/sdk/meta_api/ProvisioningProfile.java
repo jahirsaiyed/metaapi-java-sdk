@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
 import cloud.metaapi.sdk.clients.meta_api.models.ProvisioningProfileDto;
 import cloud.metaapi.sdk.clients.meta_api.models.ProvisioningProfileUpdateDto;
+import cloud.metaapi.sdk.util.Async;
 
 /**
  * Implements a provisioning profile entity
@@ -119,7 +120,7 @@ public class ProvisioningProfile {
    */
   public CompletableFuture<Void> update(ProvisioningProfileUpdateDto profile) {
     CompletableFuture<Void> result = new CompletableFuture<>();
-    CompletableFuture.runAsync(() -> {
+    Async.run(() -> {
       try {
         provisioningProfileClient.updateProvisioningProfile(getId(), profile).get();
         reload().get();

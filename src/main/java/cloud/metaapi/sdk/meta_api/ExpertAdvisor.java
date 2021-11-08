@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient;
 import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient.ExpertAdvisorDto;
 import cloud.metaapi.sdk.clients.meta_api.ExpertAdvisorClient.NewExpertAdvisorDto;
+import cloud.metaapi.sdk.util.Async;
 
 /**
  * Implements an expert advisor entity
@@ -78,7 +79,7 @@ public class ExpertAdvisor {
    * @return completable future resolving when expert advisor is updated
    */
   public CompletableFuture<Void> update(NewExpertAdvisorDto expert) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       expertAdvisorClient.updateExpertAdvisor(accountId, getExpertId(), expert).join();
       reload().join();
     });
@@ -91,7 +92,7 @@ public class ExpertAdvisor {
    * @return completable future which resolves when the file was uploaded
    */
   public CompletableFuture<Void> uploadFile(String filePath) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       expertAdvisorClient.uploadExpertAdvisorFile(accountId, getExpertId(), filePath).join();
       reload().join();
     });
@@ -104,7 +105,7 @@ public class ExpertAdvisor {
    * @return completable future which resolves when the file was uploaded
    */
   public CompletableFuture<Void> uploadFile(InputStream fileContents) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       expertAdvisorClient.uploadExpertAdvisorFile(accountId, getExpertId(), fileContents).join();
       reload().join();
     });

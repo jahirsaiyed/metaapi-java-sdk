@@ -17,6 +17,7 @@ import cloud.metaapi.sdk.clients.meta_api.MetatraderAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.MetatraderDemoAccountClient;
 import cloud.metaapi.sdk.clients.meta_api.ProvisioningProfileClient;
 import cloud.metaapi.sdk.clients.meta_api.SynchronizationThrottler;
+import cloud.metaapi.sdk.util.Async;
 
 /**
  * MetaApi MetaTrader API SDK
@@ -155,6 +156,7 @@ public class MetaApi {
   public void close() {
     metaApiWebsocketClient.removeLatencyListener(latencyMonitor);
     metaApiWebsocketClient.close();
+    Async.shutdownExecutor();
   }
   
   private void initialize(String token, Options opts) throws ValidationException, IOException {

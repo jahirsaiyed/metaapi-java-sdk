@@ -1,3 +1,6 @@
+13.2.2
+  - fixed hanging because of parallelism problems
+
 13.2.1
   - fixed dependency vulnerabilities
   - use ConcurrentHashMap instead HashMap in order to increase thread safety 

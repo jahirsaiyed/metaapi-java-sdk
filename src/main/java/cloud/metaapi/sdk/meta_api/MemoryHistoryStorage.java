@@ -12,6 +12,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder;
 import cloud.metaapi.sdk.clients.models.IsoTime;
 import cloud.metaapi.sdk.meta_api.HistoryFileManager.History;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
 /**
@@ -91,7 +92,7 @@ public class MemoryHistoryStorage extends HistoryStorage {
    * @return completable future which resolves when the history is loaded
    */
   public CompletableFuture<Void> loadDataFromDisk() {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       History history = fileManager.getHistoryFromDisk().join();
       deals = new ArrayList<>(history.deals);
       historyOrders = new ArrayList<>(history.historyOrders);

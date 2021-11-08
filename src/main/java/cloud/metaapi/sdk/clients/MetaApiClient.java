@@ -3,6 +3,8 @@ package cloud.metaapi.sdk.clients;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
+import cloud.metaapi.sdk.util.Async;
+
 /**
  * metaapi.cloud MetaTrader API client
  */
@@ -66,7 +68,7 @@ public class MetaApiClient {
      * @return completable future with completed with method access exception
      */
     protected <T> CompletableFuture<T> handleNoAccessError(String methodName) {
-    	return CompletableFuture.supplyAsync(() -> {
+    	return Async.supply(() -> {
     		throw new CompletionException(new MethodAccessException(methodName, getTokenType()));
     	});
     }

@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 
 import cloud.metaapi.sdk.clients.meta_api.MetaApiWebsocketClient;
 import cloud.metaapi.sdk.clients.models.IsoTime;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
 /**
@@ -60,7 +61,7 @@ public class ConnectionRegistry {
     if (connections.containsKey(account.getId())) {
       return CompletableFuture.completedFuture(connections.get(account.getId()));
     } else {
-      return CompletableFuture.supplyAsync(() -> {
+      return Async.supply(() -> {
         while (connectionLocks.containsKey(account.getId())) {
           connectionLocks.get(account.getId()).join();
         }

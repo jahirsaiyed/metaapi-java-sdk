@@ -16,6 +16,7 @@ import cloud.metaapi.sdk.clients.MetaApiClient;
 import cloud.metaapi.sdk.clients.HttpRequestOptions.FileStreamField;
 import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
 import cloud.metaapi.sdk.clients.meta_api.models.*;
+import cloud.metaapi.sdk.util.Async;
 
 /**
  * metaapi.cloud provisioning profile API client (see https://metaapi.cloud/docs/provisioning/)
@@ -106,7 +107,7 @@ public class ProvisioningProfileClient extends MetaApiClient {
   public CompletableFuture<Void> uploadProvisioningProfileFile(
     String provisioningProfileId, String fileName, String filePath
   ) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       try {
         uploadProvisioningProfileFile(
           provisioningProfileId,
