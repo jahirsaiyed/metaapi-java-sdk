@@ -14,6 +14,7 @@ import cloud.metaapi.sdk.clients.HttpRequestOptions.FileStreamField;
 import cloud.metaapi.sdk.clients.error_handler.*;
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException.TooManyRequestsExceptionMetadata;
 import cloud.metaapi.sdk.clients.models.Error;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.JsonMapper;
 import kong.unirest.HttpRequest;
 import kong.unirest.HttpRequestWithBody;
@@ -155,7 +156,7 @@ public class HttpClient {
   }
   
   private CompletableFuture<Void> handleRetry(long endTime, int retryAfter) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       if (endTime > Date.from(Instant.now().plusMillis(retryAfter)).getTime()) {
         try {
           Thread.sleep(retryAfter);
@@ -170,7 +171,7 @@ public class HttpClient {
   }
   
   private CompletableFuture<Integer> handleError(Throwable error, int retryCounter, long endTime) {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       try {
         if (Arrays.asList(ConflictException.class, InternalException.class, ApiException.class)
           .indexOf(error.getClass()) != - 1 && retryCounter < retries) {
@@ -199,7 +200,7 @@ public class HttpClient {
    * @return completable future resolving with http response object
    */
   protected CompletableFuture<HttpResponse<String>> makeRequest(HttpRequestOptions options) {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       try {
         HttpRequest<?> request = null;
         

@@ -42,6 +42,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.StopOptions;
 import cloud.metaapi.sdk.clients.meta_api.models.SynchronizationOptions;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade.ActionType;
 import cloud.metaapi.sdk.clients.models.*;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.Js;
 
 /**
@@ -802,7 +803,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future which resolves when synchronization started
    */
   public CompletableFuture<Boolean> synchronize(String instanceIndex) {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       Integer instance = getInstanceNumber(instanceIndex);
       String host = getHostName(instanceIndex);
       IsoTime lastHistoryOrderTime = historyStorage.getLastHistoryOrderTime(instance).join();
@@ -1215,7 +1216,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
   public CompletableFuture<Void> waitSynchronized(SynchronizationOptions options) {
     if (options == null) options = new SynchronizationOptions();
     SynchronizationOptions opts = options;
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       String instanceIndex = opts.instanceIndex;
       String synchronizationId = opts.synchronizationId;
       int timeoutInSeconds = (opts.timeoutInSeconds != null ? opts.timeoutInSeconds : 300);
@@ -1266,7 +1267,7 @@ public class MetaApiConnection extends SynchronizationListener implements Reconn
    * @return completable future resolving when connection is closed
    */
   public CompletableFuture<Void> close() {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       if (!closed) {
         stateByInstanceIndex.clear();
         websocketClient.unsubscribe(account.getId()).join();

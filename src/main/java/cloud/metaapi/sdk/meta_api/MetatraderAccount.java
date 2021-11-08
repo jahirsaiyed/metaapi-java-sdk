@@ -26,6 +26,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.Connection
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.CopyFactoryRole;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.DeploymentState;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderAccountDto.Extension;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
 /**
@@ -239,7 +240,7 @@ public class MetatraderAccount {
    * @return completable future resolving when account is scheduled for deletion
    */
   public CompletableFuture<Void> remove() {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       connectionRegistry.remove(getId());
       try {
         metatraderAccountClient.deleteAccount(getId()).get();
@@ -266,7 +267,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<Void> deploy() {
     CompletableFuture<Void> result = new CompletableFuture<>();
-    CompletableFuture.runAsync(() -> {
+    Async.run(() -> {
       try {
         metatraderAccountClient.deployAccount(getId()).get();
         reload().get();
@@ -284,7 +285,7 @@ public class MetatraderAccount {
    * @return completable future resolving when account is scheduled for undeployment
    */
   public CompletableFuture<Void> undeploy() {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       connectionRegistry.remove(getId());
       metatraderAccountClient.undeployAccount(getId()).join();
       reload().join();
@@ -297,7 +298,7 @@ public class MetatraderAccount {
    * @return completable future resolving when account is scheduled for redeployment
    */
   public CompletableFuture<Void> redeploy() {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       metatraderAccountClient.redeployAccount(getId()).join();
       reload().join();
     });
@@ -308,7 +309,7 @@ public class MetatraderAccount {
    * @return completable future resolving when account reliability is increased
    */
   public CompletableFuture<Void> increaseReliability() {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       metatraderAccountClient.increaseReliability(getId()).join();
       reload().join();
     });
@@ -324,7 +325,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<Void> waitDeployed(Integer timeoutInSeconds, Integer intervalInMilliseconds) {
     CompletableFuture<Void> result = new CompletableFuture<>();
-    CompletableFuture.runAsync(() -> {
+    Async.run(() -> {
       long startTime = Instant.now().getEpochSecond();
       long timeoutTime = startTime + (timeoutInSeconds != null ? timeoutInSeconds : 300);
       try {
@@ -353,7 +354,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<Void> waitUndeployed(Integer timeoutInSeconds, Integer intervalInMilliseconds) {
     CompletableFuture<Void> result = new CompletableFuture<>();
-    CompletableFuture.runAsync(() -> {
+    Async.run(() -> {
       long startTime = Instant.now().getEpochSecond();
       long timeoutTime = startTime + (timeoutInSeconds != null ? timeoutInSeconds : 300);
       try {
@@ -381,7 +382,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<Void> waitRemoved(Integer timeoutInSeconds, Integer intervalInMilliseconds) {
     CompletableFuture<Void> result = new CompletableFuture<>();
-    CompletableFuture.runAsync(() -> {
+    Async.run(() -> {
       long startTime = Instant.now().getEpochSecond();
       long timeoutTime = startTime + (timeoutInSeconds != null ? timeoutInSeconds : 300);
       try {
@@ -420,7 +421,7 @@ public class MetatraderAccount {
    */
   public CompletableFuture<Void> waitConnected(Integer timeoutInSeconds, Integer intervalInMilliseconds) {
     CompletableFuture<Void> result = new CompletableFuture<>();
-    CompletableFuture.runAsync(() -> {
+    Async.run(() -> {
       long startTime = Instant.now().getEpochSecond();
       long timeoutTime = startTime + (timeoutInSeconds != null ? timeoutInSeconds : 300);
       try {
@@ -477,7 +478,7 @@ public class MetatraderAccount {
    * @return completable future resolving when account is updated
    */
   public CompletableFuture<Void> update(MetatraderAccountUpdateDto account) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       metatraderAccountClient.updateAccount(getId(), account).join();
       reload().join();
     });
@@ -488,7 +489,7 @@ public class MetatraderAccount {
    * @return completable future resolving with an array of expert advisor entities
    */
   public CompletableFuture<List<ExpertAdvisor>> getExpertAdvisors() {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       checkExpertAdvisorAllowed();
       List<ExpertAdvisorDto> advisors = expertAdvisorClient.getExpertAdvisors(getId()).join();
       return advisors.stream().map(e -> new ExpertAdvisor(e, getId(), expertAdvisorClient))
@@ -502,7 +503,7 @@ public class MetatraderAccount {
    * @return completable future resolving with expert advisor entity
    */
   public CompletableFuture<ExpertAdvisor> getExpertAdvisor(String expertId) {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       checkExpertAdvisorAllowed();
       ExpertAdvisorDto advisor = expertAdvisorClient.getExpertAdvisor(getId(), expertId).join();
       return new ExpertAdvisor(advisor, getId(), expertAdvisorClient);
@@ -516,7 +517,7 @@ public class MetatraderAccount {
    * @return completable future resolving with expert advisor entity
    */
   public CompletableFuture<ExpertAdvisor> createExpertAdvisor(String expertId, NewExpertAdvisorDto expert) {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       checkExpertAdvisorAllowed();
       expertAdvisorClient.updateExpertAdvisor(getId(), expertId, expert).join();
       return getExpertAdvisor(expertId).join();

@@ -19,6 +19,7 @@ import cloud.metaapi.sdk.clients.OptionsValidator;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.ValidationException;
 import cloud.metaapi.sdk.clients.models.IsoTime;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
@@ -274,7 +275,7 @@ public class SynchronizationThrottler {
   }
   
   private CompletableFuture<Void> processQueueJob() {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       try {
         while (synchronizationQueue.size() > 0) {
           SynchronizationQueueItem queueItem = synchronizationQueue.get(0);
@@ -283,7 +284,7 @@ public class SynchronizationThrottler {
           // Often synchronizationQueue.remove(0) raises IndexOutOfBoundsException because
           // somehow synchronizationQueue size becomes 0 right after checking it. This is a
           // hook that tells Java to do not hurry
-          CompletableFuture.runAsync(() -> {}).join();
+          Async.run(() -> {}).join();
 
           if (synchronizationQueue.size() > 0 && synchronizationQueue.get(0).synchronizationId
             .equals(queueItem.synchronizationId)) {
@@ -303,7 +304,7 @@ public class SynchronizationThrottler {
    * @return Completable future resolving when synchronization is scheduled
    */
   public CompletableFuture<Boolean> scheduleSynchronize(String accountId, ObjectNode request) {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       String synchronizationId = request.get("requestId").asText();
       int instanceIndex = request.has("instanceIndex") ? request.get("instanceIndex").asInt() : -1;
       for (String key : new ArrayList<>(accountsBySynchronizationIds.keySet())) {

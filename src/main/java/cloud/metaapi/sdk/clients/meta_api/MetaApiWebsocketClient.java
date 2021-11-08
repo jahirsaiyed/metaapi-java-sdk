@@ -58,6 +58,7 @@ import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTick;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTrade;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderTradeResponse;
 import cloud.metaapi.sdk.clients.models.*;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.JsonMapper;
 import io.socket.client.IO;
@@ -367,7 +368,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * @return completable future which resolves when connection is established
    */
   public CompletableFuture<Void> connect() {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       CompletableFuture<Void> result = new CompletableFuture<>();
       int socketInstanceIndex = socketInstances.size();
       String serverUrl = getServerUrl().join();
@@ -431,7 +432,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     });
     
     socketInstance.on(Socket.EVENT_CONNECT, (Object[] args) -> {
-      CompletableFuture.runAsync(() -> {
+      Async.run(() -> {
         boolean isSharedClientApi = uri.equals(this.url);
         logger.info("MetaApi websocket client connected to the MetaApi server via " 
           + uri + " " + (isSharedClientApi ? "shared" : "dedicated") + " server");
@@ -508,11 +509,11 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         RequestResolve requestResolve = data.has("requestId")
           ? instance.requestResolves.remove(data.get("requestId").asText()) : null;
         if (requestResolve != null) {
-          CompletableFuture.runAsync(() -> {
+          Async.run(() -> {
             requestResolve.future.complete(data);
             if (data.has("timestamps") && requestResolve.type != null) {
               for (LatencyListener listener : latencyListeners) {
-                CompletableFuture.runAsync(() -> {
+                Async.run(() -> {
                   try {
                     String accountId = data.get("accountId").asText();
                     if (requestResolve.type.equals("trade")) {
@@ -938,7 +939,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    * with {@link TradeException}, check error properties for error code details
    */
   public CompletableFuture<MetatraderTradeResponse> trade(String accountId, MetatraderTrade trade) {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       ObjectNode request = jsonMapper.createObjectNode();
       request.put("type", "trade");
       request.set("trade", jsonMapper.valueToTree(trade));
@@ -1370,7 +1371,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   private CompletableFuture<Void> callAccountEvents(String accountId) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       if (eventQueues.containsKey(accountId)) {
         while (eventQueues.get(accountId).size() > 0) {
           eventQueues.get(accountId).get(0).get().join();
@@ -1382,7 +1383,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   private CompletableFuture<Void> reconnect(int socketInstanceIndex) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       if (socketInstances.size() > socketInstanceIndex) {
         SocketInstance instance = socketInstances.get(socketInstanceIndex);
         while (!instance.socket.connected() && !instance.isReconnecting && instance.connected) {
@@ -1394,7 +1395,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   
   private CompletableFuture<Void> tryReconnect(int socketInstanceIndex) {
     SocketInstance instance = socketInstances.get(socketInstanceIndex);
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       try {
         Thread.sleep(1000);
         if (!instance.socket.connected() && !instance.isReconnecting && instance.connected) {
@@ -1416,7 +1417,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   protected CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request, Long timeoutInSeconds) {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       try {
         Integer socketInstanceIndex = null;
         if (socketInstancesByAccounts.containsKey(accountId)) {
@@ -1576,7 +1577,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   private CompletableFuture<Void> processSynchronizationPacket(JsonNode data) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       try {
         String accountId = data.get("accountId").asText();
         Integer socketInstanceIndex = socketInstancesByAccounts.get(accountId);
@@ -1600,7 +1601,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
         };
         
         Function<Boolean, CompletableFuture<Void>> onDisconnected = (isTimeout) -> {
-          return CompletableFuture.runAsync(() -> {
+          return Async.run(() -> {
             if (connectedHosts.containsKey(instanceId)) {
               if (isOnlyActiveInstance.get()) {
                 List<CompletableFuture<Void>> onDisconnectedFutures = new ArrayList<>();
@@ -2095,7 +2096,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   }
   
   private CompletableFuture<Void> fireReconnected(int socketInstanceIndex) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       List<ReconnectListenerItem> reconnectListeners = new ArrayList<>();
       for (ReconnectListenerItem listener : this.reconnectListeners) {
         if (socketInstancesByAccounts.getOrDefault(listener.accountId, -1) == socketInstanceIndex) {

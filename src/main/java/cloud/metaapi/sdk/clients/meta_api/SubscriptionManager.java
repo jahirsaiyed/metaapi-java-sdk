@@ -17,6 +17,7 @@ import org.apache.logging.log4j.Logger;
 
 import cloud.metaapi.sdk.clients.error_handler.TooManyRequestsException;
 import cloud.metaapi.sdk.clients.models.IsoTime;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.ServiceProvider;
 
@@ -102,7 +103,7 @@ public class SubscriptionManager {
       }}; 
       newSubscription.isDisconnectedRetryMode = isDisconnectedRetryMode;
       subscriptions.put(instanceId, newSubscription);
-      return CompletableFuture.runAsync(() -> {
+      return Async.run(() -> {
         int subscribeRetryIntervalInSeconds = 3;
         while (subscriptions.get(instanceId).shouldRetry) {
           CompletableFuture<Boolean> resolveSubscribe = new CompletableFuture<>();
@@ -133,7 +134,7 @@ public class SubscriptionManager {
   
   private CompletableFuture<Void> subscribeTask(String accountId, Integer instanceNumber,
     int subscribeRetryIntervalInSeconds, CompletableFuture<Boolean> subscribeFuture) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       try {
         websocketClient.subscribe(accountId, instanceNumber).join();
       } catch (CompletionException err) {
@@ -211,7 +212,7 @@ public class SubscriptionManager {
    * @return completable future when the operation is completed
    */
   public CompletableFuture<Void> onDisconnected(String accountId, int instanceNumber) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       try {
         Thread.sleep((long) (Math.max(ServiceProvider.getRandom() * 5, 1) * 1000));
       } catch (InterruptedException e) {
@@ -238,7 +239,7 @@ public class SubscriptionManager {
         }
       }
       reconnectAccountIds.forEach(accountId -> {
-        CompletableFuture.runAsync(() -> {
+        Async.run(() -> {
           try {
             if (!awaitingResubscribe.contains(accountId)) {
               awaitingResubscribe.add(accountId);

@@ -27,16 +27,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>13.2.1</version>
+  <version>13.2.2</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/13.2.1/jar).
-
-## Configuring JDK
-Note, that on some Java versions the SDK can hang on some API calls due to low value of `java.util.concurrent.ForkJoinPool.common.parallelism` JDK variable configured in your system. This is known to happen for Java 8 and Java 16.
-
-A solution is to set the above JDK variable to a higher value. Value of 8 works fine for connections to a single account. You might need to adjust this setting further in case you connect to many accounts at once.
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/13.2.2/jar).
 
 ## Running Java SDK examples
 In order to run Java SDK examples, follow these steps:

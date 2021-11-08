@@ -30,6 +30,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderDeal;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.JsonMapper;
 
 /**
@@ -153,7 +154,7 @@ public class HistoryFileManager {
    * @return completable future resolving with history of deals and orders
    */
   public CompletableFuture<History> getHistoryFromDisk() {
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       try {
         History history = new History();
         Path configPath = getFilePath("config");
@@ -196,7 +197,7 @@ public class HistoryFileManager {
    * @return completable future which resolves when disk storage is updated
    */
   public CompletableFuture<Void> updateDiskStorage() {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       if (!isUpdating) {
         isUpdating = true;
         try {
@@ -220,7 +221,7 @@ public class HistoryFileManager {
    * Updates stored config for account
    */
   private CompletableFuture<Void> updateConfig() {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       Path filePath = getFilePath("config");
       try {
         ObjectNode config = jsonMapper.createObjectNode();
@@ -240,7 +241,7 @@ public class HistoryFileManager {
    * @return completable future which resolves when the storage is deleted
    */
   public CompletableFuture<Void> deleteStorageFromDisk() {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       try {
         Files.delete(getFilePath("config"));
         Files.delete(getFilePath("deals"));

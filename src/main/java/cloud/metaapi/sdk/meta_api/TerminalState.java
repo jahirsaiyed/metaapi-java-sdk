@@ -18,6 +18,7 @@ import cloud.metaapi.sdk.clients.meta_api.SynchronizationListener;
 import cloud.metaapi.sdk.clients.meta_api.models.*;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderOrder.OrderType;
 import cloud.metaapi.sdk.clients.meta_api.models.MetatraderPosition.PositionType;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.util.Js;
 
 /**
@@ -137,7 +138,7 @@ public class TerminalState extends SynchronizationListener {
       timeoutInSeconds = 30L;
     }
     long timeoutInSecondsFinal = timeoutInSeconds;
-    return CompletableFuture.supplyAsync(() -> {
+    return Async.supply(() -> {
       if (!getPrice(symbol).isPresent()) {
         if (!waitForPriceResolves.containsKey(symbol)) {
           waitForPriceResolves.put(symbol, new ArrayList<>());

@@ -13,6 +13,7 @@ import java.util.concurrent.CompletionException;
 import cloud.metaapi.sdk.clients.HttpClient;
 import cloud.metaapi.sdk.clients.HttpRequestOptions;
 import cloud.metaapi.sdk.clients.MetaApiClient;
+import cloud.metaapi.sdk.util.Async;
 import cloud.metaapi.sdk.clients.HttpRequestOptions.FileStreamField;
 import cloud.metaapi.sdk.clients.HttpRequestOptions.Method;
 
@@ -141,7 +142,7 @@ public class ExpertAdvisorClient extends MetaApiClient {
    * @return completable future resolving when file upload is completed
    */
   public CompletableFuture<Void> uploadExpertAdvisorFile(String accountId, String expertId, String filePath) {
-    return CompletableFuture.runAsync(() -> {
+    return Async.run(() -> {
       try {
         uploadExpertAdvisorFile(accountId, expertId, new FileStreamField(new File(filePath))).join();
       } catch (FileNotFoundException e) {
