@@ -27,11 +27,11 @@ If you use Apache Maven, add this to `<dependencies>` in your `pom.xml`:
 <dependency>
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>13.2.2</version>
+  <version>13.2.3</version>
 </dependency>
 ```
 
-Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/13.2.2/jar).
+Other options can be found on [this page](https://search.maven.org/artifact/cloud.metaapi.sdk/metaapi-java-sdk/13.2.3/jar).
 
 ## Running Java SDK examples
 In order to run Java SDK examples, follow these steps:

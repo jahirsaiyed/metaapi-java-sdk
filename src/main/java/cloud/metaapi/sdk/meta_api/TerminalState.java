@@ -248,7 +248,7 @@ public class TerminalState extends SynchronizationListener {
   @Override
   public CompletableFuture<Void> onOrdersReplaced(String instanceIndex, List<MetatraderOrder> orders) {
     State state = getState(instanceIndex);
-    state.orders = orders;
+    state.orders = new ArrayList<>(orders);
     state.completedOrders.clear();
     return CompletableFuture.completedFuture(null);
   }
