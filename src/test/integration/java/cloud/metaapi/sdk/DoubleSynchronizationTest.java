@@ -61,10 +61,12 @@ class DoubleSynchronizationTest {
     final MetatraderAccountApi accountApi = api.getMetatraderAccountApi();
     if (token != null) {
       List<ProvisioningProfile> profiles = profileApi.getProvisioningProfiles().join();
+      System.out.println("Loaded profiles");
       assertTimeoutPreemptively(Duration.ofMinutes(10), () -> {
         ProvisioningProfile profile = profiles.stream()
           .filter(p -> p.getName().equals(serverName))
           .findFirst().orElseGet(() -> {
+            System.out.println("Creating new profile");
             return profileApi.createProvisioningProfile(new NewProvisioningProfileDto() {{
               name = serverName;
               version = 5;
@@ -77,9 +79,11 @@ class DoubleSynchronizationTest {
           profile.uploadFile("servers.dat", serverDatFile).join();
         }
         List<MetatraderAccount> accounts = accountApi.getAccounts().join();
+        System.out.println("Loaded accounts");
         MetatraderAccount account = accounts.stream()
           .filter(a -> a.getLogin().equals(login) && a.getType().startsWith("cloud"))
           .findFirst().orElseGet(() -> {
+            System.out.println("Creating new account");
             String envLogin = login;
             String envPassword = password;
             return accountApi.createAccount(new NewMetatraderAccountDto() {{
@@ -94,14 +98,17 @@ class DoubleSynchronizationTest {
             }}).join();
           });
         MetatraderAccount accountCopy = accountApi.getAccount(account.getId()).join();
+        System.out.println("Prepared accounts");
         CompletableFuture.allOf(
           account.deploy(),
           accountCopy.deploy()
         ).join();
+        System.out.println("Deployed accounts");
         CompletableFuture.allOf(
           account.waitConnected(),
           accountCopy.waitConnected()
         ).join();
+        System.out.println("Connected accounts");
         MetaApiConnection connection = account.connect().join();
         MetaApiConnection connectionCopy = accountCopy.connect().join();
         CompletableFuture.allOf(
@@ -112,6 +119,7 @@ class DoubleSynchronizationTest {
             this.timeoutInSeconds = 600;
           }})
         ).join();
+        System.out.println("Synchronized accounts");
         account.undeploy().join();
         accountCopy.undeploy().join();
         MetaApiWebsocketClient websocketClient = ((MetaApiWebsocketClient) FieldUtils

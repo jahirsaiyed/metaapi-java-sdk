@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Lists;
 import org.assertj.core.util.Maps;
 import org.junit.jupiter.api.AfterAll;
@@ -45,6 +46,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import cloud.metaapi.sdk.clients.HttpClient;
+import cloud.metaapi.sdk.clients.HttpRequestOptions;
 import cloud.metaapi.sdk.clients.RetryOptions;
 import cloud.metaapi.sdk.clients.TimeoutException;
 import cloud.metaapi.sdk.clients.error_handler.*;
@@ -178,78 +180,204 @@ class MetaApiWebsocketClientTest {
     assertTrue(Double.valueOf(clientId) >= 0 && Double.valueOf(clientId) < 1);
   }
   
- /**
-  * Tests {@link MetaApiWebsocketClient#tryReconnect()}
-  */
- @Test
- void testChangesClientIdOnReconnect() throws InterruptedException {
-   clientId = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
-   connectAmount = 0;
-   client.close();
-   server.addConnectListener(new ConnectListener() {
-     @Override
-     public void onConnect(SocketIOClient connected) {
-       socket = connected;
-       connectAmount++;
-       double headerClientId = Double.valueOf(socket.getHandshakeData().getHttpHeaders().get("client-id"));
-       double queryClientId = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
-       assertEquals(headerClientId, queryClientId);
-       assertNotEquals(clientId, headerClientId);
-       assertNotEquals(clientId, queryClientId);
-       clientId = queryClientId;
-       if (connectAmount == 1) {
-         socket.disconnect();
-       }
-     }
-   });
-   client.connect().join();
-   Thread.sleep(2000);
-   assertTrue(connectAmount >= 2);
- }
- 
- /**
-  * Tests {@link MetaApiWebsocketClient#getServerUrl}
-  */
- @ParameterizedTest
- @MethodSource("provideMetatraderPosition")
- void testConnectsToDedicatedServer(MetatraderPosition position) throws Exception {
-   Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any())).thenReturn(CompletableFuture
-     .completedFuture(new MetaApiWebsocketClient.ServerUrl() {{url = "http://localhost:6784";}}));
-   List<MetatraderPosition> positions = Arrays.asList(position);
-   socket.disconnect();
-   client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
-     application = "application";
-     domain = "project-stock.agiliumlabs.cloud";
-     requestTimeout = 15000L;
-     connectTimeout = 15000L;
-     useSharedClientApi = false;
-     retryOpts = new RetryOptions() {{
-       retries = 3;
-       minDelayInSeconds = 1;
-       maxDelayInSeconds = 3;
-     }};
-   }});
-   server.addEventListener("request", Object.class, new DataListener<Object>() {
-     @Override
-     public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
-       JsonNode request = jsonMapper.valueToTree(data);
-       if (  request.get("type").asText().equals("getPositions") 
-          && request.get("accountId").asText().equals("accountId")
-          && request.get("application").asText().equals("RPC")
-        ) {
-         ObjectNode response = jsonMapper.createObjectNode();
-         response.put("type", "response");
-         response.set("accountId", request.get("accountId"));
-         response.set("requestId", request.get("requestId"));
-         response.set("positions", jsonMapper.valueToTree(positions));
-         client.sendEvent("response", response.toString());
-       }
-     }
-   });
-   List<MetatraderPosition> actual = client.getPositions("accountId").join();
-   assertThat(actual).usingRecursiveComparison().isEqualTo(positions);
-   Mockito.verify(httpClient).requestJson(Mockito.any(), Mockito.any());
- }
+  /**
+   * Tests {@link MetaApiWebsocketClient#tryReconnect()}
+   */
+  @Test
+  void testChangesClientIdOnReconnect() throws InterruptedException {
+    clientId = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
+    connectAmount = 0;
+    client.close();
+    server.addConnectListener(new ConnectListener() {
+      @Override
+      public void onConnect(SocketIOClient connected) {
+        socket = connected;
+        connectAmount++;
+        double headerClientId = Double.valueOf(socket.getHandshakeData().getHttpHeaders().get("client-id"));
+        double queryClientId = Double.valueOf(socket.getHandshakeData().getSingleUrlParam("clientId"));
+        assertEquals(headerClientId, queryClientId);
+        assertNotEquals(clientId, headerClientId);
+        assertNotEquals(clientId, queryClientId);
+        clientId = queryClientId;
+        if (connectAmount == 1) {
+          socket.disconnect();
+        }
+      }
+    });
+    client.connect().join();
+    Thread.sleep(2000);
+    assertTrue(connectAmount >= 2);
+  }
+  
+  /**
+    * Tests {@link MetaApiWebsocketClient#getServerUrl}
+    */
+  @ParameterizedTest
+  @MethodSource("provideMetatraderPosition")
+  void testConnectsToDedicatedServer(MetatraderPosition position) throws Exception {
+    Mockito.when(httpClient.request(Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture("{\"url\": \"http://localhost:6784\"}"));
+    List<MetatraderPosition> positions = Arrays.asList(position);
+    socket.disconnect();
+    client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+      application = "application";
+      domain = "project-stock.agiliumlabs.cloud";
+      requestTimeout = 15000L;
+      connectTimeout = 15000L;
+      useSharedClientApi = false;
+      retryOpts = new RetryOptions() {{
+        retries = 3;
+        minDelayInSeconds = 1;
+        maxDelayInSeconds = 3;
+      }};
+    }});
+    server.addEventListener("request", Object.class, new DataListener<Object>() {
+      @Override
+      public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
+        JsonNode request = jsonMapper.valueToTree(data);
+        if (  request.get("type").asText().equals("getPositions") 
+            && request.get("accountId").asText().equals("accountId")
+            && request.get("application").asText().equals("RPC")
+          ) {
+          ObjectNode response = jsonMapper.createObjectNode();
+          response.put("type", "response");
+          response.set("accountId", request.get("accountId"));
+          response.set("requestId", request.get("requestId"));
+          response.set("positions", jsonMapper.valueToTree(positions));
+          client.sendEvent("response", response.toString());
+        }
+      }
+    });
+    List<MetatraderPosition> actual = client.getPositions("accountId").join();
+    assertThat(actual).usingRecursiveComparison().isEqualTo(positions);
+    Mockito.verify(httpClient).request(Mockito.any());
+  }
+
+  /**
+    * Tests {@link MetaApiWebsocketClient#getServerUrl}
+    */
+  @Test
+  void testThrowsErrorIfRegionNotFound() throws Exception {
+    client.close();
+    Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any()))
+      .thenAnswer(new Answer<CompletableFuture<String[]>>() {
+      public CompletableFuture<String[]> answer(InvocationOnMock invocation) throws Throwable {
+        HttpRequestOptions opts = invocation.getArgument(0, HttpRequestOptions.class);
+        if (opts.getUrl().equals("https://mt-provisioning-api-v1.project-stock.agiliumlabs.cloud/users/current/" +
+          "regions")) {
+          return CompletableFuture.completedFuture(new String[] {"canada", "us-west"});
+        }
+        return CompletableFuture.completedFuture(null);
+      }
+    });
+    client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+      application = "application";
+      region = "wrong";
+      domain = "project-stock.agiliumlabs.cloud";
+      requestTimeout = 15000L;
+      connectTimeout = 15000L;
+      useSharedClientApi = false;
+    }});
+    try {
+      client.getServerUrl();
+      Assertions.fail("Not found error expected");
+    } catch (Exception err) {
+      assertTrue(err instanceof NotFoundException);
+    }
+  }
+  
+  /**
+   * Test {@link MetaApiWebsocketClient#getServerUrl}
+   */
+  @Test
+  void testConnectsToLegacyUrlIfDefaultRegionSelected() throws Exception {
+    client.close();
+    Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any()))
+      .thenAnswer(new Answer<CompletableFuture<String[]>>() {
+      public CompletableFuture<String[]> answer(InvocationOnMock invocation) throws Throwable {
+        HttpRequestOptions opts = invocation.getArgument(0, HttpRequestOptions.class);
+        if (opts.getUrl().equals("https://mt-provisioning-api-v1.project-stock.agiliumlabs.cloud/users/current/" +
+          "regions")) {
+          return CompletableFuture.completedFuture(new String[] {"canada", "us-west"});
+        }
+        return CompletableFuture.completedFuture(null);
+      }
+    });
+    client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+      application = "application";
+      region = "canada";
+      domain = "project-stock.agiliumlabs.cloud";
+      requestTimeout = 15000L;
+      connectTimeout = 15000L;
+      useSharedClientApi = true;
+    }});
+    String url = client.getServerUrl();
+    assertEquals(url, "https://mt-client-api-v1.project-stock.agiliumlabs.cloud");
+  };
+  
+  /**
+   * Tests {@link MetaApiWebsocketClient#getServerUrl}
+   */
+  @Test
+  void testConnectsToSharedSelectedRegion() throws Exception {
+    client.close();
+    Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any()))
+      .thenAnswer(new Answer<CompletableFuture<String[]>>() {
+      public CompletableFuture<String[]> answer(InvocationOnMock invocation) throws Throwable {
+        HttpRequestOptions opts = invocation.getArgument(0, HttpRequestOptions.class);
+        if (opts.getUrl().equals("https://mt-provisioning-api-v1.project-stock.agiliumlabs.cloud/users/current/" +
+          "regions")) {
+          return CompletableFuture.completedFuture(new String[] {"canada", "us-west"});
+        }
+        return CompletableFuture.completedFuture(null);
+      }
+    });
+    client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+      application = "application";
+      region = "us-west";
+      domain = "project-stock.agiliumlabs.cloud";
+      requestTimeout = 15000L;
+      connectTimeout = 15000L;
+      useSharedClientApi = true;
+    }});
+    String url = client.getServerUrl();
+    assertEquals(url, "https://mt-client-api-v1.us-west.project-stock.agiliumlabs.cloud");
+  };
+  
+  /**
+   * Test {@link MetaApiWebsocketClient#getServerUrl}
+   */
+  @Test
+  void testConnectsToDedicatedSelectedRegion() throws Exception {
+    client.close();
+    Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any()))
+    .thenAnswer(new Answer<CompletableFuture<String[]>>() {
+      public CompletableFuture<String[]> answer(InvocationOnMock invocation) throws Throwable {
+        HttpRequestOptions opts = invocation.getArgument(0, HttpRequestOptions.class);
+        if (opts.getUrl().equals("https://mt-provisioning-api-v1.project-stock.agiliumlabs.cloud/users/current/" +
+          "regions")) {
+          return CompletableFuture.completedFuture(new String[] {"canada", "us-west"});
+        }
+        return CompletableFuture.completedFuture(null);
+      }
+    });
+    Mockito.when(httpClient.request(Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture("{"
+        + "\"url\": \"http://localhost:8081\","
+        + "\"hostname\": \"mt-client-api-dedicated\","
+        + "\"domain\": \"project-stock.agiliumlabs.cloud\""
+      + "}"));
+    client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
+      application = "application";
+      region = "us-west";
+      domain = "project-stock.agiliumlabs.cloud";
+      requestTimeout = 15000L;
+      connectTimeout = 15000L;
+      useSharedClientApi = false;
+    }});
+    String url = client.getServerUrl();
+    assertEquals(url, "https://mt-client-api-dedicated.us-west.project-stock.agiliumlabs.cloud");
+  };
 
   /**
    * Tests {@link MetaApiWebsocketClient#getAccountInformation(String)}
@@ -2783,8 +2911,8 @@ class MetaApiWebsocketClientTest {
     };
     client.close();
     socket.disconnect();
-    Mockito.when(httpClient.requestJson(Mockito.any(), Mockito.any())).thenReturn(CompletableFuture
-      .completedFuture(new MetaApiWebsocketClient.ServerUrl() {{url = "http://localhost:6784";}}));
+    Mockito.when(httpClient.request(Mockito.any()))
+      .thenReturn(CompletableFuture.completedFuture("{\"url\": \"http://localhost:6784\"}"));
     client = new MetaApiWebsocketClient(httpClient, "token", new MetaApiWebsocketClient.ClientOptions() {{
       application = "application";
       domain = "project-stock.agiliumlabs.cloud";

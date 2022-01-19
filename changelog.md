@@ -1,3 +1,6 @@
+13.3.0
+  - added region selection
+
 13.2.3
   - fixed order state update error in terminal state
 

@@ -45,6 +45,10 @@ public class MetaApi {
      */
     public String domain = "agiliumtrade.agiliumtrade.ai";
     /**
+     * Optional region to connect to
+     */
+    public String region;
+    /**
      * Timeout for socket requests in seconds. By default is {@code 1 minute}
      */
     public int requestTimeout = 60;
@@ -190,6 +194,7 @@ public class MetaApi {
     websocketOptions.retryOpts = opts.retryOpts;
     websocketOptions.eventProcessing = opts.eventProcessing;
     websocketOptions.useSharedClientApi = opts.useSharedClientApi;
+    websocketOptions.region = opts.region;
     metaApiWebsocketClient = new MetaApiWebsocketClient(httpClient, token, websocketOptions);
     provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, opts.domain));
     connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, opts.application);

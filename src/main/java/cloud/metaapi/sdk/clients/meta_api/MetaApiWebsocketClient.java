@@ -76,6 +76,8 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   protected static int resetDisconnectTimerTimeout = 60000;
   
   private String domain;
+  private String region;
+  private String hostname;
   private String url;
   private String token;
   private String application;
@@ -126,6 +128,10 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
      * Domain to connect to. By default is {@code agiliumtrade.agiliumtrade.ai}
      */
     public String domain = "agiliumtrade.agiliumtrade.ai";
+    /**
+     * Optional region to connect to
+     */
+    public String region;
     /**
      * Timeout for socket requests in milliseconds. By default is {@code 1 minute}
      */
@@ -196,7 +202,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     this.httpClient = httpClient;
     this.application = opts.application;
     this.domain = opts.domain;
-    this.url = "https://mt-client-api-v1." + opts.domain;
+    this.region = opts.region;
+    this.hostname = "mt-client-api-v1";
+    this.url = "https://" + this.hostname + "." + this.domain;
     this.token = token;
     this.requestTimeout = opts.requestTimeout;
     this.connectTimeout = opts.connectTimeout;
@@ -370,10 +378,10 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   public CompletableFuture<Void> connect() {
     return Async.supply(() -> {
       CompletableFuture<Void> result = new CompletableFuture<>();
-      int socketInstanceIndex = socketInstances.size();
-      String serverUrl = getServerUrl().join();
-      MetaApiWebsocketClient self = this;
       try {
+        int socketInstanceIndex = socketInstances.size();
+        String serverUrl = getServerUrl();
+        MetaApiWebsocketClient self = this;
         SocketInstance instance = new SocketInstance() {{
           id = socketInstanceIndex;
           connected = false;
@@ -1384,32 +1392,30 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   
   private CompletableFuture<Void> reconnect(int socketInstanceIndex) {
     return Async.run(() -> {
-      if (socketInstances.size() > socketInstanceIndex) {
-        SocketInstance instance = socketInstances.get(socketInstanceIndex);
-        while (!instance.socket.connected() && !instance.isReconnecting && instance.connected) {
-          tryReconnect(socketInstanceIndex).join();
+      try {
+        if (socketInstances.size() > socketInstanceIndex) {
+          SocketInstance instance = socketInstances.get(socketInstanceIndex);
+          while (!instance.socket.connected() && !instance.isReconnecting && instance.connected) {
+            tryReconnect(socketInstanceIndex);
+          }
         }
+      } catch (Throwable err) {
+        throw new CompletionException(err);
       }
     });
   }
   
-  private CompletableFuture<Void> tryReconnect(int socketInstanceIndex) {
+  private void tryReconnect(int socketInstanceIndex) throws Exception {
     SocketInstance instance = socketInstances.get(socketInstanceIndex);
-    return Async.run(() -> {
-      try {
-        Thread.sleep(1000);
-        if (!instance.socket.connected() && !instance.isReconnecting && instance.connected) {
-          instance.sessionId = RandomStringUtils.randomAlphanumeric(32);
-          instance.socket.close();
-          instance.clientId = Math.random();
-          instance.isReconnecting = true;
-          createSocket(instance, getServerUrl().join(), null);
-          instance.socket.connect();
-        }
-      } catch (Throwable e) {
-        throw new CompletionException(e);
-      }
-    });
+    Thread.sleep(1000);
+    if (!instance.socket.connected() && !instance.isReconnecting && instance.connected) {
+      instance.sessionId = RandomStringUtils.randomAlphanumeric(32);
+      instance.socket.close();
+      instance.clientId = Math.random();
+      instance.isReconnecting = true;
+      createSocket(instance, getServerUrl(), null);
+      instance.socket.connect();
+    }
   }
   
   private CompletableFuture<JsonNode> rpcRequest(String accountId, ObjectNode request) {
@@ -2117,18 +2123,43 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     });
   }
   
-  protected static class ServerUrl {
-    public String url;
-  }
-  
-  private CompletableFuture<String> getServerUrl() {
-    if (useSharedClientApi) {
-      return CompletableFuture.completedFuture(url);
+  protected String getServerUrl() throws Exception {
+    boolean isDefaultRegion = this.region == null;
+    if (this.region != null) {
+      HttpRequestOptions opts = new HttpRequestOptions("https://mt-provisioning-api-v1." + this.domain +
+        "/users/current/regions", Method.GET);
+      opts.getHeaders().put("auth-token", token);
+      List<String> regions = Arrays.asList(httpClient.requestJson(opts, String[].class).join());
+      if (!regions.contains(this.region)) {
+        String errorMessage = "The region \"" + this.region + "\" you are trying to connect to does not exist " +
+          "or is not available to you. Please specify a correct region name in the region MetaApi constructor option.";
+        logger.error(errorMessage);
+        throw new NotFoundException(errorMessage);
+      }
+      if (this.region.equals(regions.get(0))) {
+        isDefaultRegion = true;
+      }
+    }
+    
+    String url;
+    if (this.useSharedClientApi) {
+      if (isDefaultRegion) {
+        url = this.url;
+      } else {
+        url = "https://" + this.hostname + "." + this.region + "." + this.domain;
+      }
     } else {
       HttpRequestOptions opts = new HttpRequestOptions("https://mt-provisioning-api-v1." + 
         domain + "/users/current/servers/mt-client-api", Method.GET);
       opts.getHeaders().put("auth-token", token);
-      return httpClient.requestJson(opts, ServerUrl.class).thenApply(response -> response.url);
+      JsonNode response = jsonMapper.readTree(httpClient.request(opts).join());
+      if (isDefaultRegion) {
+        url = response.get("url").asText();
+      } else {
+        url = "https://" + response.get("hostname").asText() + "." + this.region + "." +
+          response.get("domain").asText();
+      }
     }
+    return url;
   }
 }
