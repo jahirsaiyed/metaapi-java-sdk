@@ -1,3 +1,6 @@
+13.3.1
+  - fixed dependency vulnerabilities
+
 13.3.0
   - added region selection
 
