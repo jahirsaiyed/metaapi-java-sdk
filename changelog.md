@@ -1,3 +1,6 @@
+13.3.2
+  - added accountType field to MT5 demo account model
+
 13.3.1
   - fixed dependency vulnerabilities
 
