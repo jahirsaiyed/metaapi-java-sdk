@@ -34,6 +34,10 @@ public class NewMetatraderAccountDto {
    */
   public String server;
   /**
+   * Platform id (mt4 or mt5), or {@code null}
+   */
+  public String platform;
+  /**
    * Id of the account's provisioning profile
    */
   public String provisioningProfileId;
