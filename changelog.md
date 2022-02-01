@@ -1,3 +1,6 @@
+13.3.3
+  - added platform field to new metatrader account dto model
+
 13.3.2
   - added accountType field to MT5 demo account model
 
