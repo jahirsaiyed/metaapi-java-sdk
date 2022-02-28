@@ -51,7 +51,7 @@ public class MetatraderDeal {
     /**
      * Deal magic number or {@code null}, identifies the EA which initiated the deal
      */
-    public Integer magic;
+    public Long magic;
     /**
      * Time the deal was conducted at
      */

@@ -1,3 +1,6 @@
+14.0.0
+  - breaking change: change type of `magic` field to `long`
+
 13.3.3
   - added platform field to new metatrader account dto model
 

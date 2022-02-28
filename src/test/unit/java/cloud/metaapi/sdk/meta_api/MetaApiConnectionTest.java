@@ -1273,7 +1273,7 @@ class MetaApiConnectionTest {
     deal.commission = -0.25;
     deal.entryType = DealEntryType.DEAL_ENTRY_IN;
     deal.id = "33230099";
-    deal.magic = 1000;
+    deal.magic = 1000L;
     deal.platform = "mt5";
     deal.orderId = "46214692";
     deal.positionId = "46214692";

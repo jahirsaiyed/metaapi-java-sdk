@@ -79,5 +79,5 @@ public class MetatraderTrade {
     /**
      * Magic number (expert adviser id) or {@code null}
      */
-    public Integer magic;
+    public Long magic;
 }

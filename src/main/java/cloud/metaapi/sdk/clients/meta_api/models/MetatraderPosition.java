@@ -34,7 +34,7 @@ public class MetatraderPosition {
     /**
      * Position magic number, identifies the EA which opened the position
      */
-    public int magic;
+    public long magic;
     /**
      * Time position was opened at
      */

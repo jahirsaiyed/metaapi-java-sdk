@@ -68,7 +68,7 @@ public class MetatraderAccountDto {
   /**
    * MetaTrader magic to place trades using
    */
-  public int magic;
+  public long magic;
   /**
    * Account deployment state
    */

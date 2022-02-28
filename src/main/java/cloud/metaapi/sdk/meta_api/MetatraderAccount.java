@@ -119,7 +119,7 @@ public class MetatraderAccount {
    * Returns MetaTrader magic to place trades using
    * @return MetaTrader magic to place trades using
    */
-  public int getMagic() {
+  public long getMagic() {
     return data.magic;
   }
   

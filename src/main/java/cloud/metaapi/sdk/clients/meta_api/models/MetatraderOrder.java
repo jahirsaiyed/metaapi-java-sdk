@@ -55,7 +55,7 @@ public class MetatraderOrder {
     /**
      * Order magic number, identifies the EA which created the order
      */
-    public int magic;
+    public long magic;
     /**
      * Time order was created at
      */

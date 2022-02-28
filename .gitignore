@@ -2,6 +2,7 @@ bin
 .classpath
 .settings
 .project
+.temp
 target
 logs
 broker.srv

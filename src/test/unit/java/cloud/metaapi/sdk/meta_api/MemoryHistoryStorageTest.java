@@ -40,7 +40,7 @@ class MemoryHistoryStorageTest {
     Mockito.when(storageFileManagerMock.deleteStorageFromDisk()).thenReturn(CompletableFuture.completedFuture(null));
     ServiceProvider.setHistoryFileManagerMock(storageFileManagerMock);
     storage = new MemoryHistoryStorage("accountId");
-    testDeal = new MetatraderDeal() {{ id = "37863643"; type = DealType.DEAL_TYPE_BALANCE; magic = 0;
+    testDeal = new MetatraderDeal() {{ id = "37863643"; type = DealType.DEAL_TYPE_BALANCE; magic = 0L;
       time = new IsoTime(new Date(100)); commission = 0.0; swap = 0.0; profit = 10000;
       platform = "mt5"; comment = "Demo deposit 1"; }};
     testOrder = new MetatraderOrder() {{ id = "61210463"; type = OrderType.ORDER_TYPE_SELL;
