@@ -70,13 +70,13 @@ public class HistoryFileManagerTest {
     storage = Mockito.mock(HistoryStorage.class);
     fileManager = Mockito.spy(new HistoryFileManager("accountId", "application", storage) {{
       updateJobIntervalInMilliseconds = 500; }});
-    testDeal = new MetatraderDeal() {{ id = "37863643"; type = DealType.DEAL_TYPE_BALANCE; magic = 0;
+    testDeal = new MetatraderDeal() {{ id = "37863643"; type = DealType.DEAL_TYPE_BALANCE; magic = 0L;
       time = new IsoTime(new Date(100)); commission = 0.0; swap = 0.0; profit = 10000;
       platform = "mt5"; comment = "Demo deposit 1"; }};
-    testDeal2 = new MetatraderDeal() {{ id = "37863644"; type = DealType.DEAL_TYPE_SELL; magic = 1;
+    testDeal2 = new MetatraderDeal() {{ id = "37863644"; type = DealType.DEAL_TYPE_SELL; magic = 1L;
       time = new IsoTime(new Date(200)); commission = 0.0; swap = 0.0; profit = 10000;
       platform = "mt5"; comment = "Demo deposit 2"; }};
-    testDeal3 = new MetatraderDeal() {{ id = "37863645"; type = DealType.DEAL_TYPE_BUY; magic = 2;
+    testDeal3 = new MetatraderDeal() {{ id = "37863645"; type = DealType.DEAL_TYPE_BUY; magic = 2L;
       time = new IsoTime(new Date(300)); commission = 0.0; swap = 0.0; profit = 10000;
       platform = "mt5"; comment = "Demo deposit 3"; }};
     testOrder = new MetatraderOrder() {{ id = "61210463"; type = OrderType.ORDER_TYPE_SELL;
@@ -198,8 +198,8 @@ public class HistoryFileManagerTest {
     fileManager.setStartNewDealIndex(0);
     fileManager.setStartNewOrderIndex(0);
     fileManager.updateDiskStorage().get();
-    testDeal2.magic = 100;
-    testOrder2.magic = 100;
+    testDeal2.magic = 100L;
+    testOrder2.magic = 100L;
     fileManager.setStartNewDealIndex(1);
     fileManager.setStartNewOrderIndex(1);
     fileManager.updateDiskStorage().get();
@@ -221,8 +221,8 @@ public class HistoryFileManagerTest {
     fileManager.setStartNewDealIndex(0);
     fileManager.setStartNewOrderIndex(0);
     fileManager.updateDiskStorage().get();
-    testDeal.magic = 100;
-    testDeal2.magic = 100;
+    testDeal.magic = 100L;
+    testDeal2.magic = 100L;
     testOrder.magic = 100;
     testOrder2.magic = 100;
     fileManager.setStartNewDealIndex(0);

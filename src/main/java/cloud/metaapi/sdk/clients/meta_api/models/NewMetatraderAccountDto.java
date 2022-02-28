@@ -48,7 +48,7 @@ public class NewMetatraderAccountDto {
   /**
    * MetaTrader magic to place trades using
    */
-  public int magic;
+  public long magic;
   /**
    * Flag indicating if trades should be placed as manual trades, or {@code null}. Default is false.
    */

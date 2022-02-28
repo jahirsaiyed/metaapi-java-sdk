@@ -25,7 +25,7 @@ public class TradeOptions {
     /**
      * Magic (expert id) number or {@code null}. If not set default value specified in account entity will be used.
      */
-    public Integer magic;
+    public Long magic;
     /**
      * Optional slippage in points or {@code null}. Should be greater or equal to zero. If not set,
      * default value specified in account entity will be used. Slippage is ignored if execution mode set to
