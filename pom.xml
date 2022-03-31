@@ -4,7 +4,7 @@
 
   <groupId>cloud.metaapi.sdk</groupId>
   <artifactId>metaapi-java-sdk</artifactId>
-  <version>14.0.0</version>
+  <version>14.0.1</version>
   <packaging>jar</packaging>
 
   <name>${project.groupId}:${project.artifactId}</name>
@@ -242,6 +242,11 @@
     <dependency>
       <groupId>cloud.metaapi.sdk</groupId>
       <artifactId>metaapi-metastats-sdk</artifactId>
+      <version>[1.0.0,)</version>
+    </dependency>
+    <dependency>
+      <groupId>cloud.metaapi.sdk</groupId>
+      <artifactId>metaapi-common-java</artifactId>
       <version>[1.0.0,)</version>
     </dependency>
   </dependencies>

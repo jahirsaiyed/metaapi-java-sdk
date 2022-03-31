@@ -1338,7 +1338,7 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
   public void queuePacket(JsonNode packet) {
     String accountId = packet.get("accountId").asText();
     List<JsonNode> packets = packetOrderer.restoreOrder(packet);
-    if (sequentialEventProcessing) {
+    if (sequentialEventProcessing && packet.has("sequenceNumber")) {
       List<Supplier<CompletableFuture<Void>>> events = packets.stream().map(packetItem -> {
         return new Supplier<CompletableFuture<Void>>() {
           @Override

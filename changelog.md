@@ -1,3 +1,10 @@
+14.0.1
+  - fixed terminal state access during initial synchronization
+  - fixed waiting for prices in terminal state
+  - immediately process packets without sequence number
+  - fixed selecting best terminal state for price and specification access
+  - fixed integrity of common class interfaces between MetaApi SDKs
+
 14.0.0
   - breaking change: change type of `magic` field to `long`
 
