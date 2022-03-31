@@ -115,7 +115,7 @@ public class MetaApi {
    * Constructs MetaApi class instance
    * @param token authorization token
    * @param opts application options, or {@code null}
-   * @throws ValidationException if application name is incorrect
+   * @throws ValidationException if specified options are invalid
    * @throws IOException if packet logger is enabled and failed to create the log directory
    */
   public MetaApi(String token, Options opts) throws ValidationException, IOException {

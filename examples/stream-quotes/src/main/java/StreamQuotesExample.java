@@ -134,6 +134,7 @@ public class StreamQuotesExample {
         new MarketDataSubscription() {{ type = "ticks"; }},
         new MarketDataSubscription() {{ type = "marketDepth"; intervalInMilliseconds = 5000; }}
       )).join();
+      System.out.println("Price after subscribe: " + asJson(connection.getTerminalState().getPrice(symbol)));
       
       System.out.println("[" + new IsoTime().toString() + "] Synchronized successfully, streaming "
         + symbol + " market data now...");

@@ -157,9 +157,7 @@ class MetaApiWebsocketClientTest {
     clientSubscriptionManager = Mockito.spy(clientSubscriptionManager);
     FieldUtils.writeField(client, "subscriptionManager", clientSubscriptionManager, true);
     
-    clientPacketOrderer = (PacketOrderer) FieldUtils.readField(client, "packetOrderer", true);
-    clientPacketOrderer = Mockito.spy(clientPacketOrderer);
-    FieldUtils.writeField(client, "packetOrderer", clientPacketOrderer, true);
+    spyClientPacketOrderer();
   }
 
   @AfterEach
@@ -2873,6 +2871,7 @@ class MetaApiWebsocketClientTest {
   long ordersCallTime;
   long positionsCallTime;
   long disconnectedCallTime;
+  long pricesCallTime;
   
   /**
    * Tests {@link MetaApiWebsocketClient#queuePacket}
@@ -2883,11 +2882,11 @@ class MetaApiWebsocketClientTest {
     ordersCallTime = 0;
     positionsCallTime = 0;
     disconnectedCallTime = 0;
+    pricesCallTime = 0;
     SynchronizationListener listener = new SynchronizationListener() {
       @Override
       public CompletableFuture<Void> onDisconnected(String instanceIndex) {
         return CompletableFuture.runAsync(() -> {
-          System.out.println("onDisconnected");
           Js.sleep(625);
           disconnectedCallTime = Date.from(Instant.now()).getTime();
         });
@@ -2895,7 +2894,6 @@ class MetaApiWebsocketClientTest {
       @Override
       public CompletableFuture<Void> onOrdersReplaced(String instanceIndex, List<MetatraderOrder> orders) {
         return CompletableFuture.runAsync(() -> {
-          System.out.println("onOrdersReplaced");
           Js.sleep(1250);
           ordersCallTime = Date.from(Instant.now()).getTime();
         });
@@ -2903,9 +2901,16 @@ class MetaApiWebsocketClientTest {
       @Override
       public CompletableFuture<Void> onPositionsReplaced(String instanceIndex, List<MetatraderPosition> positions) {
         return CompletableFuture.runAsync(() -> {
-          System.out.println("onPositionsReplaced");
           Js.sleep(125);
           positionsCallTime = Date.from(Instant.now()).getTime();
+        });
+      }
+      @Override
+      public CompletableFuture<Void> onSymbolPricesUpdated(String instanceIndex, List<MetatraderSymbolPrice> prices,
+        Double equity, Double margin, Double freeMargin, Double marginLevel, Double accountCurrencyExchangeRate) {
+        return CompletableFuture.runAsync(() -> {
+          Js.sleep(125);
+          pricesCallTime = Date.from(Instant.now()).getTime();
         });
       }
     };
@@ -2922,6 +2927,7 @@ class MetaApiWebsocketClientTest {
       retryOpts = new RetryOptions() {{retries = 3; minDelayInSeconds = 1; maxDelayInSeconds = 3;}};
       eventProcessing = new MetaApiWebsocketClient.EventProcessingOptions() {{sequentialProcessing = true;}};
     }});
+    spyClientPacketOrderer();
     server.addEventListener("request", Object.class, new DataListener<Object>() {
       @Override
       public void onData(SocketIOClient client, Object data, AckRequest ackSender) throws Exception {
@@ -2941,19 +2947,46 @@ class MetaApiWebsocketClientTest {
     });
     client.getPositions("accountId").join();
     client.addSynchronizationListener("accountId", listener);
+    Mockito.doAnswer(new Answer<List<JsonNode>>() {
+      @Override
+      public List<JsonNode> answer(InvocationOnMock invocation) throws Throwable {
+        return Arrays.asList(invocation.getArgument(0, JsonNode.class));
+      }
+    }).when(clientPacketOrderer).restoreOrder(Mockito.any(JsonNode.class));
     socket.sendEvent("synchronization", Js.asJson("type", "authenticated",  "accountId", "accountId", 
-      "host", "ps-mpa-1", "instanceIndex", 1, "replicas", 2).toString());
+      "host", "ps-mpa-1", "instanceIndex", 1, "replicas", 2, "sequenceNumber", 1).toString());
     Thread.sleep(50);
     Thread.sleep(7375);
     socket.sendEvent("synchronization", Js.asJson("type", "orders", "accountId", "accountId",
-      "orders", Arrays.asList(), "instanceIndex", 1, "host", "ps-mpa-1").toString());
+      "orders", Arrays.asList(), "instanceIndex", 1, "host", "ps-mpa-1", "sequenceNumber", 2).toString());
+    
+    ObjectNode pricesPacketItem = jsonMapper.createObjectNode();
+    pricesPacketItem.put("symbol", "EURUSD");
+    
+    ArrayNode pricesPacket = jsonMapper.createArrayNode();
+    pricesPacket.add(pricesPacketItem);
+    
+    ObjectNode synchronizationPacket = jsonMapper.createObjectNode();
+    synchronizationPacket.put("type", "prices");
+    synchronizationPacket.put("accountId", "accountId");
+    synchronizationPacket.set("prices", pricesPacket);
+    synchronizationPacket.put("instanceIndex", 1);
+    synchronizationPacket.put("host", "ps-mpa-1");
+    synchronizationPacket.put("equity", 100);
+    synchronizationPacket.put("margin", 200);
+    synchronizationPacket.put("freeMargin", 400);
+    synchronizationPacket.put("marginLevel", 40000);
+    
+    socket.sendEvent("synchronization", synchronizationPacket.toString());
     Thread.sleep(50);
     Thread.sleep(375);
     socket.sendEvent("synchronization", Js.asJson("type", "positions", "accountId", "accountId",
-      "positions", Arrays.asList(), "instanceIndex", 1, "host", "ps-mpa-1").toString());
+      "positions", Arrays.asList(), "instanceIndex", 1, "host", "ps-mpa-1", "sequenceNumber", 3).toString());
     Thread.sleep(50);
     Thread.sleep(2500);
     Thread.sleep(50);
+    assertNotEquals(0, pricesCallTime);
+    assertTrue(ordersCallTime > pricesCallTime);
     assertTrue(disconnectedCallTime > ordersCallTime);
     assertTrue(positionsCallTime > disconnectedCallTime);
   }
@@ -3084,5 +3117,11 @@ class MetaApiWebsocketClientTest {
     price.profitTickValue = 0.59731;
     price.lossTickValue = 0.59736;
     return Stream.of(Arguments.of(price));
+  }
+  
+  private void spyClientPacketOrderer() throws Exception {
+    clientPacketOrderer = (PacketOrderer) FieldUtils.readField(client, "packetOrderer", true);
+    clientPacketOrderer = Mockito.spy(clientPacketOrderer);
+    FieldUtils.writeField(client, "packetOrderer", clientPacketOrderer, true);
   }
 }

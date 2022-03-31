@@ -36,6 +36,8 @@ public class TerminalState extends SynchronizationListener {
   private Map<String, List<CompletableFuture<Void>>> waitForPriceResolves = new ConcurrentHashMap<>(); 
   
   private static class State {
+    @SuppressWarnings("unused")
+    public String instanceIndex;
     public boolean connected = false;
     public boolean connectedToBroker = false;
     public MetatraderAccountInformation accountInformation = null;
@@ -46,8 +48,12 @@ public class TerminalState extends SynchronizationListener {
     public Map<String, MetatraderSymbolPrice> pricesBySymbol = new ConcurrentHashMap<>();
     public Map<String, Date> completedOrders = new ConcurrentHashMap<>();
     public Map<String, Date> removedPositions = new ConcurrentHashMap<>();
+    @SuppressWarnings("unused")
+    public boolean ordersInitialized = false;
     public boolean positionsInitialized = false;
     public long lastUpdateTime = 0;
+    public int initializationCounter = 0;
+    public int specificationCount = 0;
   }
   
   /**
@@ -105,7 +111,7 @@ public class TerminalState extends SynchronizationListener {
    * if specification for a symbol is not found
    */
   public Optional<MetatraderSymbolSpecification> getSpecification(String symbol) {
-    return Optional.ofNullable(getBestState().specificationsBySymbol.get(symbol));
+    return Optional.ofNullable(getBestState(symbol, "specification").specificationsBySymbol.get(symbol));
   }
   
   /**
@@ -115,7 +121,7 @@ public class TerminalState extends SynchronizationListener {
    * if price for a symbol is not found
    */
   public Optional<MetatraderSymbolPrice> getPrice(String symbol) {
-    return Optional.ofNullable(getBestState().pricesBySymbol.get(symbol));
+    return Optional.ofNullable(getBestState(symbol, "price").pricesBySymbol.get(symbol));
   }
   
   /**
@@ -195,7 +201,9 @@ public class TerminalState extends SynchronizationListener {
   @Override
   public CompletableFuture<Void> onAccountInformationUpdated(String instanceIndex,
     MetatraderAccountInformation accountInformation) {
-    getState(instanceIndex).accountInformation = accountInformation;
+    State state = getState(instanceIndex);
+    state.accountInformation = accountInformation;
+    state.initializationCounter = 1;
     return CompletableFuture.completedFuture(null);
   }
   
@@ -206,6 +214,7 @@ public class TerminalState extends SynchronizationListener {
     state.positions = new ArrayList<>(positions);
     state.removedPositions.clear();
     state.positionsInitialized = true;
+    state.initializationCounter = 2;
     return CompletableFuture.completedFuture(null);
   }
 
@@ -250,6 +259,8 @@ public class TerminalState extends SynchronizationListener {
     State state = getState(instanceIndex);
     state.orders = new ArrayList<>(orders);
     state.completedOrders.clear();
+    state.ordersInitialized = true;
+    state.initializationCounter = 3;
     return CompletableFuture.completedFuture(null);
   }
 
@@ -313,6 +324,7 @@ public class TerminalState extends SynchronizationListener {
     for (String symbol : removedSymbols) {
       state.specificationsBySymbol.remove(symbol);
     }
+    state.specificationCount = state.specifications.size();
     return CompletableFuture.completedFuture(null);
   }
   
@@ -427,24 +439,41 @@ public class TerminalState extends SynchronizationListener {
   
   private State getState(String instanceIndex) {
     if (!stateByInstanceIndex.containsKey(instanceIndex)) {
-      stateByInstanceIndex.put(instanceIndex, constructTerminalState());
+      stateByInstanceIndex.put(instanceIndex, constructTerminalState(instanceIndex));
     }
     return stateByInstanceIndex.get(instanceIndex);
   }
   
-  private State constructTerminalState() {
-    return new State();
+  private State constructTerminalState(String instanceIndex) {
+    State result = new State();
+    result.instanceIndex = instanceIndex;
+    return result;
   }
   
   private State getBestState() {
+    return getBestState(null, "default");
+  }
+  
+  private State getBestState(String symbol, String mode) {
     State result = null;
-    Long maxUpdateTime = null;
+    Long maxUpdateTime = -1L;
+    int maxInitializationCounter = -1;
+    int maxSpecificationCount = -1;
     for (State state : stateByInstanceIndex.values()) {
-      if (maxUpdateTime == null || maxUpdateTime < state.lastUpdateTime) {
-        maxUpdateTime = state.lastUpdateTime;
-        result = state;
+      if (maxInitializationCounter < state.initializationCounter ||
+          maxInitializationCounter == state.initializationCounter && maxInitializationCounter == 3 &&
+          maxUpdateTime < state.lastUpdateTime ||
+          maxInitializationCounter == state.initializationCounter && maxInitializationCounter == 0 &&
+          maxSpecificationCount < state.specificationCount) {
+        if (symbol == null || (mode.equals("specification") && state.specificationsBySymbol.containsKey(symbol)) ||
+            (mode.equals("price") && state.pricesBySymbol.containsKey(symbol))) {
+          maxUpdateTime = state.lastUpdateTime;
+          maxInitializationCounter = state.initializationCounter;
+          maxSpecificationCount = state.specificationCount;
+          result = state;
+        }
       }
     }
-    return result != null ? result : constructTerminalState();
+    return result != null ? result : constructTerminalState(null);
   }
 }

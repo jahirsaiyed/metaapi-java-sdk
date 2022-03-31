@@ -101,6 +101,7 @@ public class MetaApiSynchronizationExample {
       System.out.println("orders: " + asJson(terminalState.getOrders()));
       System.out.println("specifications: " + asJson(terminalState.getSpecifications()));
       System.out.println("EURUSD specification: " + asJson(terminalState.getSpecification("EURUSD").orElse(null)));
+      connection.subscribeToMarketData("EURUSD").join();
       System.out.println("EURUSD price: " + asJson(terminalState.getPrice("EURUSD").orElse(null)));
       
       // trade
