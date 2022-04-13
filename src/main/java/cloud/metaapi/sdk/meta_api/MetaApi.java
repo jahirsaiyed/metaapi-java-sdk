@@ -199,7 +199,7 @@ public class MetaApi {
     provisioningProfileApi = new ProvisioningProfileApi(new ProvisioningProfileClient(httpClient, token, opts.domain));
     connectionRegistry = new ConnectionRegistry(metaApiWebsocketClient, opts.application);
     HistoricalMarketDataClient historicalMarketDataClient = new HistoricalMarketDataClient(
-      historicalMarketDataHttpClient, token, opts.domain);
+      historicalMarketDataHttpClient, token, opts.region, opts.domain);
     metatraderAccountApi = new MetatraderAccountApi(new MetatraderAccountClient(httpClient, token, opts.domain),
       metaApiWebsocketClient, connectionRegistry, new ExpertAdvisorClient(httpClient, token, opts.domain),
         historicalMarketDataClient);

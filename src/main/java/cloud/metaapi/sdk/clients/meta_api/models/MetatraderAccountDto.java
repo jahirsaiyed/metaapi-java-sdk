@@ -11,7 +11,8 @@ public class MetatraderAccountDto {
   /**
    * Account deployment state enum
    */
-  public enum DeploymentState { CREATED, DEPLOYING, DEPLOYED, UNDEPLOYING, UNDEPLOYED, DELETING }
+  public enum DeploymentState { CREATED, DEPLOYING, DEPLOYED, DEPLOY_FAILED, UNDEPLOYING, UNDEPLOYED, UNDEPLOY_FAILED,
+    DELETING, DELETE_FAILED, REDEPLOY_FAILED }
   
   /**
    * Terminal and broker connection status enum
