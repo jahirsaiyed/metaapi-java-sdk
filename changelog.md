@@ -1,3 +1,9 @@
+14.0.2
+  - fixed out of order synchronization packets came from the previous synchronizations
+  - fixed region support in historical market data client
+  - added cloud-g1 and cloud-g2 values to `AccountType` enum
+  - added failed states to `DeploymentState` enum
+
 14.0.1
   - fixed terminal state access during initial synchronization
   - fixed waiting for prices in terminal state

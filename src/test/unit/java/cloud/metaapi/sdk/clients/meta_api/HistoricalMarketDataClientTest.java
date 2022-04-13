@@ -24,14 +24,15 @@ import cloud.metaapi.sdk.util.JsonMapper;
  */
 class HistoricalMarketDataClientTest {
 
-  private final String marketDataClientApiUrl = "https://mt-market-data-client-api-v1.agiliumtrade.agiliumtrade.ai";
+  private final String marketDataClientApiUrl = "https://mt-market-data-client-api-v1.vint-hill.agiliumtrade.ai";
   private HistoricalMarketDataClient client;
   private HttpClientMock httpClient;
   
   @BeforeEach
   void setUp() throws ValidationException {
     httpClient = new HttpClientMock((opts) -> CompletableFuture.completedFuture("empty"));
-    client = new HistoricalMarketDataClient(httpClient, "header.payload.sign");
+    client = new HistoricalMarketDataClient(httpClient, "header.payload.sign", "vint-hill",
+      "agiliumtrade.agiliumtrade.ai");
   }
 
   /**

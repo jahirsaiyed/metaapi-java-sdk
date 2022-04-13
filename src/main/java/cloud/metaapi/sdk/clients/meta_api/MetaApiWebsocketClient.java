@@ -565,9 +565,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
     });
     socketInstance.on("synchronization", (Object[] args) -> {
       try {
-        JsonNode packet = jsonMapper.readTree(args[0].toString());
+        ObjectNode packet = (ObjectNode) jsonMapper.readTree(args[0].toString());
         if (packet.isTextual()) {
-          packet = jsonMapper.readTree(packet.asText());
+          packet = (ObjectNode) jsonMapper.readTree(packet.asText());
         }
         String synchronizationId = packet.has("synchronizationId")
           ? packet.get("synchronizationId").asText() : null;
@@ -576,8 +576,10 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
           if (packetLogger != null) {
             packetLogger.logPacket(packet);
           }
-          queuePacket(packet);
+        } else {
+          packet.put("type", "noop");
         }
+        queuePacket(packet);
       } catch (JsonProcessingException e) {
         logger.error("Failed to parse incoming synchronization packet", e);
       }
@@ -1337,7 +1339,9 @@ public class MetaApiWebsocketClient implements OutOfOrderListener {
    */
   public void queuePacket(JsonNode packet) {
     String accountId = packet.get("accountId").asText();
-    List<JsonNode> packets = packetOrderer.restoreOrder(packet);
+    List<JsonNode> packets = packetOrderer.restoreOrder(packet).stream()
+      .filter(p -> !p.get("type").asText().equals("noop"))
+      .collect(Collectors.toList());
     if (sequentialEventProcessing && packet.has("sequenceNumber")) {
       List<Supplier<CompletableFuture<Void>>> events = packets.stream().map(packetItem -> {
         return new Supplier<CompletableFuture<Void>>() {

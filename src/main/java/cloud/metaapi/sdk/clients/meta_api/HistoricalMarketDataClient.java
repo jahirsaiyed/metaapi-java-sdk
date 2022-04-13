@@ -18,24 +18,21 @@ import cloud.metaapi.sdk.clients.models.IsoTime;
 public class HistoricalMarketDataClient extends MetaApiClient {
   
   /**
-   * Constructs historical market data API client instance with default domain agiliumtrade.agiliumtrade.ai
-   * @param httpClient HTTP client
-   * @param token authorization token
-   */
-  public HistoricalMarketDataClient(HttpClient httpClient, String token) {
-    super(httpClient, token);
-    this.host = "https://mt-market-data-client-api-v1.agiliumtrade.agiliumtrade.ai";
-  }
-  
-  /**
    * Constructs historical market data API client instance
    * @param httpClient HTTP client
    * @param token authorization token
+   * @param region region to connect to, or {@code null}
    * @param domain domain to connect to
    */
-  public HistoricalMarketDataClient(HttpClient httpClient, String token, String domain) {
+  public HistoricalMarketDataClient(HttpClient httpClient, String token, String region, String domain) {
     super(httpClient, token, domain);
-    this.host = "https://mt-market-data-client-api-v1." + domain;
+    if (region != null) {
+      List<String> domainLevels = Arrays.asList(domain.split("\\."));
+      domain = String.join(".", domainLevels.subList(1, domainLevels.size()));
+      this.host = "https://mt-market-data-client-api-v1." + region + "." + domain;
+    } else {
+      this.host = "https://mt-market-data-client-api-v1." + domain;
+    }
   }
 
   /**

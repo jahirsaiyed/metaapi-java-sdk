@@ -24,7 +24,6 @@ import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
@@ -57,6 +56,7 @@ import cloud.metaapi.sdk.meta_api.MetatraderAccount;
 import cloud.metaapi.sdk.util.Js;
 import cloud.metaapi.sdk.util.JsonMapper;
 import cloud.metaapi.sdk.util.ServiceProvider;
+import io.github.artsok.ParameterizedRepeatedIfExceptionsTest;
 
 class SyncStabilityTest {
 
@@ -456,7 +456,7 @@ class SyncStabilityTest {
     stopWebsocketServer();
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testSynchronizesAccount(Runnable beforeEach) {
     beforeEach.run();
@@ -470,7 +470,7 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testReconnectsOnServerSocketCrash(Runnable beforeEach) throws InterruptedException {
     beforeEach.run();
@@ -483,7 +483,7 @@ class SyncStabilityTest {
     Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
   }
 
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testSetsStateToDisconnectedOnTimeout(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -502,7 +502,7 @@ class SyncStabilityTest {
     assertFalse(connection.getTerminalState().isConnectedToBroker());
   }
 
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testResubscribesOnTimeout(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -519,7 +519,7 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   }
 
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testSynchronizesIfSubscribeResponseArrivesAfterSynchronization(Runnable beforeEach) {
     beforeEach.run();
@@ -557,8 +557,8 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   }
 
-  @ParameterizedTest
   @MethodSource("provideBeforeEach")
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   void testWaitsUntilAccountIsRedeployedAfterDisconnect(Runnable beforeEach) throws Exception {
     beforeEach.run();
     FieldUtils.writeField(websocketClient, "resetDisconnectTimerTimeout", 1625, true);
@@ -589,7 +589,7 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   }
 
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testResubscribesImmediatelyAfterDisconnectOnStatusPacket(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -618,7 +618,7 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   };
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testReconnectsAfterServerRestarts(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -636,7 +636,7 @@ class SyncStabilityTest {
     Assertions.assertThat(response).usingRecursiveComparison().isEqualTo(accountInformation);
   };
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testSynchronizesIfConnectingWhileServerIsRebooting(Runnable beforeEach) {
     beforeEach.run();
@@ -658,7 +658,7 @@ class SyncStabilityTest {
     assertTrue(connection.getTerminalState().isConnectedToBroker());
   };
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testResubscribesOtherAccountsAfterOneOfConnectionsIsClosed(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -695,7 +695,7 @@ class SyncStabilityTest {
     assertTrue(connection3.getTerminalState().isConnectedToBroker());
   };
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testLimitsSubscriptionsDuringPerUser429error(Runnable beforeEach) throws InterruptedException {
     beforeEach.run();
@@ -751,7 +751,7 @@ class SyncStabilityTest {
     assertTrue(connection3.isSynchronized());
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testWaitsForRetryTimeAfterPerUser429error(Runnable beforeEach) throws InterruptedException {
     beforeEach.run();
@@ -812,7 +812,7 @@ class SyncStabilityTest {
     assertTrue(connection3.isSynchronized());
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testWaitsForRetryTimeAfterPerServer429Error(Runnable beforeEach) throws InterruptedException {
     beforeEach.run();
@@ -870,7 +870,7 @@ class SyncStabilityTest {
     assertEquals(sidByAccounts.get("accountId"), sidByAccounts.get("accountId4"));
   };
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testReconnectsAfterPerServer429ErrorIfConnectionHasNoSubscribedAccounts(Runnable beforeEach) {
     beforeEach.run();
@@ -912,7 +912,7 @@ class SyncStabilityTest {
     assertNotEquals(sids.get(0), sids.get(1));
   };
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testFreesASubscribeSlotOnUnsubscribeAfterPerServer429Error(Runnable beforeEach) throws InterruptedException {
     beforeEach.run();
@@ -969,7 +969,7 @@ class SyncStabilityTest {
     assertEquals(sidByAccounts.get("accountId"), sidByAccounts.get("accountId4"));
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testWaitsForRetryTimeAfterPerServerPerUser429error(Runnable beforeEach) throws InterruptedException {
     beforeEach.run();
@@ -1033,7 +1033,7 @@ class SyncStabilityTest {
     assertEquals(sidByAccounts.get("accountId"), sidByAccounts.get("accountId5"));
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testAttemptsToResubscribeOnDisconnectedPacket(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -1054,7 +1054,7 @@ class SyncStabilityTest {
       && connection.getTerminalState().isConnectedToBroker());
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testHandlesMultipleStreamsInOneInstanceNumber(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -1101,7 +1101,7 @@ class SyncStabilityTest {
     assertFalse(connection.getTerminalState().isConnectedToBroker());
   };
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testDoesNotResubscribeIfMultipleStreamsAndOneTimedOut(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -1146,7 +1146,7 @@ class SyncStabilityTest {
     assertTrue(subscribeCalled);
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testDoesNotSynchronizeIfConnectionIsClosed(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -1192,7 +1192,7 @@ class SyncStabilityTest {
     assertEquals(1, synchronizeCounter);
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testDoesNotResubscribeAfterConnectionIsClosed(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -1251,7 +1251,7 @@ class SyncStabilityTest {
     assertFalse(connection.getTerminalState().isConnectedToBroker());
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testDoesNotResubscribeOnTimeoutIfConnectionIsClosed(Runnable beforeEach) throws Exception {
     beforeEach.run();
@@ -1267,7 +1267,7 @@ class SyncStabilityTest {
     assertFalse(connection.isSynchronized());
   }
   
-  @ParameterizedTest
+  @ParameterizedRepeatedIfExceptionsTest(repeats = 3)
   @MethodSource("provideBeforeEach")
   void testDoesNotSendMultipleSubscribeRequestsIfStatusArrivesFasterThanSubscribe(Runnable beforeEach) throws Exception {
     beforeEach.run();
