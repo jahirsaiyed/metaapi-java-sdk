@@ -1,5 +1,7 @@
 # metaapi.cloud SDK for Java
 
+Note: The Java SDK was updated long time ago and lacks important bugfixes and updates. We plan to update the java SDK soon. Meanwhile we recommend you to use javascript or python SDK instead. 
+
 MetaApi is a powerful, fast, cost-efficient, easy to use and standards-driven cloud forex trading API for MetaTrader 4 and MetaTrader 5 platform designed for traders, investors and forex application developers to boost forex application development process. MetaApi can be used with any broker and does not require you to be a brokerage.
 
 CopyFactory is a simple yet powerful copy-trading API which is a part of MetaApi. See below for CopyFactory readme section.
